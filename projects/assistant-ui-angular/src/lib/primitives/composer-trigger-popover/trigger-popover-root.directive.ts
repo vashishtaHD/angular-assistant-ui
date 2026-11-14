@@ -219,3 +219,6 @@ export function injectTriggerPopoverAriaProps(): Signal<TriggerPopoverAriaProps>
     };
   });
 }
+
+/** Deprecated alias (the React `Unstable_TriggerPopoverRoot` name) of {@link AuiComposerTriggerPopoverRootDirective}. */
+export { AuiComposerTriggerPopoverRootDirective as AuiUnstableComposerTriggerPopoverRootDirective };

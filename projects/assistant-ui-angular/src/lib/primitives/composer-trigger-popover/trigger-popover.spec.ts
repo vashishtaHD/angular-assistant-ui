@@ -245,7 +245,7 @@ describe('composer trigger popover', () => {
     expect(t.aui.composer.getState().text).toBe('hi :user[Mary]{name=mary} ');
     expect(t.textarea.value).toBe('hi :user[Mary]{name=mary} ');
     expect(t.host.inserted).toEqual(['mary']);
-    expect(t.host.rt.config).toBeTruthy();
+    expect(t.aui.thread.getState().messages).toHaveLength(0);
     expect(t.mention.hidden).toBe(true);
   });
 

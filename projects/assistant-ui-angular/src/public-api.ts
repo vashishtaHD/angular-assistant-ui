@@ -125,6 +125,7 @@ export {
 } from './lib/primitives/composer-trigger-popover/trigger-contracts';
 export {
   AuiComposerTriggerPopoverRootDirective,
+  AuiUnstableComposerTriggerPopoverRootDirective,
   injectTriggerPopoverRootContext,
   injectTriggerPopoverRootContextOptional,
   injectTriggerPopoverTriggers,
@@ -140,6 +141,7 @@ export {
 } from './lib/primitives/composer-trigger-popover/trigger-popover-root.directive';
 export {
   AuiComposerTriggerPopoverDirective,
+  AuiUnstableComposerTriggerPopoverDirective,
   injectTriggerPopoverScopeContext,
   injectTriggerPopoverScopeContextOptional,
   type TriggerActionConfig,

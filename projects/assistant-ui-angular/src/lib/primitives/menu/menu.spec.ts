@@ -1,4 +1,4 @@
-// Ported from packages/react/src/primitives/dropdownMenuRenderPrimitives.test.tsx @ 7d74276
+// Original spec: the upstream dropdownMenuRenderPrimitives test only covers render props (n/a here); these mirror the Radix menu behaviors (roving focus, typeahead, Escape focus return)
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
@@ -174,6 +174,19 @@ describe('headless menu', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('Space mid-typeahead extends the search instead of selecting the item', async () => {
+    const t = await setup();
+    t.trigger.focus();
+    key(t.trigger, 'ArrowDown');
+    await t.settle();
+    key(t.items[0]!, 'b');
+    expect(document.activeElement).toBe(t.items[2]);
+    key(t.items[2]!, ' ');
+    await t.settle();
+    expect(t.host.calls).toEqual([]);
+    expect(t.content.hidden).toBe(false);
   });
 
   it('Escape closes and returns focus to the trigger', async () => {

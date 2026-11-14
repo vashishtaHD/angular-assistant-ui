@@ -459,3 +459,6 @@ export function injectTriggerPopoverScopeContext(): AuiComposerTriggerPopoverDir
 export function injectTriggerPopoverScopeContextOptional(): AuiComposerTriggerPopoverDirective | null {
   return inject(AuiComposerTriggerPopoverDirective, { optional: true });
 }
+
+/** Deprecated alias (the React `Unstable_TriggerPopover` name) of {@link AuiComposerTriggerPopoverDirective}. */
+export { AuiComposerTriggerPopoverDirective as AuiUnstableComposerTriggerPopoverDirective };

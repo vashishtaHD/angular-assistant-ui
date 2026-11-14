@@ -44,7 +44,8 @@ export interface SlashCommandAdapterBundle {
  * Bundles slash command definitions (with inline `execute` callbacks) into an
  * `{ adapter, action }` pair for `[auiComposerTriggerPopover]`. `execute` stays
  * in the closure and is never attached to the `TriggerItem`, keeping items
- * serializable. The options may be a plain object or a function returning one.
+ * serializable. The options may be a plain object or a function returning one
+ * (`iconMap` and `fallbackIcon` are read once, when the bundle is created).
  *
  * Must be called in an injection context. React name:
  * `unstable_useSlashCommandAdapter`.

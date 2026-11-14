@@ -51,8 +51,8 @@ interface LiveState {
  * returns the last fetched items synchronously and schedules a debounced fetch
  * when the query changes; when results arrive the `adapter` signal changes
  * identity, which re-runs the popover's lookup. It is a search-only adapter
- * (no categories). A failed fetch is retried on the next lookup of the same
- * query that is not caused by the failure itself.
+ * (no categories). A failed fetch is not retried by the render that shows the failure;
+ * a later lookup of the same query retries it.
  *
  * Must be called in an injection context. React name:
  * `unstable_useLiveCompletionAdapter`.
@@ -82,7 +82,8 @@ export function injectLiveCompletionAdapter(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let token = 0;
   let pendingQuery: string | null = null;
-  let retryableQuery: string | null = null;
+  // A failed state whose failure render has already read it; a later lookup may retry.
+  let observedFailure: LiveState | null = null;
   let destroyed = false;
 
   const invalidatePending = () => {
@@ -103,11 +104,10 @@ export function injectLiveCompletionAdapter(
     const key = cacheKey();
     if (state().key !== key) {
       invalidatePending();
-      retryableQuery = null;
+      observedFailure = null;
       state.set({ query: NO_QUERY, items: [], failed: false, key });
     }
     if (pendingQuery === query) return;
-    if (retryableQuery === query) retryableQuery = null;
     pendingQuery = query;
     clearTimeout(timer);
     const current = ++token;
@@ -127,9 +127,6 @@ export function injectLiveCompletionAdapter(
             pendingQuery = null;
             state.set({ query, items: [], failed: true, key });
             loading.set(false);
-            // Arm the retry only after the failure state has been consumed, so the
-            // failure itself cannot immediately schedule another request.
-            queueMicrotask(() => (retryableQuery = query));
           },
         );
     }, resolve().debounceMs ?? 60);
@@ -143,11 +140,24 @@ export function injectLiveCompletionAdapter(
       search: (query: string) => {
         if (!enabled()) {
           // search() runs inside a computed; defer signal writes out of it.
-          queueMicrotask(invalidatePending);
+          queueMicrotask(() => {
+            invalidatePending();
+            // Disabling drops cached results, so re-enabling refetches.
+            if (state().query !== NO_QUERY) {
+              state.set({ query: NO_QUERY, items: [], failed: false, key: cacheKey() });
+            }
+          });
           return [];
         }
         const key = cacheKey();
-        if (query !== s.query || s.key !== key || retryableQuery === query) {
+        // The lookup that renders a failure must not retry it (that would loop on a
+        // dead backend); only a later lookup of the same failed state may.
+        let retry = false;
+        if (s.failed && s.query === query && s.key === key) {
+          if (observedFailure === s) retry = true;
+          else observedFailure = s;
+        }
+        if (query !== s.query || s.key !== key || retry) {
           queueMicrotask(() => scheduleFetch(query));
         } else {
           queueMicrotask(() => {

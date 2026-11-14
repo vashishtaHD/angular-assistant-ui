@@ -43,6 +43,7 @@ let nextModalId = 0;
   host: {
     '[attr.data-state]': 'open() ? "open" : "closed"',
     '(document:pointerdown)': 'onDocumentPointerdown($event)',
+    '(document:keydown.escape)': 'onEscape($event)',
   },
 })
 export class AuiAssistantModalRootDirective implements OnChanges {
@@ -106,6 +107,13 @@ export class AuiAssistantModalRootDirective implements OnChanges {
 
   private scheduleFocus(): void {
     afterNextRender(() => this.content?.focusInitial(), { injector: this.injector });
+  }
+
+  /** @internal Escape dismisses wherever focus is, unless another handler claimed it. */
+  onEscape(event: Event): void {
+    if (!this.open() || event.defaultPrevented) return;
+    event.preventDefault();
+    this.setOpen(false, true);
   }
 
   /** @internal */

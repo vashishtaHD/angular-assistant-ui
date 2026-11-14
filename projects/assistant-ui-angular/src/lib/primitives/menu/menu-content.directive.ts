@@ -43,6 +43,11 @@ export class AuiMenuContentDirective {
     });
   }
 
+  /** @internal True while a typeahead search is in progress (Space then extends it). */
+  isTypingAhead(): boolean {
+    return this.typeahead !== '';
+  }
+
   /** @internal */
   contains(node: Node): boolean {
     return this.el.contains(node);

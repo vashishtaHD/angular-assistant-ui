@@ -99,7 +99,7 @@ describe('assistant modal', () => {
     expect(document.activeElement).toBe(t.trigger);
   });
 
-  it('dismisses on an outside pointerdown, but not on the anchor or content', async () => {
+  it('dismissOnInteractOutside dismisses on an outside pointerdown, but not on the anchor or content', async () => {
     const t = await setup();
     t.trigger.click();
     await t.settle();
@@ -123,6 +123,33 @@ describe('assistant modal', () => {
     expect(t.content.hidden).toBe(false);
   });
 
+  it('Escape closes the modal even when focus is outside it', async () => {
+    const t = await setup();
+    t.trigger.click();
+    await t.settle();
+    const outside = document.getElementById('outside')!;
+    outside.focus();
+    expect(document.activeElement).toBe(outside);
+    outside.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    await t.settle();
+    expect(t.content.hidden).toBe(true);
+    expect(document.activeElement).toBe(t.trigger);
+  });
+
+  it('Escape is ignored once another handler prevented it', async () => {
+    const t = await setup();
+    t.trigger.click();
+    await t.settle();
+    t.field.addEventListener('keydown', (e) => e.preventDefault());
+    t.field.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    await t.settle();
+    expect(t.content.hidden).toBe(false);
+  });
+
   it('openOnRunStart opens on thread.runStart', async () => {
     const t = await setup();
     expect(t.content.hidden).toBe(true);
@@ -138,5 +165,47 @@ describe('assistant modal', () => {
     t.host.rt.setRunning(true);
     await t.settle();
     expect(t.content.hidden).toBe(true);
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiAssistantModalRootDirective,
+    AuiAssistantModalTriggerDirective,
+    AuiAssistantModalContentDirective,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <button id="outside">outside</button>
+    <div [auiProvider]="config">
+      <div auiAssistantModalRoot>
+        <button auiAssistantModalTrigger>chat</button>
+        <div auiAssistantModalContent><input /></div>
+      </div>
+    </div>
+  `,
+})
+class DefaultsHostComponent {
+  readonly rt = createTestRuntime();
+  readonly config = this.rt.config;
+}
+
+describe('assistant modal defaults', () => {
+  it('an outside pointerdown does not dismiss by default (upstream default)', async () => {
+    configureTestBed({ imports: [DefaultsHostComponent] });
+    const fixture = TestBed.createComponent(DefaultsHostComponent);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    document.body.append(el);
+    el.querySelector<HTMLElement>('button[auiAssistantModalTrigger]')!.click();
+    await fixture.whenStable();
+    const content = el.querySelector<HTMLElement>('[auiAssistantModalContent]')!;
+    expect(content.hidden).toBe(false);
+    document.getElementById('outside')!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    await fixture.whenStable();
+    expect(content.hidden).toBe(false);
   });
 });

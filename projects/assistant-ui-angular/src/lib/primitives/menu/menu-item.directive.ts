@@ -49,6 +49,8 @@ export class AuiMenuItemDirective {
   /** @internal */
   protected onKeydown(event: KeyboardEvent): void {
     if (event.key !== 'Enter' && event.key !== ' ') return;
+    // Mid-typeahead, Space extends the search (handled by the content) instead of selecting.
+    if (event.key === ' ' && this.root.content?.isTypingAhead()) return;
     event.preventDefault();
     this.el.click();
   }

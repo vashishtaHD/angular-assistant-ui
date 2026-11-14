@@ -8,9 +8,10 @@ const TABBABLE =
 /**
  * The modal window: `role="dialog"`, hidden while the modal is closed. When it
  * opens, focus moves to the first tabbable element inside (or the dialog
- * itself). Escape closes it and returns focus to the trigger; a pointer-down
- * outside the content, trigger and anchor dismisses it unless
- * `dismissOnInteractOutside` is false.
+ * itself). Escape (handled on the document, so it works wherever focus is) closes
+ * it and returns focus to the trigger; a pointer-down
+ * outside the content, trigger and anchor dismisses it only when
+ * `dismissOnInteractOutside` is true.
  *
  * `side` and `align` are exposed as `data-side` / `data-align` for the
  * consumer's positioning.
@@ -26,7 +27,6 @@ const TABBABLE =
     '[attr.data-state]': 'root.open() ? "open" : "closed"',
     '[attr.data-side]': 'side()',
     '[attr.data-align]': 'align()',
-    '(keydown.escape)': 'onEscape($event)',
   },
 })
 export class AuiAssistantModalContentDirective {
@@ -39,10 +39,10 @@ export class AuiAssistantModalContentDirective {
   /** Preferred alignment against the anchor (default `end`). */
   readonly align = input<'start' | 'center' | 'end'>('end');
   /**
-   * Close on a pointer-down outside the modal. Upstream defaults this to
-   * false; this port defaults it to true (see the Task 10 report).
+   * Close on a pointer-down outside the modal. Defaults to false, as upstream
+   * (`dissmissOnInteractOutside`, sic): clicking the page keeps the chat open.
    */
-  readonly dismissOnInteractOutside = input(true, { transform: booleanAttribute });
+  readonly dismissOnInteractOutside = input(false, { transform: booleanAttribute });
 
   constructor() {
     this.root.content = this;
@@ -61,12 +61,5 @@ export class AuiAssistantModalContentDirective {
   focusInitial(): void {
     const first = this.el.querySelector<HTMLElement>(TABBABLE);
     (first ?? this.el).focus({ preventScroll: true });
-  }
-
-  /** @internal */
-  protected onEscape(event: Event): void {
-    if (event.defaultPrevented) return;
-    event.preventDefault();
-    this.root.setOpen(false, true);
   }
 }

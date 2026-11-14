@@ -103,7 +103,8 @@ function shallowEqualRecords(a: ToolDescriptions, b: ToolDescriptions): boolean 
  * Creates the `{ adapter, directive }` bundle for `@` mentions. Supports tools
  * registered in model context, explicit items, or both, flat or categorized.
  * The options may be a plain object or a function returning one (read inside
- * computed signals, so it can depend on signals).
+ * computed signals, so it can depend on signals). `iconMap` and `fallbackIcon` are
+ * read once, when the bundle is created.
  *
  * Must be called in an injection context inside an `[auiProvider]`. React name:
  * `unstable_useMentionAdapter`.
@@ -120,7 +121,8 @@ function shallowEqualRecords(a: ToolDescriptions, b: ToolDescriptions): boolean 
  * ```
  */
 export function injectMentionAdapter(
-  options?: Unstable_UseMentionAdapterOptions | (() => Unstable_UseMentionAdapterOptions),
+  options?:
+    Unstable_UseMentionAdapterOptions | (() => Unstable_UseMentionAdapterOptions | undefined),
 ): MentionAdapterBundle {
   assertInInjectionContext(injectMentionAdapter);
   const aui = injectAui();
@@ -142,13 +144,9 @@ export function injectMentionAdapter(
     () => {
       version();
       if (!wantsTools()) return EMPTY_TOOL_MENTIONS;
-      let tools;
-      try {
-        tools = aui.thread.getModelContext().tools;
-      } catch {
-        // No thread scope (yet).
-        return EMPTY_TOOL_MENTIONS;
-      }
+      // Only a missing thread scope means "no tools"; errors from providers propagate.
+      if (aui.thread.source === null) return EMPTY_TOOL_MENTIONS;
+      const tools = aui.thread.getModelContext().tools;
       if (!tools) return EMPTY_TOOL_MENTIONS;
       const mentions = Object.create(null) as Record<string, string | undefined>;
       for (const [name, tool] of Object.entries(tools)) mentions[name] = tool.description;
