@@ -32,7 +32,7 @@ export function assertTestProjectMatchesEnvironment(): void {
  * `zoneless`). In the zoneless project it adds
  * `provideExperimentalZonelessChangeDetection()` (the Angular 18 name).
  */
-export function configureTestBed(extra: TestModuleMetadata = {}): typeof TestBed {
+export function configureTestBed(extra: TestModuleMetadata = {}): TestBed {
   assertTestProjectMatchesEnvironment();
   const providers = [
     ...(isZonelessTestRun() ? [provideExperimentalZonelessChangeDetection()] : []),

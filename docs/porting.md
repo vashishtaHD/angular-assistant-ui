@@ -25,11 +25,11 @@ Status is one of `ported`, `planned`, `n/a`.
 
 | Upstream export                         | Status  |
 | --------------------------------------- | ------- |
-| AuiProvider                             | planned |
-| AuiIf                                   | planned |
-| useAui                                  | planned |
-| useAuiState                             | planned |
-| useAuiEvent                             | planned |
+| AuiProvider                             | ported  |
+| AuiIf                                   | ported  |
+| useAui                                  | ported  |
+| useAuiState                             | ported  |
+| useAuiEvent                             | ported  |
 | useScrollLock                           | planned |
 | MessageByIdProvider                     | planned |
 | PartByIndexProvider                     | planned |

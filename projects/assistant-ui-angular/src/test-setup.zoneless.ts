@@ -1,3 +1,4 @@
+import './test-setup.web-streams';
 import { getTestBed } from '@angular/core/testing';
 import {
   BrowserDynamicTestingModule,
