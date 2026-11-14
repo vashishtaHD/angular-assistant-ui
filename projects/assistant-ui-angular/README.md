@@ -188,8 +188,10 @@ See [docs/porting.md](../../docs/porting.md) for what is ported and what is plan
 | 22 | Zoneless | Verified by the compatibility matrix (core 22.2.6, `provideZonelessChangeDetection()`) |
 
 The compatibility matrix (`npm run compat -- <ng18|ng20|ng22>`, and the `compat` CI job) installs the
-packed library into a fresh app per version, builds it, and runs a browser smoke test that streams a
-scripted reply. Angular 22's CLI requires Node `^22.22.3` or `^24.15.0`.
+packed library into a fresh app per version, builds it, and runs a browser smoke test over a scripted
+(offline) transport: a streamed text reply, a tool call that renders a registered tool UI (and updates
+it in place when the result arrives), `*auiIf` swapping Send and Stop while a run is active, and
+cancelling a running reply. Angular 22's CLI requires Node `^22.22.3` or `^24.15.0`.
 
 <!-- compat-table -->
 

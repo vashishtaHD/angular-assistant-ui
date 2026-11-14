@@ -124,7 +124,7 @@ if (!tarball) {
 
 // The tarball must carry the upstream MIT notice (LICENSE) and NOTICE, identical to the root copies.
 {
-  const listing = spawnSync('tar', ['-tzf', join(packDir, tarball)], { encoding: 'utf8' });
+  const listing = spawnSync('tar', ['-tzf', tarball], { cwd: packDir, encoding: 'utf8' });
   if (listing.status !== 0) {
     console.error(`\n[compat:${app}] FAIL: could not list ${tarball}: ${listing.stderr}`);
     process.exit(1);
