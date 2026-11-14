@@ -1,5 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import angular from '@analogjs/vite-plugin-angular';
 import { defineConfig } from 'vitest/config';
+
+// The secondary entries import the main entry by its package name (as
+// ng-packagr requires); specs resolve it to the sources so they do not
+// depend on `npm run build:lib`.
+const mainEntry = {
+  find: /^angular-assistant-ui$/,
+  replacement: fileURLToPath(new URL('./src/public-api.ts', import.meta.url)),
+};
 
 // `react` resolves to tap's standalone shim so the store/core packages run
 // without React (same approach as upstream's Vue package). The jsx runtimes
@@ -23,7 +32,7 @@ const reactAliases = [
 function project(name: 'zone' | 'zoneless') {
   return {
     plugins: [angular({ tsconfig: 'tsconfig.spec.json' })],
-    resolve: { alias: reactAliases },
+    resolve: { alias: [mainEntry, ...reactAliases] },
     test: {
       name,
       globals: true,
