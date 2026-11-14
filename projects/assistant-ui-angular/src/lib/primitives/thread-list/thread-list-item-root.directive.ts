@@ -1,6 +1,13 @@
 // Ported from packages/react/src/primitives/threadListItem/ThreadListItemRoot.tsx @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
 // (and packages/vue/src/primitives/ThreadListItemPrimitiveRoot.ts)
-import { Directive, ElementRef, inject } from '@angular/core';
+import {
+  DestroyRef,
+  Directive,
+  ElementRef,
+  Renderer2,
+  afterNextRender,
+  inject,
+} from '@angular/core';
 import { injectAuiState } from '../../state/inject-aui-state';
 import { ThreadListItemFocus, injectThreadListCollection } from './thread-list-focus-group';
 
@@ -29,7 +36,6 @@ import { ThreadListItemFocus, injectThreadListCollection } from './thread-list-f
     '[attr.data-active]': "active() ? 'true' : null",
     '[attr.aria-current]': "active() ? 'true' : null",
     '[attr.data-archived]': "archived() ? 'true' : null",
-    '(keydown)': 'onKeydown($event)',
   },
 })
 export class AuiThreadListItemRootDirective {
@@ -41,6 +47,21 @@ export class AuiThreadListItemRootDirective {
   protected readonly active = injectAuiState((s) => s.threads.mainThreadId === s.threadListItem.id);
   /** True while this item is archived. */
   protected readonly archived = injectAuiState((s) => s.threadListItem.status === 'archived');
+
+  constructor() {
+    // Listen after first render so this handler runs after any consumer
+    // `(keydown)` on the same element (listeners fire in registration order,
+    // and template listeners are registered at creation). The consumer can
+    // then veto navigation with `preventDefault()`, as in React/Vue.
+    const renderer = inject(Renderer2);
+    let stop: (() => void) | undefined;
+    afterNextRender(() => {
+      stop = renderer.listen(this.element, 'keydown', (event: KeyboardEvent) =>
+        this.onKeydown(event),
+      );
+    });
+    inject(DestroyRef).onDestroy(() => stop?.());
+  }
 
   /** @internal */
   protected onKeydown(event: KeyboardEvent): void {

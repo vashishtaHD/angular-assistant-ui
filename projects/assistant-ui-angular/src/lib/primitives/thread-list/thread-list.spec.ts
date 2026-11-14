@@ -1,5 +1,5 @@
 // Mirrors packages/vue/src/primitives/ThreadListKeyboardNav.test.ts and threadListStructural.unarchive.test.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import type {
   RemoteThreadListAdapter,
@@ -10,6 +10,7 @@ import { InMemoryThreadListAdapter } from '@assistant-ui/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../../testing-internal/test-bed';
 import { createTestRuntime } from '../../../testing-internal/test-runtime';
+import { injectAuiState } from '../../state/inject-aui-state';
 import { AuiProviderDirective } from '../../provider/aui-provider.directive';
 import {
   AuiThreadListItemArchiveDirective,
@@ -81,8 +82,8 @@ function makeAdapter(
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div auiThreadListItemRoot class="item">
-      <button auiThreadListItemTrigger class="trigger">
+    <div auiThreadListItemRoot class="item" (keydown)="onKey($event)">
+      <button auiThreadListItemTrigger class="trigger" [disabled]="off()">
         <aui-thread-list-item-title fallback="Untitled" />
       </button>
       <button auiThreadListItemArchive class="archive">a</button>
@@ -91,7 +92,16 @@ function makeAdapter(
     </div>
   `,
 })
-class RowComponent {}
+class RowComponent {
+  private readonly id = injectAuiState((s) => s.threadListItem.id);
+  protected readonly off = () => disabledIds().has(this.id());
+  protected onKey(event: KeyboardEvent): void {
+    if (vetoKeys()) event.preventDefault();
+  }
+}
+
+const disabledIds = signal<ReadonlySet<string>>(new Set());
+const vetoKeys = signal(false);
 
 let current: {
   config: ReturnType<ReturnType<typeof createTestRuntime>['withThreadList']>['config'];
@@ -167,6 +177,8 @@ const keydown = (el: HTMLElement, key: string, init: KeyboardEventInit = {}) =>
   el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key, ...init }));
 
 afterEach(() => {
+  disabledIds.set(new Set());
+  vetoKeys.set(false);
   TestBed.resetTestingModule();
   vi.restoreAllMocks();
 });
@@ -317,6 +329,30 @@ describe('thread list keyboard navigation', () => {
     first!.focus();
     expect(keydown(first!, 'ArrowDown')).toBe(false);
     expect(document.activeElement).toBe(first);
+  });
+
+  it('lets a keydown handler on the item root itself veto navigation', async () => {
+    const t = await mount(three());
+    const [first] = t.regularTriggers();
+    vetoKeys.set(true);
+    first!.focus();
+    expect(keydown(first!, 'ArrowDown')).toBe(false);
+    expect(document.activeElement).toBe(first);
+    vetoKeys.set(false);
+    keydown(first!, 'ArrowDown');
+    expect(document.activeElement).toBe(t.regularTriggers()[1]);
+  });
+
+  it('moves the tab stop when the current one is disabled, and back when re-enabled', async () => {
+    const t = await mount(three());
+    const tabindexes = () => t.regularTriggers().map((el) => el.getAttribute('tabindex'));
+    expect(tabindexes()).toEqual(['0', '-1', '-1']);
+    disabledIds.set(new Set(['a']));
+    await settle(t.fixture);
+    expect(tabindexes()).toEqual(['-1', '0', '-1']);
+    disabledIds.set(new Set());
+    await settle(t.fixture);
+    expect(tabindexes()).toEqual(['0', '-1', '-1']);
   });
 
   it.each(['altKey', 'ctrlKey', 'metaKey', 'shiftKey'] as const)(

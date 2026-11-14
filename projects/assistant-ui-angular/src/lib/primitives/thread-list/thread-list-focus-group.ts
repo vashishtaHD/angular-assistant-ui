@@ -2,6 +2,11 @@
 // (also packages/vue/src/primitives/threadListFocusGroup.ts; the Radix Collection becomes a registry of trigger buttons)
 import { Injectable, inject, signal } from '@angular/core';
 
+interface Entry {
+  trigger: HTMLButtonElement;
+  isDisabled: () => boolean;
+}
+
 const inDomOrder = (a: HTMLElement, b: HTMLElement): number => {
   const position = a.compareDocumentPosition(b);
   if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
@@ -17,14 +22,18 @@ const inDomOrder = (a: HTMLElement, b: HTMLElement): number => {
  */
 @Injectable()
 export class ThreadListCollection {
-  private readonly entries = signal<readonly HTMLButtonElement[]>([]);
+  private readonly entries = signal<readonly Entry[]>([]);
   private readonly focused = signal<HTMLButtonElement | null>(null);
 
-  /** Adds `trigger`; returns the function that removes it. */
-  register(trigger: HTMLButtonElement): () => void {
-    this.entries.update((list) => (list.includes(trigger) ? list : [...list, trigger]));
+  /**
+   * Adds `trigger`; returns the function that removes it. `isDisabled` should
+   * read signals so the roving tab stop follows enabled-state changes.
+   */
+  register(trigger: HTMLButtonElement, isDisabled: () => boolean = () => false): () => void {
+    const entry: Entry = { trigger, isDisabled };
+    this.entries.update((list) => [...list.filter((e) => e.trigger !== trigger), entry]);
     return () => {
-      this.entries.update((list) => list.filter((entry) => entry !== trigger));
+      this.entries.update((list) => list.filter((e) => e !== entry));
       if (this.focused() === trigger) this.focused.set(null);
     };
   }
@@ -37,14 +46,16 @@ export class ThreadListCollection {
   /** The registered, enabled triggers in document order. */
   getItems(): HTMLButtonElement[] {
     return this.entries()
-      .filter((node) => node.isConnected && !node.disabled)
+      .filter((e) => e.trigger.isConnected && !e.isDisabled() && !e.trigger.disabled)
+      .map((e) => e.trigger)
       .sort(inDomOrder);
   }
 
   /** True when `trigger` is the one trigger reachable with Tab. Reactive. */
   isTabStop(trigger: HTMLButtonElement): boolean {
     const focused = this.focused();
-    if (focused && this.entries().includes(focused) && !focused.disabled) {
+    const current = focused && this.entries().find((e) => e.trigger === focused);
+    if (current && !current.isDisabled() && !current.trigger.disabled) {
       return focused === trigger;
     }
     return this.getItems()[0] === trigger;

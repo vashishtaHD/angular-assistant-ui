@@ -50,7 +50,7 @@ export class AuiThreadListItemTriggerDirective {
     });
     let unregister: (() => void) | undefined;
     afterNextRender(() => {
-      unregister = this.collection?.register(this.element);
+      unregister = this.collection?.register(this.element, () => this.disabled());
       this.focus?.trigger.set(this.element);
     });
     inject(DestroyRef).onDestroy(() => {
