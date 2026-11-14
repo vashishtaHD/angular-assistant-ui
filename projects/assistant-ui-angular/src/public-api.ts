@@ -25,3 +25,9 @@ export {
   type AssistantEventSelector,
   type Unsubscribe,
 } from '@assistant-ui/store/client';
+
+// Composer primitives.
+export { AuiComposerRootDirective } from './lib/primitives/composer-root.directive';
+export { AuiComposerInputDirective } from './lib/primitives/composer-input.directive';
+export { AuiComposerSendDirective } from './lib/primitives/composer-send.directive';
+export { AuiComposerCancelDirective } from './lib/primitives/composer-cancel.directive';

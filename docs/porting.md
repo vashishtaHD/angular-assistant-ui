@@ -40,9 +40,9 @@ Status is one of `ported`, `planned`, `n/a`.
 | MessagePrimitiveParts                   | planned |
 | ChainOfThoughtPrimitiveParts            | planned |
 | ChainOfThoughtPrimitiveAccordionTrigger | planned |
-| ComposerPrimitiveInput                  | planned |
-| ComposerPrimitiveSend                   | planned |
-| ComposerPrimitiveCancel                 | planned |
+| ComposerPrimitiveInput                  | ported  |
+| ComposerPrimitiveSend                   | ported  |
+| ComposerPrimitiveCancel                 | ported  |
 | BranchPickerPrimitivePrevious           | planned |
 | BranchPickerPrimitiveNext               | planned |
 | BranchPickerPrimitiveNumber             | planned |
