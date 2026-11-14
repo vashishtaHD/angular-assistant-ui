@@ -63,6 +63,8 @@ afterEach(() => {
   mounted = undefined;
 });
 
+let servers = 0;
+
 interface SetupOptions extends MockMastraServerOptions {
   pageSize?: number;
   useInjectedAuth?: boolean;
@@ -71,7 +73,11 @@ interface SetupOptions extends MockMastraServerOptions {
 
 async function setup(options: SetupOptions = {}) {
   const { pageSize, useInjectedAuth, seed, ...serverOptions } = options;
-  const server = createMockMastraServer(serverOptions);
+  // A fresh base URL per test keeps the module-level stored-id registry isolated.
+  const server = createMockMastraServer({
+    baseUrl: `http://mastra-${++servers}.test`,
+    ...serverOptions,
+  });
   seed?.(server);
   mounted = await mountAui(
     () =>
@@ -318,6 +324,25 @@ describe('MastraThreads over the Mastra contract', () => {
     expect(server.threads().every((t) => t.resourceId === 'alice')).toBe(true);
   });
 
+  it('reconciles the sends of a thread it created (known empty, not unknown)', async () => {
+    const { aui, mounted, chatRequests, send, idle } = await setup();
+
+    send('one');
+    await mounted.waitFor(() => expect(messageTexts(aui).at(-1)).toBe('Echo: one'));
+    await idle();
+    send('two');
+    await mounted.waitFor(() => expect(messageTexts(aui).at(-1)).toBe('Echo: two'));
+    await idle();
+
+    const [first, second] = chatRequests().map(
+      (r) => r.body as { messages: UIMessage[]; messageIds?: string[] },
+    );
+    const ids = messageIds(aui);
+    expect(first!.messageIds).toEqual([ids[0]]);
+    expect(second!.messageIds).toEqual(ids.slice(0, 3));
+    expect(second!.messages.map((m) => m.id)).toEqual([ids[2]]);
+  });
+
   it('creates a new thread with metadata.archived=false and titles it once Mastra has', async () => {
     const { aui, server, mounted, send, idle } = await setup({ title: false });
 
@@ -448,6 +473,58 @@ describe('MastraThreads over the Mastra contract', () => {
     await mounted.waitFor(() => expect(messageTexts(aui).at(-1)).toContain('Blue it is.'));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(chatRequests()).toHaveLength(2);
-    vi.restoreAllMocks();
+  });
+
+  describe('after a failed history load', () => {
+    const stored = [
+      user('u1', 'first'),
+      assistant('a1', 'reply one'),
+      user('u2', 'second'),
+      assistant('a2', 'reply two'),
+    ];
+
+    for (const [label, failure] of [
+      ['a 5xx', { status: 503, body: { error: 'Service Unavailable' } }],
+      ['a network error', 'network'],
+    ] as const) {
+      it(`does not erase the stored thread on the next send (${label})`, async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        try {
+          const { aui, server, mounted, chatRequests, historyRequests, send, idle } = await setup({
+            seed: (s) => {
+              s.seedThread({ id: 't1' }, stored);
+              s.failNext({ method: 'GET', path: `/chat/${AGENT}/threads/t1/messages` }, failure);
+            },
+          });
+          aui.threads().switchToThread('t1');
+          await mounted.waitFor(() => expect(historyRequests('t1')).toHaveLength(1));
+          await mounted.waitFor(() => expect(aui.thread().getState().isLoading).toBe(false));
+          expect(messageIds(aui)).toEqual([]);
+
+          send('after the failure');
+          await mounted.waitFor(() =>
+            expect(messageTexts(aui).at(-1)).toBe('Echo: after the failure'),
+          );
+          await idle();
+
+          // The server kept the conversation it could not show and appended the new turn.
+          const ids = server.messages('t1').map((m) => m.id);
+          expect(ids.slice(0, 4)).toEqual(['u1', 'a1', 'u2', 'a2']);
+          expect(ids).toHaveLength(6);
+          // Unknown stored state: no messageIds, so the server does not reconcile.
+          expect(chatRequests().at(-1)!.body).not.toHaveProperty('messageIds');
+
+          // It stays unknown until the history loads again: the next send does not reconcile.
+          send('and again');
+          await mounted.waitFor(() => expect(messageTexts(aui).at(-1)).toBe('Echo: and again'));
+          await idle();
+          expect(chatRequests().at(-1)!.body).not.toHaveProperty('messageIds');
+          expect(server.messages('t1')).toHaveLength(8);
+          expect(consoleError).toHaveBeenCalled();
+        } finally {
+          consoleError.mockRestore();
+        }
+      });
+    }
   });
 });

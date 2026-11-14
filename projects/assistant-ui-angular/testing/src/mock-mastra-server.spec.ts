@@ -1,5 +1,5 @@
 import type { UIMessage } from 'ai';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMockMastraServer } from './mock-mastra-server';
 
 const user = (id: string): UIMessage => ({ id, role: 'user', parts: [{ type: 'text', text: id }] });
@@ -60,7 +60,10 @@ describe('createMockMastraServer', () => {
       'u1',
       start.messageId,
     ]);
-    expect(server.threads()[0]).toMatchObject({ id: 't1', resourceId: 'dev-user', title: 'u1' });
+    // The title is set asynchronously after the turn.
+    await vi.waitFor(() =>
+      expect(server.threads()[0]).toMatchObject({ id: 't1', resourceId: 'dev-user', title: 'u1' }),
+    );
   });
 
   it('reconciles the stored log with messageIds, except on resubmits', async () => {
@@ -90,6 +93,35 @@ describe('createMockMastraServer', () => {
     await chat({ messages: [last], messageIds: ['u1'], memory: { thread: 't1' } });
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(server.messages('t1')).toHaveLength(4);
+  });
+
+  it('does not reconcile without messageIds, and de-duplicates by id', async () => {
+    const { server, chat } = setup();
+    server.seedThread({ id: 't1' }, [user('u1'), { id: 'a1', role: 'assistant', parts: [] }]);
+    await chat({ messages: [user('u1'), user('u2')], memory: { thread: 't1' } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(
+      server
+        .messages('t1')
+        .map((m) => m.id)
+        .slice(0, 3),
+    ).toEqual(['u1', 'a1', 'u2']);
+    expect(server.messages('t1')).toHaveLength(4);
+  });
+
+  it('failNext fails one matching request with a status or a network error', async () => {
+    const { server, call } = setup();
+    server.seedThread({ id: 't1' });
+    const path = '/chat/chatAgent/threads/t1/messages';
+    server.failNext({ method: 'GET', path }, { status: 503 });
+    expect(await call('GET', path)).toMatchObject({
+      status: 503,
+      json: { error: 'Internal Server Error' },
+    });
+    expect((await call('GET', path)).status).toBe(200);
+    server.failNext({ path: /\/messages$/ }, 'network');
+    await expect(call('GET', path)).rejects.toThrow(TypeError);
+    expect((await call('GET', path)).status).toBe(200);
   });
 
   it('answers the documented errors', async () => {

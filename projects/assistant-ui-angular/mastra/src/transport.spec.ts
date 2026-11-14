@@ -1,9 +1,9 @@
-﻿import { Injector, runInInjectionContext } from '@angular/core';
+import { Injector, runInInjectionContext } from '@angular/core';
 import type { UIMessage, UIMessageChunk } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { createMockMastraServer } from '../../testing/src/mock-mastra-server';
 import { MASTRA_AUTH } from './auth.token';
-import { getStoredIds, MastraHttpError } from './contract';
+import { getStoredIds, setStoredIds } from './contract';
 import { createMastraTransport, MastraChatTransport } from './transport';
 
 const user = (id: string, text = id): UIMessage => ({
@@ -44,12 +44,14 @@ const setup = (tools?: Parameters<typeof createMastraTransport>[0]['tools']) => 
       string,
       unknown
     >;
-  return { server, transport, send, lastBody };
+  const endpoint = { baseUrl: server.baseUrl, agentId: 'chatAgent' };
+  return { server, transport, send, lastBody, endpoint };
 };
 
 describe('createMastraTransport', () => {
   it('posts the whitelisted body to <api>/chat/<agentId> and records the stored ids', async () => {
-    const { server, send, lastBody } = setup();
+    const { server, send, lastBody, endpoint } = setup();
+    setStoredIds(endpoint, 't1', []); // a thread the adapter created
     const chunks = await readAll(await send('t1', [user('u1', 'hi')]));
     const start = chunks.find((c) => c.type === 'start') as { messageId: string };
 
@@ -73,10 +75,55 @@ describe('createMastraTransport', () => {
   });
 
   it('leaves the stored ids alone when the stream is cancelled', async () => {
-    const { server, send } = setup();
+    const { send, endpoint } = setup();
+    setStoredIds(endpoint, 't2', []);
     const stream = await send('t2', [user('u1')]);
     await stream.cancel();
-    expect(getStoredIds({ baseUrl: server.baseUrl, agentId: 'chatAgent' }, 't2')).toEqual([]);
+    expect(getStoredIds(endpoint, 't2')).toEqual([]);
+  });
+
+  it.each(['error', 'abort'] as const)(
+    'leaves the stored ids alone when the run ends with an %s chunk',
+    async (type) => {
+      const endpoint = { baseUrl: `http://t${Math.random()}.test`, agentId: 'chatAgent' };
+      setStoredIds(endpoint, 't1', []);
+      const sse = [
+        { type: 'start', messageId: 'a1' },
+        type === 'error' ? { type: 'error', errorText: 'boom' } : { type: 'abort' },
+      ]
+        .map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`)
+        .concat('data: [DONE]\n\n')
+        .join('');
+      const transport = createMastraTransport({
+        api: endpoint.baseUrl,
+        agentId: 'chatAgent',
+        fetch: async () =>
+          new Response(sse, {
+            headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+          }),
+      });
+      const chunks = await readAll(
+        await transport.sendMessages({
+          chatId: 't1',
+          messages: [user('u1')],
+          trigger: 'submit-message',
+          messageId: undefined,
+          abortSignal: undefined,
+        }),
+      );
+      expect(chunks.map((c) => c.type)).toContain(type);
+      expect(getStoredIds(endpoint, 't1')).toEqual([]);
+    },
+  );
+
+  it('omits messageIds while the stored state is unknown, and keeps it unknown', async () => {
+    const { server, send, lastBody, endpoint } = setup();
+    server.seedThread({ id: 't3' }, [user('old')]);
+    await readAll(await send('t3', [user('u1'), user('u2')]));
+    expect(lastBody()).not.toHaveProperty('messageIds');
+    expect((lastBody()['messages'] as UIMessage[]).map((m) => m.id)).toEqual(['u1', 'u2']);
+    expect(getStoredIds(endpoint, 't3')).toBeUndefined();
+    expect(server.messages('t3')[0]?.id).toBe('old');
   });
 
   it('forwards model-context tools, filtered by the tools option', async () => {
@@ -156,6 +203,5 @@ describe('createMastraTransport', () => {
         abortSignal: undefined,
       }),
     ).rejects.toThrow(/Invalid or expired token/);
-    expect(MastraHttpError).toBeDefined();
   });
 });

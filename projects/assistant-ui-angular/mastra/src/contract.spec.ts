@@ -102,6 +102,31 @@ describe('buildChatBody', () => {
   });
 });
 
+describe('buildChatBody with an unknown stored state', () => {
+  const branch = [msg('u1', 'user'), msg('a1', 'assistant'), msg('u2', 'user')];
+
+  it('sends the whole branch and omits messageIds, so the server deletes nothing', () => {
+    const body = buildChatBody({ threadId: 't1', messages: branch, stored: undefined });
+    expect(ids(body.messages)).toEqual(['u1', 'a1', 'u2']);
+    expect(body).not.toHaveProperty('messageIds');
+  });
+
+  it('treats a known empty state differently from an unknown one', () => {
+    const body = buildChatBody({ threadId: 't1', messages: [msg('u1', 'user')], stored: [] });
+    expect(body.messageIds).toEqual(['u1']);
+  });
+
+  it('still sends only the last assistant message on a resubmit', () => {
+    const body = buildChatBody({
+      threadId: 't1',
+      messages: [...branch, msg('a2', 'assistant')],
+      stored: undefined,
+    });
+    expect(ids(body.messages)).toEqual(['a2']);
+    expect(body).not.toHaveProperty('messageIds');
+  });
+});
+
 describe('storedIdsAfterRun', () => {
   it('adds the streamed assistant id after a normal send', () => {
     const body = buildChatBody({ threadId: 't', messages: [msg('u1', 'user')], stored: [] });
@@ -116,5 +141,10 @@ describe('storedIdsAfterRun', () => {
     });
     expect(storedIdsAfterRun(body, 'a1')).toEqual(['u1', 'a1']);
     expect(storedIdsAfterRun(body, 'other')).toEqual(['u1', 'a1']);
+  });
+
+  it('keeps the state unknown after a send without messageIds', () => {
+    const body = buildChatBody({ threadId: 't', messages: [msg('u1', 'user')], stored: undefined });
+    expect(storedIdsAfterRun(body, 'a1')).toBeUndefined();
   });
 });

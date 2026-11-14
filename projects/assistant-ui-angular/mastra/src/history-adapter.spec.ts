@@ -59,6 +59,12 @@ describe('mastraHistoryAdapter', () => {
     expect((repo.messages[1]!.message as UIMessage).parts).toHaveLength(2);
   });
 
+  it('records a thread the server does not know (404) as known empty', async () => {
+    const { history, endpoint } = setup('nope');
+    await history.withFormat!(format).load();
+    expect(getStoredIds(endpoint, 'nope')).toEqual([]);
+  });
+
   it('loads an unknown thread (404) or a thread without a remote id as empty', async () => {
     const missing = setup('nope');
     await expect(missing.history.withFormat!(format).load()).resolves.toEqual({
@@ -88,4 +94,17 @@ describe('mastraHistoryAdapter', () => {
     server.seedThread({ id: 't1', resourceId: 'bob' });
     await expect(history.withFormat!(format).load()).rejects.toMatchObject({ status: 403 });
   });
+
+  for (const [label, failure] of [
+    ['a 5xx', { status: 500 }],
+    ['a network error', 'network'],
+  ] as const) {
+    it(`leaves the stored state unknown when the load fails (${label})`, async () => {
+      const { server, history, endpoint } = setup('t1');
+      server.seedThread({ id: 't1' }, [msg('u1', 'user'), msg('a1', 'assistant')]);
+      server.failNext({ path: '/chat/chatAgent/threads/t1/messages' }, failure);
+      await expect(history.withFormat!(format).load()).rejects.toBeDefined();
+      expect(getStoredIds(endpoint, 't1')).toBeUndefined();
+    });
+  }
 });

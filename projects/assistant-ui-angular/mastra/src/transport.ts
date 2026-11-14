@@ -5,6 +5,7 @@ import {
   authHeaders,
   buildChatBody,
   chatUrl,
+  clearStoredIds,
   getStoredIds,
   setStoredIds,
   storedIdsAfterRun,
@@ -15,7 +16,10 @@ import {
 
 /** Options for {@link createMastraTransport}. */
 export interface MastraTransportOptions {
-  /** Mastra server origin (and optional path prefix), e.g. `http://localhost:4111`. */
+  /**
+   * Mastra server origin (and optional path prefix), e.g. `http://localhost:4111`. Use the same
+   * string as the thread-list adapter's `baseUrl`: the stored-id record is keyed by it.
+   */
   api: string;
   /** Agent to chat with, e.g. `chatAgent`. The chat route is `<api>/chat/<agentId>`. */
   agentId: string;
@@ -136,11 +140,10 @@ export class MastraChatTransport extends AssistantChatTransport<UIMessage> {
           },
           flush() {
             if (failed) return;
-            setStoredIds(
-              state.endpoint,
-              pending.threadId,
-              storedIdsAfterRun(pending.body, assistantId),
-            );
+            const ids = storedIdsAfterRun(pending.body, assistantId);
+            // A send without `messageIds` did not reconcile: the stored state stays unknown.
+            if (ids) setStoredIds(state.endpoint, pending.threadId, ids);
+            else clearStoredIds(state.endpoint, pending.threadId);
           },
         }),
       );
@@ -159,6 +162,12 @@ export class MastraChatTransport extends AssistantChatTransport<UIMessage> {
  * an approval or tool-result resubmit) and `messageIds` is the whole active branch, which the
  * server uses to drop stored messages of other branches. The transport tracks the stored ids per
  * thread, seeded by the history load and updated after each completed run.
+ *
+ * While a thread's stored state is unknown (its history load failed or the thread was never
+ * loaded), `messageIds` is omitted and `messages` is the whole active branch, so the server does
+ * not reconcile (delete) anything; the stored state stays unknown until the history reloads.
+ *
+ * A failed request rejects with the AI SDK's error, not a `MastraHttpError` (see that class).
  *
  * Pass it to `MastraThreads` as a factory (`transport: () => createMastraTransport(...)`); a
  * plain instance is cloned per thread.

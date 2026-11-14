@@ -10,10 +10,12 @@ import { useMemo } from 'react';
 import { resolveMastraAuth, type MastraAuth } from './auth.token';
 import {
   ARCHIVED_KEY,
+  MastraHttpError,
   clearStoredIds,
   createThreadBody,
   listQuery,
   requestJson,
+  setStoredIds,
   threadsUrl,
   threadUrl,
   type MastraEndpoint,
@@ -68,7 +70,10 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  *   `metadata` as a whole, so the adapter merges with the thread's current metadata first.
  * - `delete` and `fetch` call the matching routes.
  * - `generateTitle` waits for the title Mastra generates asynchronously after the first turn
- *   (polling the thread) and streams it.
+ *   (polling the thread) and streams it. Polling ends at the title, at `titlePolling.timeoutMs`,
+ *   or once the thread is deleted (through this adapter, or a 404), without an error. Core's
+ *   `generateTitle` passes no abort signal, so destroying the app does not stop a poll early;
+ *   it stops at the timeout.
  * - `unstable_useAdapters` gives every thread a read-only history adapter (and `attachments`).
  *
  * The server derives the user from the auth headers; no resource id is sent.
@@ -85,6 +90,8 @@ export function mastraThreadListAdapter(
     requestJson<T>(auth, options.fetch, url, init);
 
   const getThread = (remoteId: string) => request<MastraThread>(threadUrl(endpoint, remoteId));
+  /** Threads deleted through this adapter: their title polling stops. */
+  const deleted = new Set<string>();
   const patchMetadata = async (
     remoteId: string,
     update: (metadata: Record<string, unknown>) => Record<string, unknown>,
@@ -112,6 +119,8 @@ export function mastraThreadListAdapter(
         method: 'POST',
         body: createThreadBody(threadId, { ...(init?.custom ?? {}), [ARCHIVED_KEY]: false }),
       });
+      // The server just created the thread, so its stored state is known: empty.
+      setStoredIds(endpoint, threadId, []);
       return { remoteId: threadId, externalId: undefined };
     },
     async rename(remoteId, title) {
@@ -129,6 +138,7 @@ export function mastraThreadListAdapter(
     async delete(remoteId) {
       await request(threadUrl(endpoint, remoteId), { method: 'DELETE' });
       clearStoredIds(endpoint, remoteId);
+      deleted.add(remoteId);
     },
     async fetch(threadId) {
       return toMetadata(await getThread(threadId));
@@ -137,7 +147,15 @@ export function mastraThreadListAdapter(
       return createAssistantStream(async (controller) => {
         const deadline = Date.now() + timeoutMs;
         for (;;) {
-          const { title } = await getThread(remoteId);
+          // Stop once the thread is deleted (through this adapter, or gone on the server).
+          if (deleted.has(remoteId)) return;
+          let title: string | undefined;
+          try {
+            ({ title } = await getThread(remoteId));
+          } catch (error) {
+            if (error instanceof MastraHttpError && error.status === 404) return;
+            throw error;
+          }
           if (title) {
             controller.appendText(title);
             return;

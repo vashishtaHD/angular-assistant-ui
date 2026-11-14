@@ -7,6 +7,7 @@ import {
   type ChatTransport,
   type UIMessage,
 } from 'ai';
+import { isMissingInjectionContext } from './auth.token';
 import { RemoteAISDKThreads, type RemoteAISDKThreadsOptions } from './vendor/AISDKThreads';
 
 /** Options for {@link MastraThreads}. */
@@ -57,8 +58,8 @@ export function MastraThreads(options: MastraThreadsOptions) {
   const { transport } = options;
   const injector = currentInjector();
   return RemoteAISDKThreads<UIMessage>({
-    sendAutomaticallyWhen: mastraSendAutomaticallyWhen,
     ...options,
+    sendAutomaticallyWhen: options.sendAutomaticallyWhen ?? mastraSendAutomaticallyWhen,
     transport:
       typeof transport === 'function' && injector
         ? () => runInInjectionContext(injector, transport)
@@ -69,8 +70,8 @@ export function MastraThreads(options: MastraThreadsOptions) {
 const currentInjector = (): Injector | undefined => {
   try {
     return inject(Injector);
-  } catch {
-    // Not in an injection context.
-    return undefined;
+  } catch (error) {
+    if (isMissingInjectionContext(error)) return undefined;
+    throw error;
   }
 };

@@ -30,13 +30,27 @@ export const MASTRA_AUTH = new InjectionToken<MastraAuth>('MASTRA_AUTH');
 /**
  * Returns `explicit`, else the provided {@link MASTRA_AUTH} when called in an injection context,
  * else `undefined` (no auth headers).
+ *
+ * Only a missing injection context or provider yields `undefined`; an error thrown while the
+ * provider is created propagates, so a broken auth setup fails loudly instead of sending
+ * unauthenticated requests.
+ *
+ * @param explicit The `auth` option passed by the caller, if any.
  */
 export function resolveMastraAuth(explicit: MastraAuth | undefined): MastraAuth | undefined {
   if (explicit) return explicit;
   try {
     return inject(MASTRA_AUTH, { optional: true }) ?? undefined;
-  } catch {
-    // Not in an injection context.
-    return undefined;
+  } catch (error) {
+    if (isMissingInjectionContext(error)) return undefined;
+    throw error;
   }
 }
+
+/**
+ * Whether `error` is Angular's NG0203 ("inject() must be called from an injection context").
+ * `isInjectionContext()` is not exported by every supported Angular version, so the error code
+ * is checked instead.
+ */
+export const isMissingInjectionContext = (error: unknown): boolean =>
+  error instanceof Error && /NG0?203\b/.test(error.message);

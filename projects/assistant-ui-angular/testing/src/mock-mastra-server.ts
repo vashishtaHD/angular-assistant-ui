@@ -99,6 +99,14 @@ export interface MockMastraServer {
   ): MockMastraThread;
   /** Sets a thread's title, as Mastra's asynchronous title generation does. */
   setTitle(threadId: string, title: string): void;
+  /**
+   * Makes the next request matching `match` fail: with the given status and JSON body, or with a
+   * network error (`'network'`, a rejected fetch). Each call arms one failure.
+   */
+  failNext(
+    match: { method?: string; path: string | RegExp },
+    failure: { status: number; body?: unknown } | 'network',
+  ): void;
 }
 
 const DEFAULT_TOOLS = ['getWeather', 'bookMeeting', 'askUser'];
@@ -138,7 +146,7 @@ const groupKeys = (messages: UIMessage[]) => {
  *
  * - `POST /chat/:agentId`: the whitelisted body (`messages` with `user`/`assistant` roles only,
  *   `memory.thread` required, `resumeData` requires `runId`), branch reconciliation from
- *   `messageIds` (skipped on resubmits), an SSE stream of AI SDK v7 chunks whose `start` carries
+ *   `messageIds` (skipped on resubmits and when `messageIds` is absent), an SSE stream of AI SDK v7 chunks whose `start` carries
  *   the stored assistant id (a resubmit reuses it), and the errors 400/401/403/404/413, plus 409
  *   when an echoed assistant id belongs to another thread.
  * - `GET /chat/:agentId/threads/:threadId/messages`: `{ messages, total }` (consecutive assistant
@@ -151,7 +159,8 @@ const groupKeys = (messages: UIMessage[]) => {
  *
  * Identity always comes from the auth header (or `dev-user`); `resourceId` in bodies and queries
  * is ignored, and another user's thread answers 403. A thread is created on its first chat turn
- * if it does not exist, and titled asynchronously afterwards.
+ * if it does not exist, and titled asynchronously afterwards. `failNext` injects one 5xx (or any
+ * status) or network failure into a matching request, for error-path tests.
  */
 export function createMockMastraServer(options: MockMastraServerOptions = {}): MockMastraServer {
   const baseUrl = (options.baseUrl ?? 'http://mastra.test').replace(/\/+$/, '');
@@ -510,6 +519,10 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
   };
 
   const realFetch = globalThis.fetch;
+  const failures: {
+    match: { method?: string; path: string | RegExp };
+    failure: { status: number; body?: unknown } | 'network';
+  }[] = [];
 
   const mockFetch: typeof fetch = async (input, init) => {
     const isRequest = typeof Request !== 'undefined' && input instanceof Request;
@@ -537,6 +550,17 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
       parsed = rawBody;
     }
     requests.push({ method, path, query: url.searchParams, headers, body: parsed });
+
+    const armed = failures.findIndex(
+      ({ match }) =>
+        (match.method === undefined || match.method.toUpperCase() === method) &&
+        (typeof match.path === 'string' ? match.path === path : match.path.test(path)),
+    );
+    if (armed >= 0) {
+      const [{ failure }] = failures.splice(armed, 1) as [(typeof failures)[number]];
+      if (failure === 'network') throw new TypeError('Failed to fetch');
+      return json(failure.status, failure.body ?? { error: 'Internal Server Error' });
+    }
 
     const userId = userFor(headers);
     if (!userId) return json(401, { error: 'Invalid or expired token' });
@@ -577,6 +601,9 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
       Object.assign(thread, seed);
       stored.set(seed.id, structuredClone(messages));
       return structuredClone(thread);
+    },
+    failNext(match, failure) {
+      failures.push({ match, failure });
     },
     setTitle(threadId, title) {
       const thread = threads.get(threadId);
