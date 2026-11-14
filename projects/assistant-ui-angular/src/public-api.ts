@@ -104,3 +104,25 @@ export {
   injectComposerInputHistory,
   type ComposerInputHistory,
 } from './lib/primitives/composer-input-history';
+// Task 8: thread list and thread list item primitives.
+export { AuiThreadListRootDirective } from './lib/primitives/thread-list/thread-list-root.directive';
+export {
+  AuiThreadListItemTemplateDirective,
+  AuiThreadListItemsComponent,
+} from './lib/primitives/thread-list/thread-list-items.component';
+export { AuiThreadListNewDirective } from './lib/primitives/thread-list/thread-list-new.directive';
+export { AuiThreadListLoadMoreDirective } from './lib/primitives/thread-list/thread-list-load-more.directive';
+export { AuiThreadListItemRootDirective } from './lib/primitives/thread-list/thread-list-item-root.directive';
+export { AuiThreadListItemTriggerDirective } from './lib/primitives/thread-list/thread-list-item-trigger.directive';
+export { AuiThreadListItemTitleComponent } from './lib/primitives/thread-list/thread-list-item-title.component';
+export {
+  AuiThreadListItemArchiveDirective,
+  AuiThreadListItemUnarchiveDirective,
+  AuiThreadListItemDeleteDirective,
+} from './lib/primitives/thread-list/thread-list-item-actions.directive';
+export {
+  ThreadListCollection,
+  ThreadListItemFocus,
+  injectThreadListCollection,
+  injectThreadListItemFocus,
+} from './lib/primitives/thread-list/thread-list-focus-group';
