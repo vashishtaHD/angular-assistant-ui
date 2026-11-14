@@ -1,9 +1,13 @@
 // Ported from packages/core/src/react/primitives/message/MessageGroupedParts.tsx @ 7d74276
+// and packages/react/src/primitives/message/MessagePartsGrouped.tsx @ 7d74276 (clustered mode, Empty)
 import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  isDevMode,
+  type OnInit,
   Directive,
   Injector,
   TemplateRef,
@@ -43,8 +47,9 @@ import {
 import { AuiPartTemplateDirective } from './message-parts.component';
 
 /**
- * A coalesced group of adjacent parts. `type` is the group key (always
- * `group-...`); `status` is running when any contained part runs, otherwise
+ * A group of parts: a coalesced run of adjacent parts (`groupBy` mode) or a
+ * cluster from a `groupingFunction`, whose parts need not be adjacent.
+ * `type` is the group key (always `group-...`); `status` is running when any contained part runs, otherwise
  * it mirrors the last contained part.
  */
 export interface AuiGroupPart<TKey extends `group-${string}` = `group-${string}`> {
@@ -265,7 +270,7 @@ const shouldShowIndicator = (
   host: { style: 'display: contents' },
   template: `
     <ng-template #partView
-      ><aui-part-view [templates]="partTemplates()" [templatesFirst]="true"
+      ><aui-part-view [templates]="partTemplates()" [templatesFirst]="groupBy() !== undefined"
     /></ng-template>
     <ng-template #nodeTemplate let-node>
       @if (node.kind === 'group') {
@@ -284,8 +289,13 @@ const shouldShowIndicator = (
     @if (showEmpty()) {
       @if (emptyTemplate(); as template) {
         <ng-container *ngTemplateOutlet="template; context: emptyContext(); injector: injector" />
+      } @else if (emptyTextTemplate()) {
+        <ng-container
+          *ngTemplateOutlet="emptyTextTemplate()!; context: emptyTextContext(); injector: injector"
+        />
       } @else {
         <p style="white-space: pre-line">
+          <span [attr.data-status]="messageStatus().type"></span>
           @if (messageStatus().type === 'running') {
             <span style="font-family: revert">{{ ' ●' }}</span>
           }
@@ -299,7 +309,7 @@ const shouldShowIndicator = (
     }
   `,
 })
-export class AuiMessageGroupedPartsComponent {
+export class AuiMessageGroupedPartsComponent implements OnInit {
   /** Maps each part to a group-key path; see the class docs. */
   readonly groupBy = input<AuiGroupBy | undefined>(undefined);
   /**
@@ -361,6 +371,15 @@ export class AuiMessageGroupedPartsComponent {
   );
   protected readonly emptyContext = computed<AuiEmptyTemplateContext>(() => ({
     $implicit: this.messageStatus(),
+  }));
+  protected readonly emptyTextTemplate = computed(() => this.partTemplates().get('text'));
+  /** The context for the consumer's text template: an empty text part. */
+  protected readonly emptyTextContext = computed<AuiPartTemplateContext>(() => ({
+    $implicit: {
+      type: 'text',
+      text: '',
+      status: this.messageStatus(),
+    } as AuiPartTemplateContext['$implicit'],
   }));
   /** True for a message with no parts in `groupingFunction` / parent-id mode. */
   protected readonly showEmpty = computed(
@@ -469,6 +488,22 @@ export class AuiMessageGroupedPartsComponent {
   private readonly leaves = new Map<string, LeafEntry>();
   private prunedFor: readonly RenderNode[] | undefined;
   private destroyed = false;
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /** Dev-mode checks for the two modes that share this component. */
+  ngOnInit(): void {
+    if (!isDevMode()) return;
+    const tag = this.host.nativeElement.localName;
+    if (tag === 'aui-message-grouped-parts' && !this.groupBy()) {
+      console.warn(
+        '<aui-message-grouped-parts> needs [groupBy]; without it the parts cluster by parentId. Use <aui-message-parts-grouped> for that.',
+      );
+    }
+    if (this.groupBy() && this.groupingFunction()) {
+      console.warn('[groupingFunction] is ignored while [groupBy] is set; use only one of them.');
+    }
+  }
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {

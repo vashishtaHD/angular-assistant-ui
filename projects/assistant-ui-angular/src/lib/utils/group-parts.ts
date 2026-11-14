@@ -1,5 +1,6 @@
 // Ported from packages/core/src/react/utils/groupParts.ts @ 7d74276
 // and packages/core/src/utils/getGroupStatus.ts (getGroupSummary) @ 7d74276
+// and packages/react/src/primitives/message/MessagePartsGrouped.tsx (groupMessagePartsByParentId) @ 7d74276
 // (core exports neither from a React-free entry, so both are re-implemented here).
 import { isMcpAppUri, type MessagePartStatus, type MessagePartTiming } from '@assistant-ui/core';
 import type { AssistantState } from '@assistant-ui/store/client';

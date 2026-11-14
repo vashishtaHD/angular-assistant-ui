@@ -214,6 +214,36 @@ class EmptyDefaultHostComponent {
   readonly config = hostConfig;
 }
 
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessageGroupedPartsComponent,
+    AuiPartTemplateDirective,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <aui-message-parts-grouped>
+            <ng-template auiPart="text" let-part
+              ><b class="text-slot"
+                >{{ part.type === 'text' ? part.text : 'x' }}|{{ part.status.type }}</b
+              ></ng-template
+            >
+          </aui-message-parts-grouped>
+        </ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class EmptyTextTemplateHostComponent {
+  readonly config = hostConfig;
+}
+
 const mountEmpty = async (host: new () => unknown, running: boolean) => {
   TestBed.resetTestingModule();
   const rt = createTestRuntime();
@@ -233,6 +263,14 @@ describe('MessagePrimitive.Unstable_PartsGrouped empty message', () => {
     expect(el.querySelector('.empty')?.textContent).toBe('running');
     const done = await mountEmpty(EmptyTemplateHostComponent, false);
     expect(done.querySelector('.empty')?.textContent).toBe('complete');
+  });
+
+  it('renders the consumer text template with an empty running text part', async () => {
+    const running = await mountEmpty(EmptyTextTemplateHostComponent, true);
+    expect(running.querySelector('.text-slot')?.textContent).toBe('|running');
+    const done = await mountEmpty(EmptyTextTemplateHostComponent, false);
+    expect(done.querySelector('.text-slot')?.textContent).toBe('|complete');
+    expect(done.querySelector('p')).toBeNull();
   });
 
   it('falls back to an empty text paragraph with the in-progress marker while running', async () => {
