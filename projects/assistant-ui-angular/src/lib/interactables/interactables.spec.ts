@@ -240,6 +240,13 @@ describe('interactables', () => {
     );
     idSource.set('legacy-b');
     expect(legacyId()).toBe('legacy-b');
+    // The next store notification moves the registration to the new id.
+    aui.interactables().setState('legacy-a', () => ({ text: 'poke' }));
+    await vi.waitFor(() => {
+      const definitions = aui.interactables().getState().definitions;
+      expect(definitions['legacy-b']).toBeDefined();
+      expect(definitions['legacy-a']).toBeUndefined();
+    });
     fixture.destroy();
   });
 
@@ -321,6 +328,68 @@ describe('interactables', () => {
     await vi.waitFor(async () => {
       await settle(fixture);
       expect(root.querySelector('p.note')?.textContent).toBe('still here|false');
+    });
+    fixture.destroy();
+  });
+  it('renders update calls of an interactable whose name needs sanitizing', async () => {
+    register = () =>
+      registerToolkit({
+        notepad: unstable_interactableTool({
+          name: 'my note',
+          description: 'A notepad',
+          stateSchema: schema,
+          render: NotepadComponent,
+        }),
+      });
+    const fixture = await mount();
+    const root = fixture.nativeElement as HTMLElement;
+    const toolCall = (
+      toolCallId: string,
+      toolName: string,
+      args: Record<string, never> | Record<string, string>,
+      result: Record<string, boolean | string>,
+    ) => ({
+      type: 'tool-call' as const,
+      toolCallId,
+      toolName,
+      args,
+      result,
+    });
+    flushTapSync(() =>
+      rt.append({
+        role: 'assistant',
+        content: [
+          toolCall(
+            'call-1',
+            'notepad',
+            { text: 'hello' },
+            { success: true, interactable: 'my note' },
+          ),
+        ],
+      }),
+    );
+    await vi.waitFor(async () => {
+      await settle(fixture);
+      expect(root.querySelectorAll('p.note')).toHaveLength(1);
+    });
+    // The model's update call is named `update_my_note`: the config lookup must
+    // find it under the sanitized spelling.
+    flushTapSync(() =>
+      rt.append({
+        role: 'assistant',
+        content: [
+          toolCall(
+            'call-2',
+            'update_my_note',
+            { id: 'call-1', text: 'newer' },
+            { success: true, id: 'call-1' },
+          ),
+        ],
+      }),
+    );
+    await vi.waitFor(async () => {
+      await settle(fixture);
+      expect(root.querySelectorAll('p.note')).toHaveLength(2);
     });
     fixture.destroy();
   });

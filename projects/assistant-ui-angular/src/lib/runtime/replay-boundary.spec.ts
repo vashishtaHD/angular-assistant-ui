@@ -1,4 +1,5 @@
 // Ported from packages/core/src/react/runtimes/assistant-transport/replayBoundaryStream.test.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
+import { AssistantMessageAccumulator, DataStreamDecoder } from 'assistant-stream';
 import { describe, expect, it, vi } from 'vitest';
 import { REPLAY_CONTENT_LENGTH_HEADER, createReplayBoundaryStream } from './assistant-transport';
 
@@ -180,5 +181,212 @@ describe('createReplayBoundaryStream', () => {
       done: false,
       value: encoder.encode('live2'),
     });
+  });
+
+  it('clears replaying when the stream ends before the boundary', async () => {
+    const { waitForRender, releaseNext } = createRenderWait();
+    const setReplaying = vi.fn();
+    const body = createBody(['hi']);
+    const streamPromise = createReplayBoundaryStream(
+      new Response(body, {
+        headers: { [REPLAY_CONTENT_LENGTH_HEADER]: '10' },
+      }),
+      {
+        setReplaying,
+        waitForRender,
+      },
+    );
+
+    await releaseNext();
+    const stream = await streamPromise;
+    const text = readText(stream);
+    await releaseNext();
+    await releaseNext();
+
+    await expect(text).resolves.toBe('hi');
+    expect(setReplaying).toHaveBeenLastCalledWith(false);
+    expect(body.locked).toBe(false);
+  });
+
+  it('leaves replay cleanup to the caller when the first render wait rejects', async () => {
+    const setReplaying = vi.fn();
+    const error = new Error('aborted');
+    const body = createBody(['replay']);
+
+    await expect(
+      createReplayBoundaryStream(
+        new Response(body, {
+          headers: { [REPLAY_CONTENT_LENGTH_HEADER]: '6' },
+        }),
+        {
+          setReplaying, // A thenable keeps zone.js from logging the deliberate rejection.
+          waitForRender: () =>
+            ({
+              then: (_resolve: unknown, reject: (e: unknown) => void) => reject(error),
+            }) as Promise<void>,
+        },
+      ),
+    ).rejects.toBe(error);
+
+    expect(setReplaying.mock.calls).toEqual([[true]]);
+    expect(body.locked).toBe(false);
+  });
+
+  it('clears replaying when the gated stream is cancelled', async () => {
+    const { waitForRender, releaseNext } = createRenderWait();
+    const setReplaying = vi.fn();
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('hi'));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const streamPromise = createReplayBoundaryStream(
+      new Response(body, { headers: { [REPLAY_CONTENT_LENGTH_HEADER]: '10' } }),
+      { setReplaying, waitForRender },
+    );
+
+    await releaseNext();
+    const stream = await streamPromise;
+    await stream.cancel('done');
+
+    expect(setReplaying).toHaveBeenLastCalledWith(false);
+    expect(cancelled).toBe(true);
+    expect(body.locked).toBe(false);
+  });
+
+  it('releases the response body reader after a read failure', async () => {
+    const { waitForRender, releaseNext } = createRenderWait();
+    const setReplaying = vi.fn();
+    const error = new Error('stream failed');
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(error);
+      },
+    });
+    const streamPromise = createReplayBoundaryStream(
+      new Response(body, { headers: { [REPLAY_CONTENT_LENGTH_HEADER]: '10' } }),
+      { setReplaying, waitForRender },
+    );
+
+    await releaseNext();
+    const stream = await streamPromise;
+
+    await expect(stream.getReader().read()).rejects.toBe(error);
+    expect(setReplaying).toHaveBeenLastCalledWith(false);
+    expect(body.locked).toBe(false);
+  });
+
+  it('does not wait for replay completion after cancellation unblocks a read', async () => {
+    const { waitForRender, releaseNext } = createRenderWait();
+    const setReplaying = vi.fn();
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const streamPromise = createReplayBoundaryStream(
+      new Response(body, { headers: { [REPLAY_CONTENT_LENGTH_HEADER]: '10' } }),
+      { setReplaying, waitForRender },
+    );
+
+    await releaseNext();
+    const stream = await streamPromise;
+    const reader = stream.getReader();
+    const read = reader.read();
+
+    await Promise.resolve();
+    expect(waitForRender).toHaveBeenCalledTimes(1);
+
+    await reader.cancel('done');
+    await expect(read).resolves.toMatchObject({ done: true });
+
+    expect(waitForRender).toHaveBeenCalledTimes(1);
+    expect(setReplaying).toHaveBeenLastCalledWith(false);
+    expect(cancelled).toBe(true);
+  });
+
+  it('does not clear replaying twice when cancelled during replay completion', async () => {
+    const { waitForRender, releaseNext } = createRenderWait();
+    const setReplaying = vi.fn();
+    const replayStr = 'replay';
+    const replayContentLength = encoder.encode(replayStr).byteLength;
+
+    const streamPromise = createReplayBoundaryStream(
+      createResponse([replayStr], replayContentLength),
+      { setReplaying, waitForRender },
+    );
+
+    await releaseNext();
+    const stream = await streamPromise;
+    const reader = stream.getReader();
+
+    await expect(reader.read()).resolves.toMatchObject({
+      done: false,
+      value: encoder.encode(replayStr),
+    });
+    expect(waitForRender).toHaveBeenCalledTimes(2);
+
+    const cancel = reader.cancel('done');
+    await Promise.resolve();
+    expect(setReplaying).toHaveBeenCalledTimes(1);
+
+    await releaseNext();
+    expect(setReplaying).toHaveBeenCalledTimes(2);
+    expect(setReplaying).toHaveBeenLastCalledWith(false);
+
+    await releaseNext();
+    await cancel;
+    expect(setReplaying).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets data-stream parsing commit replayed text before live tool calls', async () => {
+    const { waitForRender, releaseNext } = createRenderWait();
+    const setReplaying = vi.fn();
+    const replayPrefix = '0:"hi"\nb:{"toolCallId":"call-1","toolName":"te';
+    const liveSuffix = 'st"}\n';
+    const replayContentLength = encoder.encode(replayPrefix).byteLength;
+
+    const streamPromise = createReplayBoundaryStream(
+      createResponse([replayPrefix + liveSuffix], replayContentLength),
+      { setReplaying, waitForRender },
+    );
+
+    await releaseNext();
+    const messages = (await streamPromise)
+      .pipeThrough(new DataStreamDecoder())
+      .pipeThrough(new AssistantMessageAccumulator({ throttle: true }));
+    const reader = messages.getReader();
+
+    let sawReplayedText = false;
+    while (!sawReplayedText) {
+      const replayedMessage = await reader.read();
+      expect(replayedMessage.done).toBe(false);
+      expect(replayedMessage.value?.parts.some((part) => part.type === 'tool-call')).toBe(false);
+      sawReplayedText =
+        replayedMessage.value?.parts.some((part) => part.type === 'text' && part.text === 'hi') ??
+        false;
+    }
+    expect(setReplaying).toHaveBeenCalledTimes(1);
+
+    const liveMessagePromise = reader.read();
+    await releaseNext();
+    expect(setReplaying).toHaveBeenLastCalledWith(false);
+    await releaseNext();
+
+    let liveMessage = await liveMessagePromise;
+    while (
+      !liveMessage.done &&
+      !liveMessage.value?.parts.some(
+        (part) => part.type === 'tool-call' && part.toolName === 'test',
+      )
+    ) {
+      liveMessage = await reader.read();
+    }
+    expect(liveMessage.done).toBe(false);
   });
 });

@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const srcRoot = join(__dirname, '..');
+const BARREL = '@assistant-ui/core/react';
 
 const sourceFiles = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -13,41 +15,83 @@ const sourceFiles = (dir: string): string[] =>
       : [];
   });
 
-const BARREL = /(import|export)\s+(type\s+)?([^;]*?)\s*from\s*['"]@assistant-ui\/core\/react['"]/gs;
+const isBarrel = (node: ts.Expression | undefined): boolean =>
+  !!node && ts.isStringLiteralLike(node) && node.text === BARREL;
 
-/** Statements that load `@assistant-ui/core/react` at runtime (not type-only). */
-const BARE = /import\s*['"]@assistant-ui\/core\/react['"]/g;
-
-const runtimeBarrelImports = (source: string): string[] => [
-  ...[...source.matchAll(BARE)].map(([statement]) => statement),
-  ...[...source.matchAll(BARREL)]
-    .filter(([, , typeOnly, clause]) => {
-      if (typeOnly) return false;
-      const specifiers = clause!
-        .replace(/^\{|\}$/g, '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      return specifiers.length === 0 || specifiers.some((s) => !s.startsWith('type '));
-    })
-    .map(([statement]) => statement),
-];
+/**
+ * Statements that load `@assistant-ui/core/react` at runtime: value imports
+ * and re-exports, bare imports, `import x = require()` and dynamic `import()`.
+ * Type-only declarations (or declarations whose specifiers are all type-only)
+ * are erased and therefore allowed.
+ */
+const runtimeBarrelImports = (source: string): string[] => {
+  const file = ts.createSourceFile('source.ts', source, ts.ScriptTarget.Latest, true);
+  const found: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isImportDeclaration(node) && isBarrel(node.moduleSpecifier)) {
+      const clause = node.importClause;
+      const named = clause?.namedBindings;
+      const typeOnly =
+        !!clause &&
+        (clause.isTypeOnly ||
+          (!clause.name &&
+            !!named &&
+            ts.isNamedImports(named) &&
+            named.elements.length > 0 &&
+            named.elements.every((element) => element.isTypeOnly)));
+      if (!typeOnly) found.push(node.getText(file));
+    } else if (ts.isExportDeclaration(node) && isBarrel(node.moduleSpecifier)) {
+      const named = node.exportClause;
+      const typeOnly =
+        node.isTypeOnly ||
+        (!!named &&
+          ts.isNamedExports(named) &&
+          named.elements.length > 0 &&
+          named.elements.every((element) => element.isTypeOnly));
+      if (!typeOnly) found.push(node.getText(file));
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      isBarrel(node.moduleReference.expression) &&
+      !node.isTypeOnly
+    ) {
+      found.push(node.getText(file));
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      isBarrel(node.arguments[0])
+    ) {
+      found.push(node.getText(file));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+};
 
 describe('main entry stays free of the React barrel', () => {
-  it('detects value imports and ignores type-only ones', () => {
-    expect(runtimeBarrelImports(`import { Tools } from '@assistant-ui/core/react';`)).toHaveLength(
-      1,
-    );
-    expect(
-      runtimeBarrelImports(`export { type A, B } from '@assistant-ui/core/react';`),
-    ).toHaveLength(1);
-    expect(runtimeBarrelImports(`import '@assistant-ui/core/react';`)).toHaveLength(1);
-    expect(runtimeBarrelImports(`import type { A } from '@assistant-ui/core/react';`)).toHaveLength(
-      0,
-    );
-    expect(
-      runtimeBarrelImports(`export { type A, type B } from '@assistant-ui/core/react';`),
-    ).toHaveLength(0);
+  it('detects every kind of runtime import', () => {
+    const detect = (code: string) => runtimeBarrelImports(code).length;
+    expect(detect(`import { Tools } from '${BARREL}';`)).toBe(1);
+    expect(detect(`import * as R from '${BARREL}';`)).toBe(1);
+    expect(detect(`import Tools from '${BARREL}';`)).toBe(1);
+    expect(detect(`import '${BARREL}';`)).toBe(1);
+    expect(detect(`export { type A, B } from '${BARREL}';`)).toBe(1);
+    expect(detect(`export * from '${BARREL}';`)).toBe(1);
+    expect(detect(`const m = await import('${BARREL}');`)).toBe(1);
+    expect(detect(`import R = require('${BARREL}');`)).toBe(1);
+  });
+
+  it('ignores type-only imports and is not fooled by comments', () => {
+    const detect = (code: string) => runtimeBarrelImports(code).length;
+    expect(detect(`import type { A } from '${BARREL}';`)).toBe(0);
+    expect(detect(`import { type A, type B } from '${BARREL}';`)).toBe(0);
+    expect(detect(`export type { A } from '${BARREL}';`)).toBe(0);
+    expect(detect(`export { type A } from '${BARREL}';`)).toBe(0);
+    expect(detect(`// import the types\nimport type { A } from '${BARREL}';`)).toBe(0);
+    // A comment that mentions `import type` must not hide a value import.
+    expect(detect(`// We import type helpers below\nimport { Tools } from '${BARREL}';`)).toBe(1);
+    expect(detect(`// import('${BARREL}') is documented here`)).toBe(0);
   });
 
   it('has no runtime import of @assistant-ui/core/react in any library source', () => {

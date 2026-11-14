@@ -1,11 +1,7 @@
 // Ported from packages/core/src/react/adapters/TitleGenerationAdapter.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-import type { ThreadMessage } from '@assistant-ui/core';
 
-/** Generates a thread title from its messages. */
-export interface TitleGenerationAdapter {
-  /** Returns the title for `messages`. */
-  generateTitle(messages: readonly ThreadMessage[]): Promise<string>;
-}
+export type { TitleGenerationAdapter } from '@assistant-ui/core/react';
+import type { TitleGenerationAdapter } from '@assistant-ui/core/react';
 
 /**
  * A title adapter that uses the first user text (trimmed to 50 characters),

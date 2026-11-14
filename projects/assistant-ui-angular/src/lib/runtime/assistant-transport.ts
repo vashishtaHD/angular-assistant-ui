@@ -657,6 +657,8 @@ function createTransportThread<T>(
 interface TransportShared<T> {
   getOptions: () => AssistantTransportRuntimeOptions<T>;
   hosts: Set<{ publish: () => void; destroy: () => void }>;
+  /** Set by `destroy()`: threads mounted afterwards stay disposed. */
+  destroyed: boolean;
 }
 
 /** The per-thread body: the transport runtime wired to the thread list client. */
@@ -670,6 +672,10 @@ const TransportThread = resource(function useTransportThread<T>({
     createTransportThread<T>(shared.getOptions, () => clientRef.current!.threadListItem()),
   );
   useEffect(() => {
+    if (shared.destroyed) {
+      host.destroy();
+      return undefined;
+    }
     host.revive();
     shared.hosts.add(host);
     // Tools and instructions registered in the client's model context reach
@@ -717,12 +723,19 @@ export function createAssistantTransportRuntime<T>(
   threadList: { adapter?: RemoteThreadListAdapter } = {},
 ): AssistantTransportRuntime<T> {
   let options = initialOptions;
-  const shared: TransportShared<T> = { getOptions: () => options, hosts: new Set() };
+  const shared: TransportShared<T> = {
+    getOptions: () => options,
+    hosts: new Set(),
+    destroyed: false,
+  };
   const adapter = threadList.adapter ?? new InMemoryThreadListAdapter();
   return {
     config: AuiConfig({
       threads: RemoteThreadList({
         adapter,
+        // As upstream: every visited thread stays mounted, so its agent state and
+        // running request survive a switch to another thread.
+        backgroundThreads: true,
         thread: (threadId) => withKey(threadId, TransportThread({ shared })),
       }),
     }),
@@ -731,6 +744,7 @@ export function createAssistantTransportRuntime<T>(
       for (const host of shared.hosts) host.publish();
     },
     destroy: () => {
+      shared.destroyed = true;
       for (const host of [...shared.hosts]) host.destroy();
     },
   };

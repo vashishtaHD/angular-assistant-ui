@@ -226,6 +226,87 @@ describe('createAssistantTransportRuntime', () => {
     fixture.destroy();
   });
 
+  it('keeps a thread alive in the background: state kept and request not aborted across a switch', async () => {
+    const signals: AbortSignal[] = [];
+    const runs: { finish: () => void }[] = [];
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      signals.push(init.signal as AbortSignal);
+      if (signals.length === 1) {
+        return sseResponse({
+          messages: [
+            { id: 'u1', role: 'user', text: 'one' },
+            { id: 'a1', role: 'assistant', text: 'reply' },
+          ],
+        });
+      }
+      const held = heldResponse(init.signal as AbortSignal);
+      runs.push(held);
+      return held.response;
+    });
+    const fixture = await mount();
+
+    send('one');
+    await vi.waitFor(() =>
+      expect(
+        aui
+          .thread()
+          .getState()
+          .messages.map((m) => m.id),
+      ).toEqual(['u1', 'a1']),
+    );
+    await vi.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    const threadA = aui.threads().getState().mainThreadId;
+
+    // A second request stays in flight while the user moves to a new thread.
+    send('two');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await aui.threads().switchToNewThread();
+    await vi.waitFor(() => expect(aui.threads().getState().mainThreadId).not.toBe(threadA));
+    expect(aui.thread().getState().messages).toHaveLength(0);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(signals[1]!.aborted).toBe(false);
+
+    // Switching back shows the same conversation, and the run is still going.
+    await aui.threads().switchToThread(threadA);
+    await vi.waitFor(() =>
+      expect(
+        aui
+          .thread()
+          .getState()
+          .messages.map((m) => m.id),
+      ).toContain('a1'),
+    );
+    expect(
+      aui
+        .thread()
+        .getState()
+        .messages.map((m) => m.id)
+        .slice(0, 2),
+    ).toEqual(['u1', 'a1']);
+    expect(signals[1]!.aborted).toBe(false);
+    runs[0]!.finish();
+    await vi.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    expect(signals[1]!.aborted).toBe(false);
+    fixture.destroy();
+  });
+
+  it('stays destroyed: a thread mounted after destroy() never runs', async () => {
+    fetchMock.mockImplementation(async () => sseResponse({ messages: [] }));
+    const fixture = await mount();
+    send('one');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+
+    const first = aui.threads().getState().mainThreadId;
+    transport.destroy();
+    await aui.threads().switchToNewThread();
+    await vi.waitFor(() => expect(aui.threads().getState().mainThreadId).not.toBe(first));
+    send('two');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fixture.destroy();
+  });
+
   it('sendCommand queues a custom command through the injected function', async () => {
     fetchMock.mockImplementation(async () => sseResponse({ messages: [] }));
     const fixture = await mount();
