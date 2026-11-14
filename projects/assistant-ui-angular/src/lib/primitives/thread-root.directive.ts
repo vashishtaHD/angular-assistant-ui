@@ -1,6 +1,19 @@
 // Ported from packages/vue/src/primitives/thread.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-import { Directive } from '@angular/core';
+import { Directive, ElementRef, InjectionToken, inject } from '@angular/core';
 import { injectAui } from '../state/inject-aui';
+
+/** Injection token for the nearest thread root's element. */
+export const AUI_THREAD_ROOT_ELEMENT = new InjectionToken<ElementRef<HTMLElement>>(
+  'assistant-ui.angular.thread-root-element',
+);
+
+/**
+ * Returns the nearest `[auiThreadRoot]`'s element, or `undefined` outside one.
+ * Must be called in an injection context.
+ */
+export function injectThreadRootElementRef(): ElementRef<HTMLElement> | undefined {
+  return inject(AUI_THREAD_ROOT_ELEMENT, { optional: true }) ?? undefined;
+}
 
 /**
  * Marks the wrapper element of the thread. While it exists, Escape stops an
@@ -16,6 +29,12 @@ import { injectAui } from '../state/inject-aui';
   selector: '[auiThreadRoot]',
   standalone: true,
   host: { '(document:keydown.escape)': 'onEscape($event)' },
+  providers: [
+    {
+      provide: AUI_THREAD_ROOT_ELEMENT,
+      useFactory: () => inject<ElementRef<HTMLElement>>(ElementRef),
+    },
+  ],
 })
 export class AuiThreadRootDirective {
   private readonly aui = injectAui();
