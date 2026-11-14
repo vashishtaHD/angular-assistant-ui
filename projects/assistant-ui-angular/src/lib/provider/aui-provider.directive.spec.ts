@@ -2,7 +2,8 @@
 import { ChangeDetectionStrategy, Component, signal, type Type } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { flushTapSync } from '@assistant-ui/tap';
+import { flushTapSync, resource } from '@assistant-ui/tap';
+import { useAssistantClientDestroySignal } from '@assistant-ui/store/internal';
 import type { AssistantClient } from '@assistant-ui/store/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../testing-internal/test-bed';
@@ -40,6 +41,16 @@ const probeAui = (fixture: ComponentFixture<unknown>): FixtureClient =>
     (fixture.debugElement.query(By.directive(ProbeComponent)).componentInstance as ProbeComponent)
       .aui,
   );
+
+/** The destroy signals seen by `DestroyAwareThread` instances. */
+const destroySignals: (AbortSignal | undefined)[] = [];
+const useDestroyAwareThread = () => {
+  const signal = useAssistantClientDestroySignal();
+  if (!destroySignals.includes(signal)) destroySignals.push(signal);
+  return { getState: () => ({ selected: 0 }) };
+};
+/** A thread scope that records its client's permanent-teardown signal. */
+const DestroyAwareThread = resource(useDestroyAwareThread);
 
 describe('AuiProviderDirective', () => {
   afterEach(() => {
@@ -224,7 +235,7 @@ describe('AuiProviderDirective', () => {
     fixture.destroy();
   });
 
-  it('releases the client on destroy, soft unmounting its scopes', async () => {
+  it('runs the scope cleanups on destroy', async () => {
     @Component({
       standalone: true,
       imports: [AuiProviderDirective, ProbeComponent],
@@ -243,6 +254,30 @@ describe('AuiProviderDirective', () => {
     fixture.destroy();
     await vi.waitFor(() => expect(trackers.threadCleanups).toBe(afterMount + 1));
     expect(afterMount).toBeGreaterThanOrEqual(before);
+  });
+
+  it('destroys the client permanently on destroy, aborting its destroy signal', () => {
+    @Component({
+      standalone: true,
+      imports: [AuiProviderDirective, ProbeComponent],
+      changeDetection: ChangeDetectionStrategy.OnPush,
+      template: `<div [auiProvider]="config"><aui-probe /></div>`,
+    })
+    class HostComponent {
+      readonly config = fixtureConfig({ thread: DestroyAwareThread() });
+    }
+    destroySignals.length = 0;
+    const fixture = mount(HostComponent);
+    probeAui(fixture).thread.getState();
+
+    expect(destroySignals).toHaveLength(1);
+    const signal = destroySignals[0]!;
+    expect(signal.aborted).toBe(false);
+
+    fixture.destroy();
+    // Angular never re-attaches a destroyed view, so the teardown is
+    // permanent and in-flight work (such as a streaming run) is released.
+    expect(signal.aborted).toBe(true);
   });
 
   it('returns the throwing default client outside a provider', () => {

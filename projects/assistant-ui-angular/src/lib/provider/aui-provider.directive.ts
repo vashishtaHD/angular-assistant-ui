@@ -49,6 +49,9 @@ interface PendingSubscription {
  * constructors); they are notified once the client exists, so read state in
  * templates, `computed`s or event handlers rather than in constructors.
  *
+ * Destroying the provider destroys its client permanently (its destroy
+ * signal aborts, so an in-flight run such as a streaming chat is stopped).
+ *
  * @example
  * ```html
  * <ng-container [auiProvider]="config">
@@ -109,6 +112,10 @@ export class AuiProviderDirective implements OnChanges {
       this.destroyed = true;
       this.pending.clear();
       this.inner?.release();
+      // A destroyed Angular view never comes back, so tear the client down
+      // for good: releasing alone only soft-unmounts it, which keeps
+      // in-flight work (such as a streaming chat run) alive.
+      this.inner?.handle.destroy();
     });
   }
 

@@ -7,7 +7,13 @@
     "@assistant-ui/core": "~0.3.36",
     "@assistant-ui/store": "~0.3.23",
     "@assistant-ui/tap": "~0.9.26",
-    "@types/react": "*"
+    "@types/react": "*",
+    "ai": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    }
   },
   "dependencies": {
     "tslib": "^2.3.0"
