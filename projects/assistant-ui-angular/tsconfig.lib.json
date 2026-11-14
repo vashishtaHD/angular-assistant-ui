@@ -7,5 +7,12 @@
     "inlineSources": true,
     "types": []
   },
-  "exclude": ["**/*.spec.ts", "src/testing-internal/**", "src/test-setup.*.ts", "vitest.config.mts"]
+  "exclude": [
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "markdown/src/vendor/markdown/__tests__/**",
+    "src/testing-internal/**",
+    "src/test-setup.*.ts",
+    "vitest.config.mts"
+  ]
 }

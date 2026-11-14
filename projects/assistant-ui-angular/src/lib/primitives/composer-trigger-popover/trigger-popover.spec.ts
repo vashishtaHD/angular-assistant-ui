@@ -69,6 +69,7 @@ class ProbeComponent {
         <div
           auiComposerTriggerPopover
           #mention="auiComposerTriggerPopover"
+          class="flex"
           data-t="mention"
           char="@"
           [items]="people"
@@ -85,15 +86,23 @@ class ProbeComponent {
           char="#"
           [adapter]="catAdapter"
         >
-          <div auiComposerTriggerPopoverCategories #cats="auiComposerTriggerPopoverCategories">
+          <div
+            auiComposerTriggerPopoverCategories
+            #cats="auiComposerTriggerPopoverCategories"
+            class="flex"
+          >
             @for (c of cats.categories(); track c.id) {
               <button auiComposerTriggerPopoverCategoryItem [categoryId]="c.id">
                 {{ c.label }}
               </button>
             }
           </div>
-          <button auiComposerTriggerPopoverBack>back</button>
-          <div auiComposerTriggerPopoverItems #catItems="auiComposerTriggerPopoverItems">
+          <button auiComposerTriggerPopoverBack class="flex">back</button>
+          <div
+            auiComposerTriggerPopoverItems
+            #catItems="auiComposerTriggerPopoverItems"
+            class="flex"
+          >
             @for (item of catItems.items(); track item.id) {
               <button auiComposerTriggerPopoverItem [item]="item">{{ item.label }}</button>
             }
@@ -325,6 +334,35 @@ describe('composer trigger popover', () => {
     t.cat.querySelector<HTMLElement>('[auiComposerTriggerPopoverItems] button')!.click();
     await t.settle();
     expect(t.aui.composer.getState().text).toBe(':file[a.ts] ');
+  });
+
+  it('stays hidden while closed even under an author class that sets display', async () => {
+    // A utility class such as Tailwind's .flex beats the UA [hidden] rule (Task 10 review m6).
+    const style = document.createElement('style');
+    style.textContent = '.flex { display: flex; }';
+    document.head.append(style);
+    try {
+      const t = await setup();
+      const display = (el: Element) => getComputedStyle(el).display;
+      const part = (sel: string) => t.cat.querySelector<HTMLElement>(sel)!;
+      expect(display(t.mention)).toBe('none');
+      expect(display(t.cat)).toBe('none');
+
+      await t.type('#');
+      expect(display(t.cat)).toBe('block');
+      expect(display(part('[auiComposerTriggerPopoverCategories]'))).toBe('flex');
+      expect(display(part('[auiComposerTriggerPopoverItems]'))).toBe('none');
+      expect(display(part('button[auiComposerTriggerPopoverBack]'))).toBe('none');
+      expect(display(t.mention)).toBe('none');
+
+      await t.press('ArrowDown');
+      await t.press('Enter');
+      expect(display(part('[auiComposerTriggerPopoverCategories]'))).toBe('none');
+      expect(display(part('[auiComposerTriggerPopoverItems]'))).toBe('flex');
+      expect(display(part('button[auiComposerTriggerPopoverBack]'))).toBe('flex');
+    } finally {
+      style.remove();
+    }
   });
 });
 

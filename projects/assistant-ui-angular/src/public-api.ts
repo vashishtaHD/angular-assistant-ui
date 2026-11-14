@@ -414,6 +414,87 @@ export {
   type CreateAttachment,
   type PendingAttachment,
 } from '@assistant-ui/core';
+// Task 22: model context, frontend tools, interactables and runtime helpers.
+export {
+  injectAssistantInstructions,
+  type AssistantInstructionsOptions,
+  type MaybeSignal,
+} from './lib/model-context/instructions';
+export {
+  injectAssistantContext,
+  type AssistantContextConfig,
+  type AssistantContextOptions,
+} from './lib/model-context/context';
+export { AuiAssistantVisibleDirective } from './lib/model-context/visible';
+export {
+  makeAssistantTool,
+  registerTool,
+  type AssistantTool,
+  type AssistantToolProps,
+  type AuiToolDefinition,
+  type AuiToolDisplay,
+} from './lib/tools/register-tool';
+export {
+  injectAuiToolOverrides,
+  registerToolkit,
+  type AuiToolOverrides,
+  type AuiToolkit,
+} from './lib/tools/toolkit';
+export {
+  unstable_injectInteractable,
+  unstable_injectInteractableState,
+  unstable_injectInteractableVersions,
+  type InteractableConfig,
+  type InteractableHandle,
+  type InteractableStateHandle,
+  type InteractableStateUpdater,
+} from './lib/interactables/inject-interactable';
+export {
+  injectAssistantInteractable,
+  injectInteractableState,
+  type AssistantInteractableProps,
+  type LegacyInteractableStateHandle,
+} from './lib/interactables/legacy';
+export {
+  registerInteractableToolConfig,
+  unstable_interactableTool,
+  type InteractableToolRenderComponent,
+  type Unstable_InteractableToolConfig,
+  type Unstable_InteractableToolRenderProps,
+} from './lib/interactables/interactable-tool';
+export { unstable_injectThreadMessageIds } from './lib/state/inject-thread-message-ids';
+export {
+  createExternalStoreRuntime,
+  createLocalRuntime,
+  injectExternalStoreRuntime,
+  injectLocalRuntime,
+  remoteThreadListConfig,
+  type LocalRuntimeFactoryOptions,
+  type ManagedRuntime,
+  type RemoteThreadListConfigOptions,
+} from './lib/runtime/factories';
+export {
+  createExternalMessageConverter,
+  type ExternalMessageConverter,
+  type ExternalMessageConverterOptions,
+  type ExternalMessageConverterCallback,
+  type ExternalMessageConverterMetadata,
+} from './lib/runtime/external-message-converter';
+export {
+  messageObjectScope,
+  readonlyThreadScope,
+  textMessagePartScope,
+  threadListItemRuntimeScope,
+  type ReadonlyThreadScope,
+} from './lib/runtime/scopes';
+export * from './lib/runtime/re-exports';
+export {
+  createAssistantTransportRuntime,
+  injectAssistantTransportSendCommand,
+  injectAssistantTransportState,
+  type AssistantTransportRuntime,
+  type AssistantTransportRuntimeOptions,
+} from './lib/runtime/assistant-transport';
 
 // Task 17: tool-call elapsed time and streaming argument status (used by the styled tool fallback).
 export { injectToolCallElapsed } from './lib/tools/tool-call-elapsed';

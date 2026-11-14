@@ -36,7 +36,8 @@ export class AuiErrorRootDirective {
  * Renders the current message's error text (`messageErrorText`: a string,
  * the `message` of an error object, or `An error occurred`). Projected
  * content replaces the text. While the message has no error the element is
- * hidden and renders nothing.
+ * hidden (`hidden` plus a host `display: none` style binding, so class-based
+ * author CSS such as `.flex` cannot show it) and renders nothing.
  *
  * @example
  * ```html
@@ -51,7 +52,10 @@ export class AuiErrorRootDirective {
   selector: '[auiErrorMessage]',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '[hidden]': 'error() === undefined' },
+  host: {
+    '[hidden]': 'error() === undefined',
+    '[style.display]': 'error() === undefined ? "none" : null',
+  },
   template: `
     @if (error() !== undefined) {
       <ng-content>{{ errorText() }}</ng-content>

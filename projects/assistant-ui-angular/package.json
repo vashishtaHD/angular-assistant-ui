@@ -21,6 +21,7 @@
     "@angular/cdk": ">=18.2.0 <23.0.0",
     "@angular/common": ">=18.2.0 <23.0.0",
     "@angular/core": ">=18.2.0 <23.0.0",
+    "@angular/platform-browser": ">=18.2.0 <23.0.0",
     "@assistant-ui/ai-sdk": "0.0.18",
     "@assistant-ui/core": "~0.3.36",
     "@assistant-ui/store": "~0.3.23",
@@ -28,13 +29,18 @@
     "@types/react": "*",
     "ai": "^7.0.101",
     "assistant-stream": "^0.3.57",
-    "react": "^18 || ^19"
+    "markdown-it": "^15.0.3",
+    "react": "^18 || ^19",
+    "shiki": "^4.6.0"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/react": {
       "optional": true
     },
     "@angular/cdk": {
+      "optional": true
+    },
+    "@angular/platform-browser": {
       "optional": true
     },
     "@assistant-ui/ai-sdk": {
@@ -46,7 +52,13 @@
     "assistant-stream": {
       "optional": true
     },
+    "markdown-it": {
+      "optional": true
+    },
     "react": {
+      "optional": true
+    },
+    "shiki": {
       "optional": true
     }
   },

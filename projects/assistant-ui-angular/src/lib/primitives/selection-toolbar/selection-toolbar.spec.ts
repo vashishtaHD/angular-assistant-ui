@@ -96,6 +96,8 @@ describe('selection toolbar', () => {
   it('is hidden without a selection', async () => {
     const t = await setup();
     expect(t.toolbar.hidden).toBe(true);
+    // An inline display:none backs [hidden], so author CSS cannot show it.
+    expect(t.toolbar.style.display).toBe('none');
     expect(t.root.rect()).toBeNull();
   });
 
@@ -103,6 +105,7 @@ describe('selection toolbar', () => {
     const t = await setup();
     await t.select(t.text('m1'), 0, t.text('m1'), 5);
     expect(t.toolbar.hidden).toBe(false);
+    expect(t.toolbar.style.display).toBe('');
     expect(t.root.info()?.messageId).toBe('m1');
     expect(t.root.info()?.text).toBe('first');
     expect(t.root.rect()?.top).toBe(100);

@@ -11,13 +11,15 @@ import {
   inject,
   input,
   signal,
+  type Signal,
 } from '@angular/core';
 import {
-  UI_MENU_HOST,
-  UiMenuContentDirective,
-  UiMenuItemDirective,
-  type UiMenuHost,
-} from './headless-menu';
+  AuiMenuContentDirective,
+  AuiMenuItemDirective,
+  AuiMenuRootDirective,
+  AuiMenuSeparatorDirective,
+  AuiMenuTriggerDirective,
+} from 'angular-assistant-ui';
 
 /** Horizontal alignment of the menu relative to its trigger. */
 export type AuiDropdownMenuAlign = 'start' | 'end';
@@ -45,41 +47,47 @@ function positions(align: AuiDropdownMenuAlign): ConnectedPosition[] {
  * </ng-template>
  * ```
  *
- * Keyboard: ArrowDown/ArrowUp on the trigger open the menu on the first/last item.
- * Closes on Escape, item selection, Tab and outside click.
+ * Built on the main entry's headless menu: the host is an `[auiMenuRoot]` and
+ * an `[auiMenuTrigger]`, and the template's content and items are
+ * `[auiMenuContent]` and `[auiMenuItem]`. The template is rendered only while
+ * the menu is open; it is unmounted on close, never just hidden.
+ *
+ * Keyboard: ArrowDown/ArrowUp on the trigger open the menu on the first/last
+ * item, and a keyboard click (Enter/Space) opens it on the first item. A pointer
+ * click opens it with focus on the menu surface (no item highlighted), as Radix
+ * does; ArrowDown then enters the list. Closes on Escape, item
+ * selection, Tab and outside click.
  */
 @Directive({
   selector: '[auiDropdownMenuTrigger]',
   standalone: true,
   exportAs: 'auiDropdownMenuTrigger',
-  host: {
-    class: 'aui-dropdown-menu-trigger',
-    'aria-haspopup': 'menu',
-    '[attr.aria-expanded]': 'isOpen()',
-    '[attr.data-state]': 'isOpen() ? "open" : "closed"',
-    '(click)': 'toggle()',
-    '(keydown)': 'onKeydown($event)',
-  },
+  hostDirectives: [AuiMenuRootDirective, AuiMenuTriggerDirective],
+  host: { class: 'aui-dropdown-menu-trigger' },
 })
 export class AuiDropdownMenuTriggerDirective {
   private readonly overlay = inject(Overlay);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly viewContainerRef = inject(ViewContainerRef);
   private readonly injector = inject(Injector);
+  private readonly menu = inject(AuiMenuRootDirective);
 
   /** The menu template to open. */
   readonly template = input.required<TemplateRef<unknown>>({ alias: 'auiDropdownMenuTrigger' });
   /** Which edge of the trigger the menu lines up with. */
   readonly align = input<AuiDropdownMenuAlign>('start');
 
-  /** Whether the menu is open. */
-  readonly isOpen = signal(false);
+  /** Whether the menu is open. A read-only view of the underlying menu root's `open`. */
+  readonly isOpen: Signal<boolean> = this.menu.open.asReadonly();
 
   private overlayRef: OverlayRef | null = null;
-  private content: UiMenuContentDirective | null = null;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.teardown());
+    const stop = this.menu.watchOpenState((open) => (open ? this.attach() : this.teardown()));
+    inject(DestroyRef).onDestroy(() => {
+      stop();
+      this.teardown();
+    });
   }
 
   /** Opens the menu when closed, closes it when open. */
@@ -90,6 +98,15 @@ export class AuiDropdownMenuTriggerDirective {
 
   /** Opens the menu and focuses its first or last item. */
   open(focus: 'first' | 'last' = 'first'): void {
+    this.menu.setOpen(true, { focus });
+  }
+
+  /** Closes the menu; `restoreFocus` returns focus to the trigger. */
+  close(restoreFocus: boolean): void {
+    this.menu.setOpen(false, { restoreFocus });
+  }
+
+  private attach(): void {
     if (this.overlayRef) return;
     const strategy = this.overlay
       .position()
@@ -110,18 +127,15 @@ export class AuiDropdownMenuTriggerDirective {
       );
     });
     ref.backdropClick().subscribe(() => this.close(false));
-    // Fallback for when focus is not inside the menu (empty or all-disabled menus).
+    // Fallback for Escape while focus is outside the menu.
     ref.keydownEvents().subscribe((event) => {
-      if (event.key === 'Escape') this.close(true);
+      if (event.key === 'Escape' && !event.defaultPrevented) this.close(true);
     });
     this.overlayRef = ref;
 
-    const host: UiMenuHost = {
-      close: (restoreFocus) => this.close(restoreFocus),
-      registerContent: (content) => (this.content = content),
-    };
+    // The template is declared by the consumer, so hand its view this menu root.
     const injector = Injector.create({
-      providers: [{ provide: UI_MENU_HOST, useValue: host }],
+      providers: [{ provide: AuiMenuRootDirective, useValue: this.menu }],
       parent: this.injector,
     });
     const view = ref.attach(
@@ -129,59 +143,51 @@ export class AuiDropdownMenuTriggerDirective {
     );
     view.detectChanges();
     ref.updatePosition();
-    this.isOpen.set(true);
-    if (focus === 'last') this.content?.focusLast();
-    else this.content?.focusFirst();
-  }
-
-  /** Closes the menu; `restoreFocus` returns focus to the trigger. */
-  close(restoreFocus: boolean): void {
-    if (!this.overlayRef) return;
-    this.teardown();
-    if (restoreFocus) this.element.focus();
-  }
-
-  protected onKeydown(event: KeyboardEvent): void {
-    if (this.isOpen()) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.open('first');
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      this.open('last');
-    }
   }
 
   private teardown(): void {
     this.overlayRef?.dispose();
     this.overlayRef = null;
-    this.content = null;
-    this.isOpen.set(false);
   }
 }
 
-/** Menu surface (`role="menu"`) rendered inside the trigger's template. */
+/**
+ * Menu surface (`role="menu"`) rendered inside the trigger's template. An
+ * `[auiMenuContent]`: roving focus, Home/End, typeahead, Escape and Tab.
+ */
 @Directive({
   selector: '[auiDropdownMenuContent]',
   standalone: true,
-  hostDirectives: [UiMenuContentDirective],
-  host: { class: 'aui-dropdown-menu-content' },
+  hostDirectives: [AuiMenuContentDirective],
+  host: { class: 'aui-dropdown-menu-content', 'aria-orientation': 'vertical' },
 })
 export class AuiDropdownMenuContentDirective {}
 
 /**
- * Menu item (`role="menuitem"`). `itemSelect` fires on click, Enter and Space,
- * then the menu closes. `disabled` items are skipped by arrow keys.
+ * Menu item (`role="menuitem"`), an `[auiMenuItem]`. `itemSelect` fires on
+ * click, Enter and Space with the originating event, then the menu closes and
+ * focus returns to the trigger; call `event.preventDefault()` in the handler to
+ * keep the menu open. `disabled` items are skipped by arrow keys. The focused
+ * item carries `data-highlighted` and the roving `tabindex="0"`.
  */
 @Directive({
   selector: '[auiDropdownMenuItem]',
   standalone: true,
   hostDirectives: [
-    { directive: UiMenuItemDirective, inputs: ['disabled'], outputs: ['itemSelect'] },
+    { directive: AuiMenuItemDirective, inputs: ['disabled'], outputs: ['select: itemSelect'] },
   ],
-  host: { class: 'aui-dropdown-menu-item' },
+  host: {
+    class: 'aui-dropdown-menu-item',
+    '[attr.tabindex]': 'highlighted() ? "0" : "-1"',
+    '[attr.data-highlighted]': 'highlighted() ? "" : null',
+    '(focus)': 'highlighted.set(true)',
+    '(blur)': 'highlighted.set(false)',
+  },
 })
-export class AuiDropdownMenuItemDirective {}
+export class AuiDropdownMenuItemDirective {
+  /** @internal */
+  protected readonly highlighted = signal(false);
+}
 
 /** Non-interactive heading inside a menu. */
 @Directive({
@@ -195,6 +201,7 @@ export class AuiDropdownMenuLabelDirective {}
 @Directive({
   selector: '[auiDropdownMenuSeparator]',
   standalone: true,
-  host: { class: 'aui-dropdown-menu-separator', role: 'separator' },
+  hostDirectives: [AuiMenuSeparatorDirective],
+  host: { class: 'aui-dropdown-menu-separator' },
 })
 export class AuiDropdownMenuSeparatorDirective {}

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { flushTapSync } from '@assistant-ui/tap';
 import { describe, expect, it } from 'vitest';
+import { displayOf, useFlexAuthorClass } from '../../../testing-internal/author-css';
 import { configureTestBed } from '../../../testing-internal/test-bed';
 import { createTestRuntime, type TestRuntime } from '../../../testing-internal/test-runtime';
 import { AuiProviderDirective } from '../../provider/aui-provider.directive';
@@ -49,7 +50,7 @@ let current: TestRuntime;
       <aui-thread-messages>
         <ng-template auiMessage>
           <div class="row">
-            <div auiBranchPickerRoot hideWhenSingleBranch class="picker">
+            <div auiBranchPickerRoot hideWhenSingleBranch class="picker flex">
               <button auiBranchPickerPrevious class="prev">x</button>
               <aui-branch-picker-number class="num" />/<aui-branch-picker-count class="cnt" />
               <button auiBranchPickerNext class="next">x</button>
@@ -115,6 +116,9 @@ describe('branch picker and edit composer', () => {
   it('hideWhenSingleBranch hides a single-branch picker', async () => {
     const { fixture, rows } = await mount();
     expect(rows()[0].querySelector('.picker')!.hasAttribute('hidden')).toBe(true);
+    // Upstream returns null; an author display class must not show it.
+    useFlexAuthorClass();
+    expect(displayOf(rows()[0].querySelector('.picker')!)).toBe('none');
     fixture.destroy();
   });
 
@@ -134,6 +138,8 @@ describe('branch picker and edit composer', () => {
     await settle(fixture);
     const first = rows()[0];
     expect(first.querySelector('.picker')!.hasAttribute('hidden')).toBe(false);
+    useFlexAuthorClass();
+    expect(displayOf(first.querySelector('.picker')!)).toBe('flex');
     expect(first.querySelector('.cnt')!.textContent).toBe('2');
     expect(first.querySelector('.num')!.textContent).toBe('2');
     expect(first.querySelector<HTMLButtonElement>('.prev')!.disabled).toBe(false);

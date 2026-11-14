@@ -53,13 +53,18 @@ export class AuiComposerQuoteDirective {
 }
 
 /**
- * Renders the quoted text as the element's text content; empty (and `hidden`)
- * when there is no quote.
+ * Renders the quoted text as the element's text content; empty and hidden
+ * (`hidden` plus a host `display: none` style binding, so class-based author
+ * CSS such as `.flex` cannot show it) when there is no quote.
  */
 @Directive({
   selector: '[auiComposerQuoteText]',
   standalone: true,
-  host: { '[textContent]': 'text()', '[hidden]': '!text()' },
+  host: {
+    '[textContent]': 'text()',
+    '[hidden]': '!text()',
+    '[style.display]': 'text() ? null : "none"',
+  },
 })
 export class AuiComposerQuoteTextDirective {
   /** @internal */

@@ -13,6 +13,7 @@ import {
 import { AssistantRuntimeImpl, ExternalStoreRuntimeCore } from '@assistant-ui/core/internal';
 import { RuntimeAdapter } from '@assistant-ui/core/store';
 import { describe, expect, it, vi } from 'vitest';
+import { displayOf, useFlexAuthorClass } from '../../testing-internal/author-css';
 import { configureTestBed } from '../../testing-internal/test-bed';
 import { createTestRuntime } from '../../testing-internal/test-runtime';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
@@ -121,6 +122,7 @@ class ProbeComponent {
     <div [auiProvider]="config" auiThreadRoot>
       <aui-probe />
       <form auiComposerRoot [compact]="compact()">
+        <span auiComposerQuoteText class="bare-quote-text flex"></span>
         <div *auiComposerQuote class="quote">
           <span auiComposerQuoteText class="quote-text"></span>
           <button auiComposerQuoteDismiss class="quote-dismiss">x</button>
@@ -510,10 +512,15 @@ describe('composer quote', () => {
   it('renders QuoteText for a quote and Dismiss clears it', async () => {
     const t = await setup(createQueueRuntime(false).config);
     expect(t.el.querySelector('.quote')).toBeNull();
+    // QuoteText outside *auiComposerQuote: upstream returns null without a quote.
+    useFlexAuthorClass();
+    const bare = t.el.querySelector<HTMLElement>('.bare-quote-text')!;
+    expect(displayOf(bare)).toBe('none');
 
     flushTapSync(() => t.aui.composer.setQuote({ text: 'quoted words', messageId: 'm1' }));
     await t.settle();
     expect(t.el.querySelector('.quote-text')!.textContent).toBe('quoted words');
+    expect(displayOf(bare)).toBe('flex');
 
     (t.el.querySelector('.quote-dismiss') as HTMLButtonElement).click();
     await t.settle();

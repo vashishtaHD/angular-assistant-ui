@@ -6,7 +6,10 @@ const TABBABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * The modal window: `role="dialog"`, hidden while the modal is closed. When it
+ * The modal window: `role="dialog"`, hidden while the modal is closed (`hidden`
+ * plus a host `display: none` style binding, so class-based author CSS such as
+ * `.flex` cannot show it; a template `style`/`[style.display]` on the element
+ * or an `!important` rule still takes precedence). When it
  * opens, focus moves to the first tabbable element inside (or the dialog
  * itself). Escape (handled on the document, so it works wherever focus is) closes
  * it and returns focus to the trigger; a pointer-down
@@ -24,6 +27,7 @@ const TABBABLE =
     tabindex: '-1',
     '[id]': 'root.contentId',
     '[hidden]': '!root.open()',
+    '[style.display]': 'root.open() ? null : "none"',
     '[attr.data-state]': 'root.open() ? "open" : "closed"',
     '[attr.data-side]': 'side()',
     '[attr.data-align]': 'align()',

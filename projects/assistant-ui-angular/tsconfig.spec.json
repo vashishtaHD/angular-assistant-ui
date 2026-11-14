@@ -5,9 +5,10 @@
     "types": ["vitest/globals"],
     "paths": {
       "angular-assistant-ui": ["./src/public-api.ts"],
-      "angular-assistant-ui/testing": ["../../dist/assistant-ui-angular/testing"],
-      "angular-assistant-ui/ui": ["../../dist/assistant-ui-angular/ui"],
-      "angular-assistant-ui/mastra": ["../../dist/assistant-ui-angular/mastra"]
+      "angular-assistant-ui/testing": ["./testing/src/public-api.ts"],
+      "angular-assistant-ui/ui": ["./ui/src/public-api.ts"],
+      "angular-assistant-ui/markdown": ["./markdown/src/public-api.ts"],
+      "angular-assistant-ui/shiki": ["./shiki/src/public-api.ts"]
     }
   },
   "include": [
@@ -15,6 +16,9 @@
     "testing/**/*.spec.ts",
     "ui/**/*.spec.ts",
     "mastra/**/*.spec.ts",
+    "markdown/**/*.spec.ts",
+    "shiki/**/*.spec.ts",
+    "markdown/src/vendor/**/*.ts",
     "src/**/*.d.ts",
     "src/test-setup.*.ts",
     "src/testing-internal/**/*.ts"
