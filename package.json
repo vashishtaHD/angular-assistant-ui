@@ -16,7 +16,8 @@
     "typecheck:mastra": "npm run typecheck -w mastra-server --if-present",
     "compat": "node scripts/compat.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "typecheck:lib-spec": "tsc -p projects/assistant-ui-angular/tsconfig.spec.json --noEmit"
   },
   "private": true,
   "dependencies": {
@@ -64,6 +65,6 @@
     "mastra-server"
   ],
   "engines": {
-    "node": ">=20.11 <23"
+    "node": ">=22.13"
   }
 }
