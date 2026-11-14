@@ -1,5 +1,23 @@
 {
   "name": "mastra-server",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mastra/ai-sdk": "^1.12.0",
+    "@mastra/core": "^1.83.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "mastra": "^1.39.0",
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.7"
+  }
 }
