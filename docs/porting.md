@@ -129,8 +129,8 @@ Angular scope or directive replaces exactly are `n/a`.
 | useInlineRender | no | planned (Task 22) (Angular equivalent or documented template pattern) | Task 22 |
 | ModelContext, ModelContextOptions, ModelContextProvider, SystemPart, LanguageModelConfig, LanguageModelV1CallSettings, mergeModelContexts, ModelContextClient | no | planned (Task 22) (contracts and helpers re-exported) | Task 22 |
 | ModelContextRegistry, ModelContextRegistryToolHandle, ModelContextRegistryInstructionHandle, ModelContextRegistryProviderHandle, SerializedTool, SerializedModelContext | no | planned (Task 22) | Task 22 |
-| AssistantFrameHost, AssistantFrameProvider, useAssistantFrameHost, FRAME_MESSAGE_CHANNEL, FrameMessageType, FrameMessage | no | planned (Task 22) (model-context frame bridge; not an MCP app) | Task 22 |
-| unstable_useWebMcpProvider, unstable_defaultWebMcpFilter, Unstable_WebMcpProviderOptions, Unstable_WebMcpProviderResult | no | planned (Task 22) (WebMCP tool bridge, distinct from MCP apps) | Task 22 |
+| AssistantFrameHost, AssistantFrameProvider, useAssistantFrameHost, FRAME_MESSAGE_CHANNEL, FrameMessageType, FrameMessage | no | n/a (MCP / generative UI — out of scope by agreement) | |
+| unstable_useWebMcpProvider, unstable_defaultWebMcpFilter, Unstable_WebMcpProviderOptions, Unstable_WebMcpProviderResult | no | n/a (MCP / generative UI — out of scope by agreement) | |
 | Interactables, unstable_Interactables, useAssistantInteractable, AssistantInteractableProps | no | planned (Task 22) | Task 22 |
 | useInteractableState, unstable_useInteractable, unstable_useInteractableState, unstable_useInteractableVersions, unstable_interactableTool | no | planned (Task 22) | Task 22 |
 | unstable_getInteractableSnapshots, unstable_formatInteractableSnapshot, unstable_getInteractableVersions, Unstable_InteractableSnapshotEntry, Unstable_InteractableVersion | no | planned (Task 22) | Task 22 |
