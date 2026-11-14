@@ -136,7 +136,7 @@ export function injectAttachmentAdder(
       reason: event?.reason ?? 'adapter-error',
       message,
       contentType: held?.contentType || file.type || undefined,
-      attachmentId: held?.id,
+      attachmentId: held?.id ?? event?.attachmentId,
     });
   };
 

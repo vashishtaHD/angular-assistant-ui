@@ -246,18 +246,36 @@ describe('attachment primitives', () => {
     expect(t.el.querySelectorAll('.chip')).toHaveLength(0);
   });
 
-  it('sending the first message into an empty thread keeps the row and moves the attachments', async () => {
+  it('sending the first message into an empty thread keeps the row, rebinds it and moves the attachments', async () => {
     const warn = vi.spyOn(console, 'warn');
+    const error = vi.spyOn(console, 'error');
     const t = await setup();
+    const probe = t.fixture.debugElement.query(By.directive(ProbeComponent))
+      .componentInstance as ProbeComponent;
     pick(t, [textFile('a.txt')]);
     await t.settle();
     t.el.querySelector<HTMLButtonElement>('.send')!.click();
+    let row: Element | null = null;
+    await vi.waitFor(() => {
+      t.fixture.detectChanges();
+      row = t.el.querySelector('.row');
+      expect(row).not.toBeNull();
+    });
     await t.settle();
     await t.settle();
     expect(t.el.querySelectorAll('.chip')).toHaveLength(0);
     const sent = t.el.querySelectorAll('.row .sent');
     expect(sent).toHaveLength(1);
     expect(sent[0]!.textContent).toContain('a.txt');
+    // The row was updated in place and now reads the host's message.
+    expect(t.el.querySelector('.row')).toBe(row);
+    expect(row!.getAttribute('data-message-id')).toBe('m0');
+    // A later store update must not touch the vanished in-transit id.
+    probe.aui.composer.setText('next message');
+    await t.settle();
+    expect(error.mock.calls).toEqual([]);
+    expect(t.el.querySelector('.row')).toBe(row);
+    expect(row!.getAttribute('data-message-id')).toBe('m0');
     // The send must not re-create the whole message list (Angular NG0956).
     expect(warn.mock.calls.filter((call) => String(call[0]).includes('NG0956'))).toEqual([]);
   });
@@ -366,6 +384,17 @@ function createGatedAdapter() {
   const adapter: AttachmentAdapter = {
     accept: 'text/plain',
     async *add({ file }) {
+      if (file.name === 'nofile.txt') {
+        // An adapter whose attachment does not keep the File.
+        yield {
+          id: 'att-nofile',
+          type: 'document',
+          name: file.name,
+          contentType: file.type,
+          status: { type: 'running', reason: 'uploading', progress: 0 },
+        } as never;
+        throw new Error('lost file');
+      }
       if (file.name.startsWith('net')) {
         yield {
           id: `att-${file.name}`,
@@ -442,6 +471,16 @@ describe('attachment error ownership', () => {
       message: 'net down',
       attachmentId: 'att-net2.txt',
     });
+  });
+
+  it('keeps the attachment id of a failed upload whose attachment does not hold the File', async () => {
+    const { adapter } = createGatedAdapter();
+    nextRuntime = createAttachmentRuntime(adapter);
+    const t = await setup();
+    pick(t, [new File(['x'], 'nofile.txt', { type: 'text/plain' })]);
+    await t.settle();
+    expect(t.host.errors).toHaveLength(1);
+    expect(t.host.errors[0]).toMatchObject({ message: 'lost file', attachmentId: 'att-nofile' });
   });
 
   it('does not attribute a direct composer addition to a control with an upload in flight', async () => {
