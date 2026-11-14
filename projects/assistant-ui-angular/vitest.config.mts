@@ -29,9 +29,10 @@ function project(name: 'zone' | 'zoneless') {
       globals: true,
       environment: 'jsdom',
       setupFiles: [`src/test-setup.${name}.ts`],
-      include: ['src/**/*.spec.ts', 'testing/**/*.spec.ts'],
-      // Inline so the react aliases also apply inside @assistant-ui/* packages.
-      server: { deps: { inline: [/@assistant-ui\//] } },
+      include: ['src/**/*.spec.ts', 'testing/**/*.spec.ts', 'mastra/**/*.spec.ts'],
+      // Inline so the react aliases also apply inside @assistant-ui/* packages
+      // and @ai-sdk/react (the mastra entry runs `useChat` through the shim).
+      server: { deps: { inline: [/@assistant-ui\//, /@ai-sdk\/react/] } },
     },
   };
 }
