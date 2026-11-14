@@ -138,6 +138,49 @@ describe('createTestRuntime extras', () => {
     release();
   });
 
+  it('deletes messages that were appended without an explicit id', async () => {
+    const rt = createTestRuntime();
+    flushTapSync(() => {
+      rt.append({ role: 'user', content: text('hi') });
+      rt.append({ role: 'assistant', content: text('yo') });
+    });
+    const { client, release } = mountClient(rt.config);
+    const ids = () => client.thread.getState().messages.map((m) => m.id);
+    const [first, second] = ids();
+    expect(ids()).toHaveLength(2);
+
+    await client.thread.deleteMessage(second!);
+    await settle();
+    expect(ids()).toEqual([first]);
+    flushTapSync(() => rt.setRunning(false));
+    expect(ids()).toEqual([first]);
+    release();
+  });
+
+  it('keeps the surviving active descendant when an interior message is deleted', async () => {
+    const rt = createTestRuntime();
+    flushTapSync(() => {
+      rt.append({ id: 'u1', role: 'user', content: text('hi') });
+      rt.append({ id: 'a1', role: 'assistant', content: text('first') });
+      rt.append({ id: 'u2', role: 'user', content: text('more') });
+      rt.appendBranch('u1', { id: 'a2', role: 'assistant', content: text('alt') });
+    });
+    const { client, release } = mountClient(rt.config);
+    const ids = () => client.thread.getState().messages.map((m) => m.id);
+    expect(ids()).toEqual(['u1', 'a2']);
+    flushTapSync(() =>
+      client.thread.message({ id: 'a2' }).switchToBranch({ position: 'previous' }),
+    );
+    expect(ids()).toEqual(['u1', 'a1', 'u2']);
+
+    await client.thread.deleteMessage('a1');
+    await settle();
+    expect(ids()).toEqual(['u1', 'u2']);
+    flushTapSync(() => rt.append({ id: 'a3', role: 'assistant', content: text('later') }));
+    expect(ids()).toEqual(['u1', 'u2', 'a3']);
+    release();
+  });
+
   it('appendBranch rejects an unknown parent', () => {
     const rt = createTestRuntime();
     expect(() => rt.appendBranch('nope', { id: 'x', role: 'user', content: text('x') })).toThrow(

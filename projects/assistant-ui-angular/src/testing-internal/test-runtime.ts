@@ -114,14 +114,8 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
     }
     const removed = tree.find((entry) => entry.message.id === messageId);
     if (!removed) return;
-    const inActiveChain = (id: string | null) => {
-      for (let cursor = id; cursor;) {
-        if (cursor === messageId) return true;
-        cursor = tree?.find((entry) => entry.message.id === cursor)?.parentId ?? null;
-      }
-      return false;
-    };
-    const headWasDeleted = inActiveChain(headId);
+    // Only a deleted head moves; deleting an ancestor keeps the surviving head.
+    const headWasDeleted = headId === messageId;
     tree = tree
       .filter((entry) => entry.message.id !== messageId)
       .map((entry) =>
@@ -184,7 +178,7 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
       tree = [...tree, { message: next, parentId: headId }];
       headId = next.id;
     } else {
-      messages = [...messages, message];
+      messages = [...messages, withId(message)];
     }
     sync();
   };
@@ -203,7 +197,7 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
       });
       headId = parentId;
     } else {
-      messages = next;
+      messages = next.map(withId);
     }
     sync();
   };
