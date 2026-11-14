@@ -181,11 +181,15 @@ See [docs/porting.md](../../docs/porting.md) for what is ported and what is plan
 
 <!-- compat-table -->
 
-| Angular | Change detection | Status                                                                                                         |
-| ------- | ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| 18.2    | Zone.js          | Verified by the demo app and a live end-to-end smoke test (Mastra, OpenRouter model, tool call, streamed text) |
-| 20      | Zone.js          | Pending: covered by the CI compatibility matrix (not yet run)                              |
-| 22      | Zoneless         | Pending: covered by the CI compatibility matrix (not yet run)                              |
+| Angular | Change detection | Status |
+| ------- | ---------------- | ------ |
+| 18.2 | Zone.js | Verified: demo app, live end-to-end smoke (Mastra, OpenRouter model, tool call, streamed text), and the compatibility matrix (core 18.2.14) |
+| 20 | Zone.js | Verified by the compatibility matrix (core 20.3.35) |
+| 22 | Zoneless | Verified by the compatibility matrix (core 22.2.6, `provideZonelessChangeDetection()`) |
+
+The compatibility matrix (`npm run compat -- <ng18|ng20|ng22>`, and the `compat` CI job) installs the
+packed library into a fresh app per version, builds it, and runs a browser smoke test that streams a
+scripted reply. Angular 22's CLI requires Node `^22.22.3` or `^24.15.0`.
 
 <!-- compat-table -->
 
