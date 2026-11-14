@@ -157,6 +157,44 @@ describe('createTestRuntime extras', () => {
     release();
   });
 
+  it('keeps generated ids stable across repeated syncs and re-published messages', () => {
+    const rt = createTestRuntime();
+    const hi = { role: 'user' as const, content: text('hi') };
+    const yo = { role: 'assistant' as const, content: text('yo') };
+    flushTapSync(() => rt.append(hi));
+    const { client, release } = mountClient(rt.config);
+    const ids = () => client.thread.getState().messages.map((m) => m.id);
+    const [hiId] = ids();
+    expect(hiId).toBeTruthy();
+
+    flushTapSync(() => rt.setRunning(true));
+    flushTapSync(() => rt.setRunning(false));
+    flushTapSync(() => rt.setSuggestions([{ prompt: 'p' }]));
+    expect(ids()).toEqual([hiId]);
+
+    // Re-publishing the same id-less input keeps its id, so rows (tracked by
+    // id in aui-thread-messages) are not remounted.
+    flushTapSync(() => rt.setMessages([hi]));
+    expect(ids()).toEqual([hiId]);
+    flushTapSync(() => rt.setMessages([hi]));
+    expect(ids()).toEqual([hiId]);
+
+    flushTapSync(() => rt.setMessages([hi, yo]));
+    const [, yoId] = ids();
+    flushTapSync(() => rt.setMessages([hi, yo]));
+    flushTapSync(() => rt.setRunning(false));
+    expect(ids()).toEqual([hiId, yoId]);
+
+    // Converting to tree mode keeps the generated ids too.
+    flushTapSync(() =>
+      rt.appendBranch(hiId!, { id: 'a2', role: 'assistant', content: text('alt') }),
+    );
+    expect(ids()).toEqual([hiId, 'a2']);
+    flushTapSync(() => rt.setMessages([hi, yo]));
+    expect(ids()).toEqual([hiId, yoId]);
+    release();
+  });
+
   it('keeps the surviving active descendant when an interior message is deleted', async () => {
     const rt = createTestRuntime();
     flushTapSync(() => {
