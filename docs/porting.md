@@ -118,3 +118,28 @@ counterpart.
    projects (`npm run test:lib`) with pristine output.
 6. Add TSDoc, export from `projects/assistant-ui-angular/src/public-api.ts`, flip the
    parity row to `ported`, and run `npm run lint` and `npm run build:lib`.
+
+## Known follow-ups
+
+Found in the phase 1 final review and deliberately not done in phase 1.
+
+- Demo runtime config is not validated, and a missing `mastraChatUrl` silently falls back to
+  localhost in production builds. Validate it as a non-empty absolute URL and `console.error` when
+  falling back in a non-dev build.
+- `docs/deployment.md` has no middleware snippet. Add a `server.middleware` bearer-token check example.
+- No test for an explicit `extends` client that differs from the injected context.
+- No test for `scrollToBottomOnThreadSwitch` or `threads.selectionChanged` (thread lists are phase 2).
+- Composer autosize ignores padding and border, so a padded textarea can scroll one line early at
+  `maxRows`; the autosize test bound also passes trivially.
+- The empty-text send test does not assert the `onNew` call count.
+- No test for the "no `tools` scope" dev warning in `registerToolUI`.
+- The message config memo in `aui-thread-messages` is not pruned when the id list becomes empty (harmless).
+- An early store listener that throws in `create()` stops notifying the remaining early listeners.
+  No current listener throws; wrapping each in `try/catch` would harden it.
+- CI (`.github/workflows/ci.yml`) has never run: no remote exists yet. Push, get a green `verify` and
+  three `compat` jobs, and record the run before relying on the compat table.
+- The compat smoke covers tool UI, `*auiIf` and cancel, but the Angular 22 (zoneless) app has so far
+  only been type-checked with its own `ngc` locally, because the Angular 22 CLI needs Node
+  `^22.22.3` or `^24.15.0`. Run `npm run compat -- ng22` on such a Node.
+- Before any npm publish, add `description`, `repository`, `author` and `keywords` to the library
+  `package.json` and pick the final package name.
