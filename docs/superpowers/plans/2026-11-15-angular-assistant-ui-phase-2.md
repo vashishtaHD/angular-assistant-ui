@@ -634,6 +634,40 @@
 - [ ] **Step 6: Run the gates** plus `node scripts/check-parity.mjs`. All PASS.
 - [ ] **Step 7: Commit.** `test(compat): styled kit smoke across Angular 18/20/22; docs and parity gate`
 
+### Task 22: Model context, frontend tools, interactables, runtime helpers
+
+_Added during execution by ledger ruling R7 (Task 1 review). It runs in wave 3._
+
+**Port from:**
+- `C/react/model-context/*`: `useAssistantInstructions`, `useAssistantContext`, `makeAssistantVisible`, `useAssistantTool`, `makeAssistantTool`, `useAssistantToolUI`
+- the tool, toolkit and interactable sources named in `docs/porting.md`'s Task 22 rows
+- `V/__tests__/primitives-tool-ui.test.ts` (the `Tools` usage)
+
+**Files:**
+- `lib/model-context/{instructions,context,visible}.ts`
+- `lib/tools/{register-tool,toolkit}.ts`
+- `lib/interactables/*.ts`
+- `lib/runtime/re-exports.ts`
+- specs for each
+
+**Interfaces:**
+- `injectAssistantInstructions(instructions: string | Signal<string> | { instruction; disabled? })` registers model-context instructions for the injector's lifetime.
+- `injectAssistantContext(getContext: () => string)` and `[auiAssistantVisible]`, the Angular equivalent of `makeAssistantVisible`.
+- `registerTool(tool: ToolDefinition)` and `registerToolkit(toolkit)` register frontend tools (execute in the browser, `type: 'frontend' | 'human'`) in model context and unregister on destroy. They combine with `registerToolUI`.
+- The tool-override and interactable registration and state injectors follow the porting.md rows.
+- Re-exports of the core runtime contracts and clients listed in porting.md, with Angular-shaped factories wherever the React hook only wraps a core function.
+
+**Steps:**
+- [ ] **Step 1: Write failing specs.**
+  - Registered instructions appear in `aui.thread().getModelContext().system`, and destroying the component removes them.
+  - A registered frontend tool appears in `getModelContext().tools`; when the scripted transport emits a call to it, its `execute` runs and the result is added.
+  - A `human` tool waits for `addResult`.
+  - Interactable state round-trips.
+- [ ] **Step 2: Run them.** All should FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run the gates.**
+- [ ] **Step 5: Commit** with `feat(lib): model context, frontend tools, interactables and runtime helpers`.
+
 ### Task 21: Final review, fix wave, live smoke (controller)
 
 - [ ] **Step 1: Whole-branch review** of `main..phase-2` on Codex `gpt-6.1-sol` (reasoningEffort `high`), using the requesting-code-review `code-reviewer.md` template, the spec, this plan and the ledger.
