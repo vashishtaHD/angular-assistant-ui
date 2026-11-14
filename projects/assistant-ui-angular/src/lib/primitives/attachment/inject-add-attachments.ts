@@ -55,6 +55,12 @@ export function injectAttachmentAdder(
   const { source } = injectAuiContext();
   let destroyed = false;
 
+  // The generation changes when the thread, the provider's client or the
+  // composer runtime behind it changes (A to B to A included). Replacing the
+  // provider's config keeps the client and the thread id but swaps the runtime
+  // (a spec covers it), so the runtime is compared where the composer exposes
+  // it; composers that do not (store-level ones) rely on thread and client.
+  // Draft updates change none of the three.
   let generation = 0;
   const scopeOf = () => {
     try {
@@ -62,7 +68,6 @@ export function injectAttachmentAdder(
       return {
         thread: getProxiedAssistantState(client).optional.threads?.mainThreadId,
         client,
-        // The composer's runtime changes when the scoped composer is replaced.
         runtime: client.composer.__internal_getRuntime?.(),
       };
     } catch {
@@ -76,8 +81,9 @@ export function injectAttachmentAdder(
       next.thread !== scope.thread ||
       next.client !== scope.client ||
       next.runtime !== scope.runtime
-    )
+    ) {
       generation++;
+    }
     scope = next;
   });
   inject(DestroyRef).onDestroy(() => {
@@ -90,36 +96,52 @@ export function injectAttachmentAdder(
   };
 
   // Recent composer failure events, so a rejection can learn its `reason`.
-  const recent: AuiAttachmentError[] = [];
+  // Each carries a sequence number; an operation only claims events raised
+  // after it started.
+  let sequence = 0;
+  const recent: { seq: number; event: AuiAttachmentError }[] = [];
   injectAuiEvent('composer.attachmentAddError', (payload) => {
     recent.push({
-      reason: payload.reason,
-      message: payload.message,
-      contentType: payload.contentType,
-      attachmentId: payload.attachmentId,
+      seq: ++sequence,
+      event: {
+        reason: payload.reason,
+        message: payload.message,
+        contentType: payload.contentType,
+        attachmentId: payload.attachmentId,
+      },
     });
     if (recent.length > 20) recent.shift();
   });
-  const claim = (message: string): AuiAttachmentError | undefined => {
-    const index = recent.findIndex((event) => event.message === message);
-    return index === -1 ? undefined : recent.splice(index, 1)[0];
+  const claim = (message: string, startedAt: number): AuiAttachmentError | undefined => {
+    for (let index = recent.length - 1; index >= 0; index--) {
+      const entry = recent[index]!;
+      if (entry.seq > startedAt && entry.event.message === message) {
+        recent.splice(index, 1);
+        return entry.event;
+      }
+    }
+    return undefined;
   };
 
   const heldBy = (file: File) =>
     aui.composer.getState().attachments.find((a) => 'file' in a && a.file === file);
 
-  const reportRejection = (file: File, error: unknown) => {
+  const reportRejection = (file: File, error: unknown, startedAt: number) => {
     const message = error instanceof Error ? error.message : String(error);
-    const event = claim(message);
+    // Only the reason comes from the event; the file and its attachment are
+    // identified by this operation's own `File`.
+    const event = claim(message, startedAt);
+    const held = heldBy(file);
     report({
       reason: event?.reason ?? 'adapter-error',
       message,
-      contentType: event?.contentType ?? (file.type || undefined),
-      attachmentId: event?.attachmentId ?? heldBy(file)?.id,
+      contentType: held?.contentType || file.type || undefined,
+      attachmentId: held?.id,
     });
   };
 
   const addOne = (file: File) => {
+    const startedAt = sequence;
     aui.composer.addAttachment(file).then(
       () => {
         const held = heldBy(file);
@@ -135,7 +157,7 @@ export function injectAttachmentAdder(
       (error: unknown) => {
         // The failure event is delivered on a microtask of its own; give it one
         // macrotask to arrive before reporting from the rejection.
-        setTimeout(() => reportRejection(file, error), 0);
+        setTimeout(() => reportRejection(file, error, startedAt), 0);
       },
     );
   };

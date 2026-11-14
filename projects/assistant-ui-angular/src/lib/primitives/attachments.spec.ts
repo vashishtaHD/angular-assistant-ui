@@ -36,6 +36,7 @@ import {
 import { injectAui } from '../state/inject-aui';
 
 interface Msg {
+  id: string;
   role: 'user' | 'assistant';
   content: never;
   attachments?: unknown;
@@ -49,14 +50,11 @@ const defaultAdapter = () =>
 
 /**
  * A runtime whose `onNew` records the sent user message, attachments included.
- * It starts with an assistant greeting, like a real chat: the first send swaps
- * core's in-transit submission row for the host's message row, and with an
- * otherwise empty thread that would re-create the whole list.
+ * The thread starts empty: the first send replaces core's in-transit submission
+ * row by the host's message row under a different id.
  */
 function createAttachmentRuntime(attachmentAdapter: AttachmentAdapter = defaultAdapter()) {
-  let messages: Msg[] = [
-    { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] as never },
-  ];
+  let messages: Msg[] = [];
   let isDisabled = false;
   const make = (): ExternalStoreAdapter<Msg> => ({
     messages,
@@ -68,6 +66,7 @@ function createAttachmentRuntime(attachmentAdapter: AttachmentAdapter = defaultA
       messages = [
         ...messages,
         {
+          id: `m${messages.length}`,
           role: 'user',
           content: message.content as never,
           attachments: message.attachments,
@@ -247,7 +246,7 @@ describe('attachment primitives', () => {
     expect(t.el.querySelectorAll('.chip')).toHaveLength(0);
   });
 
-  it('sending moves the attachments onto the user message', async () => {
+  it('sending the first message into an empty thread keeps the row and moves the attachments', async () => {
     const warn = vi.spyOn(console, 'warn');
     const t = await setup();
     pick(t, [textFile('a.txt')]);
@@ -366,10 +365,21 @@ function createGatedAdapter() {
   });
   const adapter: AttachmentAdapter = {
     accept: 'text/plain',
-    async add({ file }) {
+    async *add({ file }) {
+      if (file.name.startsWith('net')) {
+        yield {
+          id: `att-${file.name}`,
+          type: 'document',
+          name: file.name,
+          contentType: file.type,
+          file,
+          status: { type: 'running', reason: 'uploading', progress: 0 },
+        };
+        throw new Error('net down');
+      }
       if (file.name === 'slow.txt') await gate;
       if (file.name === 'boom.txt') throw new Error('boom');
-      return {
+      yield {
         id: `att-${file.name}`,
         type: 'document',
         name: file.name,
@@ -413,6 +423,25 @@ describe('attachment error ownership', () => {
     expect(t.host.errors).toHaveLength(1);
     expect(t.host.errors[0]).toMatchObject({ reason: 'adapter-error', message: 'boom' });
     expect(t.host.dropErrors).toEqual([]);
+  });
+
+  it('reports the own id and type of the failing file when an earlier failure had the same message', async () => {
+    const { adapter } = createGatedAdapter();
+    nextRuntime = createAttachmentRuntime(adapter);
+    const t = await setup();
+    const probe = t.fixture.debugElement.query(By.directive(ProbeComponent))
+      .componentInstance as ProbeComponent;
+    await probe.aui.composer
+      .addAttachment(new File(['x'], 'net1.txt', { type: 'text/plain' }))
+      .catch(() => undefined);
+    pick(t, [new File(['y'], 'net2.txt', { type: 'text/plain' })]);
+    await t.settle();
+    expect(t.host.errors).toHaveLength(1);
+    expect(t.host.errors[0]).toMatchObject({
+      reason: 'adapter-error',
+      message: 'net down',
+      attachmentId: 'att-net2.txt',
+    });
   });
 
   it('does not attribute a direct composer addition to a control with an upload in flight', async () => {

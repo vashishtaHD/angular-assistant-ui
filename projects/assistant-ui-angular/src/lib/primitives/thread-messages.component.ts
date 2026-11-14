@@ -50,8 +50,8 @@ export class AuiMessageTemplateDirective {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
-    @for (id of ids(); track id) {
-      <aui-scope-outlet [config]="configFor(id)" [template]="messageTemplate().templateRef" />
+    @for (key of keys(); track key) {
+      <aui-scope-outlet [config]="configFor(key)" [template]="messageTemplate().templateRef" />
     }
   `,
 })
@@ -61,12 +61,47 @@ export class AuiThreadMessagesComponent {
 
   private readonly aui = injectAui();
   private readonly messages = injectAuiState((s) => s.thread.messages);
-  /** The message ids, stable while they keep the same order. */
-  protected readonly ids = stableKeys(() => this.messages().map((message) => message.id));
+  /**
+   * One key per row, stable while the rows keep the same order. A key is the
+   * message id, except across the send handoff: core shows a sent message first
+   * as an in-transit submission row under a generated id, then the host's
+   * message replaces it under its own id. That row keeps its key, so it is
+   * updated in place instead of being re-created (which Angular reports as
+   * NG0956 when it is the whole list, e.g. the first message of a thread).
+   */
+  protected readonly keys = stableKeys(() => this.computeKeys());
 
-  private readonly configs = new Map<string, AuiConfig>();
+  private rows: { id: string; key: string; submission: boolean }[] = [];
+  private readonly idByKey = new Map<string, string>();
+  private readonly configs = new Map<string, { id: string; config: AuiConfig }>();
   private prunedFor: readonly string[] | undefined;
   private destroyed = false;
+
+  private computeKeys(): string[] {
+    const messages = this.messages();
+    const previous = this.rows;
+    const next = messages.map((message, index) => {
+      const submission = message.submission !== undefined;
+      const known = previous.find((row) => row.id === message.id);
+      if (known) return { id: message.id, key: known.key, submission };
+      // A user message that appears where an in-transit submission row just
+      // disappeared is that row, landed.
+      const old = previous[index];
+      if (
+        old?.submission &&
+        !submission &&
+        message.role === 'user' &&
+        !messages.some((other) => other.id === old.id)
+      ) {
+        return { id: message.id, key: old.key, submission };
+      }
+      return { id: message.id, key: message.id, submission };
+    });
+    this.rows = next;
+    this.idByKey.clear();
+    for (const row of next) this.idByKey.set(row.key, row.id);
+    return next.map((row) => row.key);
+  }
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -75,24 +110,24 @@ export class AuiThreadMessagesComponent {
     });
   }
 
-  /** Returns the memoised scope config for `id`. */
-  protected configFor(id: string): AuiConfig {
-    const ids = this.ids();
-    if (ids !== this.prunedFor) {
-      this.prunedFor = ids;
-      const live = new Set(ids);
-      for (const key of this.configs.keys()) {
-        if (!live.has(key)) this.configs.delete(key);
+  /** Returns the memoised scope config for the row `key` (rebuilt when its message id changes). */
+  protected configFor(key: string): AuiConfig {
+    const keys = this.keys();
+    if (keys !== this.prunedFor) {
+      this.prunedFor = keys;
+      const live = new Set(keys);
+      for (const known of this.configs.keys()) {
+        if (!live.has(known)) this.configs.delete(known);
       }
     }
-    let config = this.configs.get(id);
-    if (!config) {
-      const aui = this.aui;
-      // A row whose id left the thread is about to be removed by `@for`, so
-      // it is not "current": its expiry must not report it as stale.
-      config = messageScopeConfig(aui, id, () => !this.destroyed && hasMessage(aui, id));
-      this.configs.set(id, config);
-    }
+    const id = this.idByKey.get(key) ?? key;
+    const existing = this.configs.get(key);
+    if (existing && existing.id === id) return existing.config;
+    const aui = this.aui;
+    // A row whose id left the thread is about to be removed by `@for`, so
+    // it is not "current": its expiry must not report it as stale.
+    const config = messageScopeConfig(aui, id, () => !this.destroyed && hasMessage(aui, id));
+    this.configs.set(key, { id, config });
     return config;
   }
 }
