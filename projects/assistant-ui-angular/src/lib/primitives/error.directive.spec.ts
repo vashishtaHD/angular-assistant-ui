@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import type { AuiConfig } from '@assistant-ui/store/client';
 import { describe, expect, it } from 'vitest';
+import { displayOf, useFlexAuthorClass } from '../../testing-internal/author-css';
 import { configureTestBed } from '../../testing-internal/test-bed';
 import { createTestRuntime, type DemoMessage } from '../../testing-internal/test-runtime';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
@@ -36,9 +37,9 @@ let hostConfig: AuiConfig;
     <ng-container [auiProvider]="config">
       <aui-thread-messages>
         <ng-template auiMessage>
-          <div auiErrorRoot class="root"><span auiErrorMessage class="msg"></span></div>
+          <div auiErrorRoot class="root"><span auiErrorMessage class="msg flex"></span></div>
           <div auiErrorRoot class="custom">
-            <span auiErrorMessage class="custom-msg">Custom</span>
+            <span auiErrorMessage class="custom-msg flex">Custom</span>
           </div>
         </ng-template>
       </aui-thread-messages>
@@ -77,6 +78,8 @@ describe('ErrorPrimitive', () => {
     });
     expect(text(el, '.msg')).toBe('boom');
     expect(el.querySelector('.msg')?.hasAttribute('hidden')).toBe(false);
+    useFlexAuthorClass();
+    expect(displayOf(el.querySelector('.msg')!)).toBe('flex');
   });
 
   it('the message shows the message of an error object', async () => {
@@ -108,6 +111,10 @@ describe('ErrorPrimitive', () => {
 
   it('the message renders nothing and is hidden on success', async () => {
     const el = await mount({ role: 'assistant', content: [{ type: 'text', text: 'hi' }] });
+    // Upstream returns null; an author display class must not show the empty element.
+    useFlexAuthorClass();
+    expect(displayOf(el.querySelector('.msg')!)).toBe('none');
+    expect(displayOf(el.querySelector('.custom-msg')!)).toBe('none');
     expect(text(el, '.msg')).toBe('');
     expect(el.querySelector('.msg')?.hasAttribute('hidden')).toBe(true);
     expect(el.querySelector('.custom-msg')?.hasAttribute('hidden')).toBe(true);
