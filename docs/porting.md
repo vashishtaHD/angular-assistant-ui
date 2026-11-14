@@ -181,7 +181,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | ActionBarPrimitive.ExportMarkdown | no | ported | Task 4 |
 | ActionBarPrimitive.Speak, ActionBarPrimitive.StopSpeaking, SpeechSynthesisAdapter, WebSpeechSynthesisAdapter | no | n/a (speech out of scope) |  |
 | ActionBarPrimitive.Resume, ActionBarPrimitive.RefreshRun | no | n/a (cloud and resumable run state out of scope) |  |
-| ActionBarMorePrimitive.Root, ActionBarMorePrimitive.Trigger, ActionBarMorePrimitive.Content, ActionBarMorePrimitive.Item, ActionBarMorePrimitive.Separator | no | partial (menu, roving focus and aliases ported; the action bar interaction lock that upstream `ActionBarMoreRoot` takes while open is NOT wired, owned by Task 4, seam is `(openChange)` on `[auiActionBarMoreRoot]`, wired by the controller at integration) | Task 10 |
+| ActionBarMorePrimitive.Root, ActionBarMorePrimitive.Trigger, ActionBarMorePrimitive.Content, ActionBarMorePrimitive.Item, ActionBarMorePrimitive.Separator | no | ported (menu, roving focus and aliases; `[auiActionBarMoreRoot]` holds the enclosing `[auiActionBarRoot]` interaction lock while open, following the actual open state for both interaction and the `open` binding, and releases it on close or destroy) | Task 10, integration |
 | BranchPickerPrimitive.Root | no | ported | Task 4 |
 | BranchPickerPrimitive.Previous, BranchPickerPrimitive.Next | yes | ported | Task 4 |
 | BranchPickerPrimitive.Number | yes | ported | Task 4 |

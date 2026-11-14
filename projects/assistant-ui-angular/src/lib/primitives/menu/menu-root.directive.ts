@@ -79,6 +79,7 @@ export class AuiMenuRootDirective implements OnChanges {
 
   private lastOpen = false;
   private pendingFocus: AuiMenuInitialFocus = 'content';
+  private readonly openListeners = new Set<(open: boolean) => void>();
 
   /** @internal */
   ngOnChanges(changes: SimpleChanges): void {
@@ -112,10 +113,21 @@ export class AuiMenuRootDirective implements OnChanges {
     if (this.open()) this.scheduleFocus();
   }
 
+  /**
+   * @internal Calls `listener` on every open/closed transition, whether it came
+   * from a user interaction (`setOpen`) or from the `open` input binding.
+   * Returns the function that removes the listener.
+   */
+  watchOpenState(listener: (open: boolean) => void): () => void {
+    this.openListeners.add(listener);
+    return () => this.openListeners.delete(listener);
+  }
+
   private handleOpenState(open: boolean): void {
     if (open === this.lastOpen) return;
     this.lastOpen = open;
     if (open) this.scheduleFocus();
+    for (const listener of [...this.openListeners]) listener(open);
   }
 
   private scheduleFocus(): void {
