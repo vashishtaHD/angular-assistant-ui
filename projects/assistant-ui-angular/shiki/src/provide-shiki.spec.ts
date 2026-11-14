@@ -5,7 +5,7 @@ import { provideShikiHighlighter } from 'angular-assistant-ui/shiki';
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 
-function inject(opts?: Parameters<typeof provideShikiHighlighter>[0]) {
+function provideAndGet(opts?: Parameters<typeof provideShikiHighlighter>[0]) {
   configureTestBed({ providers: [provideShikiHighlighter(opts)] });
   return TestBed.inject(AUI_SYNTAX_HIGHLIGHTER);
 }
@@ -19,37 +19,47 @@ const loadTs = () =>
 
 describe('provideShikiHighlighter', () => {
   it('highlights ts into dual-theme shiki markup', async () => {
-    const html = await inject().highlight('const a = 1', 'ts');
+    const html = await provideAndGet().highlight('const a = 1', 'ts');
     expect(html).toContain('<pre class="shiki');
     expect(html).toContain('<span style="');
+    expect(html).toContain('light-dark(');
+    expect(html).not.toMatch(/style="[^"]*[^-]color:#[0-9a-f]+/i);
     expect(html).toContain('--shiki-dark:');
+    expect(html).toContain('--shiki-light:');
     expect(html).toContain('const');
   });
 
   it('escapes the code', async () => {
-    const html = await inject().highlight('<img src=x onerror=alert(1)>', 'html');
+    const html = await provideAndGet().highlight('<img src=x onerror=alert(1)>', 'html');
     expect(html).not.toContain('<img');
+    expect(html).toContain('&#x3C;');
   });
 
   it('returns null for unknown or empty languages', () => {
-    const h = inject();
+    const h = provideAndGet();
     expect(h.highlight('x', 'definitely-not-a-language')).toBeNull();
     expect(h.highlight('x', '')).toBeNull();
   });
 
+  it('fails early with a clear message for an unknown theme name', () => {
+    expect(() =>
+      provideShikiHighlighter({ themes: { light: 'nope', dark: 'github-dark' } }),
+    ).toThrow(/unknown Shiki theme "nope"/);
+  });
+
   it('knows aliases and is case-insensitive', async () => {
-    const h = inject();
+    const h = provideAndGet();
     expect(await h.highlight('echo hi', 'Shell')).toContain('shiki');
     expect(await h.highlight('const a = 1', 'typescript')).toContain('shiki');
   });
 
   it('only knows the configured langs', () => {
-    expect(inject({ langs: ['json'] }).highlight('x', 'ts')).toBeNull();
+    expect(provideAndGet({ langs: ['json'] }).highlight('x', 'ts')).toBeNull();
   });
 
   it('creates one highlighter for concurrent first calls', async () => {
     const loadHighlighter = vi.fn(loadTs);
-    const h = inject({ loadHighlighter });
+    const h = provideAndGet({ loadHighlighter });
     const results = await Promise.all([
       h.highlight('const a = 1', 'ts'),
       h.highlight('const b = 2', 'ts'),
@@ -66,7 +76,7 @@ describe('provideShikiHighlighter', () => {
       .fn<() => Promise<HighlighterCore>>()
       .mockRejectedValueOnce(new Error('boom'))
       .mockImplementation(loadTs);
-    const h = inject({ loadHighlighter });
+    const h = provideAndGet({ loadHighlighter });
     await expect(h.highlight('x', 'ts')).rejects.toThrow('boom');
     expect(await h.highlight('const a = 1', 'ts')).toContain('shiki');
   });
