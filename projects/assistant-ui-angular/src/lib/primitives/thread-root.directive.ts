@@ -1,6 +1,7 @@
 // Ported from packages/vue/src/primitives/thread.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-import { Directive } from '@angular/core';
+import { Directive, ElementRef, inject } from '@angular/core';
 import { injectAui } from '../state/inject-aui';
+import { AUI_THREAD_ROOT_ELEMENT } from './composer-input-support';
 
 /**
  * Marks the wrapper element of the thread. While it exists, Escape stops an
@@ -15,7 +16,8 @@ import { injectAui } from '../state/inject-aui';
 @Directive({
   selector: '[auiThreadRoot]',
   standalone: true,
-  host: { '(document:keydown.escape)': 'onEscape($event)' },
+  providers: [{ provide: AUI_THREAD_ROOT_ELEMENT, useFactory: () => inject(ElementRef) }],
+  host: { 'data-aui-thread-root': '', '(document:keydown.escape)': 'onEscape($event)' },
 })
 export class AuiThreadRootDirective {
   private readonly aui = injectAui();

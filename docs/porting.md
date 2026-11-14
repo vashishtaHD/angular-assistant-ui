@@ -141,20 +141,20 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ComposerPrimitive.Root | no | ported (as `[auiComposerRoot]`); form submit handling planned | Task 5 |
-| ComposerPrimitive.Input | partial (`submitOnEnter`) | ported (as `[auiComposerInput]`); full props planned | Task 5 |
+| ComposerPrimitive.Root | no | ported (as `form[auiComposerRoot]`: submit, click-to-focus, `data-aui-composer-type`, `compact`) |  |
+| ComposerPrimitive.Input | partial (`submitOnEnter`) | ported (as `textarea[auiComposerInput]`: `submitMode`, deprecated `submitOnEnter`, `cancelOnEscape`, `addAttachmentOnPaste`, `autoFocus`, `focusOnRunStart`, `focusOnThreadSwitch`, `focusOnScrollToBottom`, `insertNewlineOnTouchEnter`, steer hotkey, IME) |  |
 | ComposerPrimitive.Send | yes | ported (as `button[auiComposerSend]`) |  |
 | ComposerPrimitive.Cancel | yes | ported (as `button[auiComposerCancel]`) |  |
 | ComposerPrimitive.AddAttachment | yes | planned (Task 6) | Task 6 |
 | ComposerPrimitive.Attachments | yes | planned (Task 6) | Task 6 |
 | ComposerPrimitive.AttachmentByIndex | provider | planned (Task 6) | Task 6 |
 | ComposerPrimitive.AttachmentDropzone | yes | planned (Task 6) | Task 6 |
-| ComposerPrimitive.Quote, ComposerPrimitive.QuoteText, ComposerPrimitive.QuoteDismiss | no | planned (Task 5) | Task 5 |
-| ComposerPrimitive.Queue | no | planned (Task 5) | Task 5 |
-| QueueItemPrimitive.Text, QueueItemPrimitive.Steer, QueueItemPrimitive.Remove | no | planned (Task 5) | Task 5 |
-| unstable_useComposerInputHistory, Unstable_ComposerInputHistory | no | planned (Task 5) | Task 5 |
-| unstable_useComposerInput, Unstable_UseComposerInputOptions, Unstable_ComposerInput | no | planned (Task 5) | Task 5 |
-| unstable_useComposerRunStartFocusGuard, Unstable_ComposerRunStartFocusGuard | no | planned (Task 5) | Task 5 |
+| ComposerPrimitive.Quote, ComposerPrimitive.QuoteText, ComposerPrimitive.QuoteDismiss | no | ported (as `*auiComposerQuote`, `[auiComposerQuoteText]`, `button[auiComposerQuoteDismiss]`) |  |
+| ComposerPrimitive.Queue | no | ported (as `<aui-composer-queue>` with `ng-template[auiQueueItem]`) |  |
+| QueueItemPrimitive.Text, QueueItemPrimitive.Steer, QueueItemPrimitive.Remove | no | ported (as `[auiQueueItemText]`, `button[auiQueueItemSteer]`, `button[auiQueueItemRemove]`) |  |
+| unstable_useComposerInputHistory, Unstable_ComposerInputHistory | no | ported (as `injectComposerInputHistory()` / `ComposerInputHistory`) |  |
+| unstable_useComposerInput, Unstable_UseComposerInputOptions, Unstable_ComposerInput | no | ported (as `injectComposerInput()` / `ComposerInputOptions` / `ComposerInputBridge`) |  |
+| unstable_useComposerRunStartFocusGuard, Unstable_ComposerRunStartFocusGuard | no | ported (as `injectComposerRunStartFocusGuard()` / `ComposerRunStartFocusGuard`) |  |
 | ComposerPrimitive.TriggerPopoverRoot, ComposerPrimitive.TriggerPopover, ComposerPrimitive.TriggerPopoverCategories, ComposerPrimitive.TriggerPopoverCategoryItem, ComposerPrimitive.TriggerPopoverItems, ComposerPrimitive.TriggerPopoverItem, ComposerPrimitive.TriggerPopoverBack | no | planned (Task 10) | Task 10 |
 | ComposerPrimitive.Unstable_TriggerPopoverRoot, ComposerPrimitive.Unstable_TriggerPopover, ComposerPrimitive.Unstable_TriggerPopoverCategories, ComposerPrimitive.Unstable_TriggerPopoverCategoryItem, ComposerPrimitive.Unstable_TriggerPopoverItems, ComposerPrimitive.Unstable_TriggerPopoverItem, ComposerPrimitive.Unstable_TriggerPopoverBack | no | planned (Task 10) (deprecated aliases of the rows above, exported under the same Angular names) | Task 10 |
 | unstable_useTriggerPopoverRootContext, unstable_useTriggerPopoverRootContextOptional, unstable_useTriggerPopoverScopeContext, unstable_useTriggerPopoverScopeContextOptional, unstable_useTriggerPopoverTriggers, unstable_useTriggerPopoverTriggersOptional | no | planned (Task 10) (as `inject*` functions) | Task 10 |

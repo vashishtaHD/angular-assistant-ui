@@ -3,6 +3,8 @@ import { Directive, booleanAttribute, input } from '@angular/core';
 import { composerCancelDisabled } from '@assistant-ui/core/store/internal';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
+import { injectComposerCancelWithFocus } from './composer-input-support';
+import { AuiActionButtonHostDirective, injectActionButton } from './action-button';
 
 /**
  * A button that cancels the current run. Disabled while nothing can be
@@ -11,27 +13,22 @@ import { injectAuiState } from '../state/inject-aui-state';
 @Directive({
   selector: 'button[auiComposerCancel]',
   standalone: true,
-  host: {
-    type: 'button',
-    '[disabled]': 'isDisabled()',
-    '(click)': 'onClick($event)',
-  },
+  hostDirectives: [AuiActionButtonHostDirective],
 })
 export class AuiComposerCancelDirective {
   private readonly aui = injectAui();
+  private readonly cancelWithFocus = injectComposerCancelWithFocus(() =>
+    this.aui.composer.cancel(),
+  );
   private readonly cancelDisabled = injectAuiState(composerCancelDisabled);
 
   /** Consumer-controlled disabled flag, combined with the store predicate. */
   readonly disabled = input(false, { transform: booleanAttribute });
 
-  /** @internal */
-  isDisabled(): boolean {
-    return this.disabled() || this.cancelDisabled();
-  }
-
-  /** @internal */
-  onClick(event: MouseEvent): void {
-    if (event.defaultPrevented || this.isDisabled()) return;
-    this.aui.composer.cancel();
+  constructor() {
+    injectActionButton({
+      disabled: () => this.disabled() || this.cancelDisabled(),
+      onClick: (event) => this.cancelWithFocus(event.currentTarget as HTMLElement),
+    });
   }
 }

@@ -61,10 +61,21 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
     onAtBottomChange: (value) => this.isAtBottomState.set(value),
   });
 
+  private readonly scrollListeners = new Set<(config: { behavior: ScrollBehavior }) => void>();
+
   /** The value provided as `AUI_VIEWPORT`. */
   readonly viewport: AuiViewport = {
     isAtBottom: this.isAtBottomState.asReadonly(),
-    scrollToBottom: (behavior: ScrollBehavior = 'auto') => this.scroller.scrollToBottom(behavior),
+    scrollToBottom: (behavior: ScrollBehavior = 'auto') => {
+      this.scroller.scrollToBottom(behavior);
+      for (const listener of [...this.scrollListeners]) listener({ behavior });
+    },
+    onScrollToBottom: (callback) => {
+      this.scrollListeners.add(callback);
+      return () => {
+        this.scrollListeners.delete(callback);
+      };
+    },
     registerContentInset: this.scroller.registerContentInset,
   };
 

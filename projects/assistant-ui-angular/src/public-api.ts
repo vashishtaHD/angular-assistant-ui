@@ -44,7 +44,6 @@ export {
 
 // Composer primitives.
 export { AuiComposerRootDirective } from './lib/primitives/composer-root.directive';
-export { AuiComposerInputDirective } from './lib/primitives/composer-input.directive';
 export { AuiComposerSendDirective } from './lib/primitives/composer-send.directive';
 export { AuiComposerCancelDirective } from './lib/primitives/composer-cancel.directive';
 
@@ -67,3 +66,41 @@ export {
   injectActionButton,
   type ActionButtonOptions,
 } from './lib/primitives/action-button';
+
+// Task 5: full composer (root form, full input props, quote, queue).
+export {
+  AuiComposerInputDirective,
+  type AuiComposerSubmitMode,
+} from './lib/primitives/composer-input.directive';
+export {
+  AuiComposerQuoteDirective,
+  AuiComposerQuoteTextDirective,
+  AuiComposerQuoteDismissDirective,
+} from './lib/primitives/composer-quote.directive';
+export {
+  AuiComposerQueueComponent,
+  AuiQueueItemTemplateDirective,
+} from './lib/primitives/composer-queue.component';
+export { AuiQueueItemTextDirective } from './lib/primitives/queue-item/text';
+export { AuiQueueItemSteerDirective } from './lib/primitives/queue-item/steer';
+export { AuiQueueItemRemoveDirective } from './lib/primitives/queue-item/remove';
+export {
+  AUI_COMPOSER_COMPACT,
+  AUI_COMPOSER_INPUT_PLUGIN_REGISTRY,
+  AUI_THREAD_ROOT_ELEMENT,
+  injectComposerCancelWithFocus,
+  injectComposerRunStartFocusGuard,
+  type AuiComposerCompact,
+  type AuiComposerInputPlugin,
+  type AuiComposerInputPluginRegistry,
+  type ComposerRunStartFocusGuard,
+} from './lib/primitives/composer-input-support';
+export {
+  injectComposerInput,
+  type ComposerInputBridge,
+  type ComposerInputOptions,
+} from './lib/primitives/composer-input-bridge';
+export {
+  injectComposerInputHistory,
+  type ComposerInputHistory,
+} from './lib/primitives/composer-input-history';
