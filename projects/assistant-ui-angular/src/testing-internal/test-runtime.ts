@@ -168,18 +168,19 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
   const core = new ExternalStoreRuntimeCore(makeAdapter());
   const runtime = new AssistantRuntimeImpl(core);
   const sync = () => core.setAdapter(makeAdapter());
-  // An id-less input gets its id once: the normalized copy is remembered per
-  // input object, so re-publishing that object (setMessages, appendBranch)
-  // reuses the same stored node and id instead of remounting its row/scope.
-  const normalized = new WeakMap<DemoMessage, DemoMessage & { id: string }>();
+  // An id-less input gets its id once, remembered per input object, so
+  // re-publishing that object (setMessages, appendBranch) keeps its id and
+  // its row/scope. Only the id is cached: the copy is rebuilt from the
+  // input every time, so reassigned role/content still flows through.
+  const generated = new WeakMap<DemoMessage, string>();
   const withId = (message: DemoMessage): DemoMessage & { id: string } => {
-    if (message.id !== undefined) return message as DemoMessage & { id: string };
-    let stored = normalized.get(message);
-    if (!stored) {
-      stored = { ...message, id: `test-msg-${++generatedIds}` };
-      normalized.set(message, stored);
+    if (message.id !== undefined) return { ...message, id: message.id };
+    let id = generated.get(message);
+    if (id === undefined) {
+      id = `test-msg-${++generatedIds}`;
+      generated.set(message, id);
     }
-    return stored;
+    return { ...message, id };
   };
   const append = (message: DemoMessage) => {
     if (tree) {

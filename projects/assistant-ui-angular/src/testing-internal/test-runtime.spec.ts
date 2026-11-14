@@ -195,6 +195,33 @@ describe('createTestRuntime extras', () => {
     release();
   });
 
+  it('publishes reassigned content of a reused id-less message under the same id', () => {
+    const rt = createTestRuntime();
+    const reply: { role: 'assistant'; content: ReturnType<typeof text> } = {
+      role: 'assistant',
+      content: text('before'),
+    };
+    flushTapSync(() => rt.append(reply));
+    const { client, release } = mountClient(rt.config);
+    const shown = () =>
+      client.thread.getState().messages.map((m) => ({
+        id: m.id,
+        text: (m.content[0] as { text: string }).text,
+      }));
+    const [{ id }] = shown();
+
+    reply.content = text('after');
+    flushTapSync(() => rt.setMessages([reply]));
+    expect(shown()).toEqual([{ id, text: 'after' }]);
+
+    // Tree mode rebuilds the payload from the current input as well.
+    flushTapSync(() => rt.appendBranch(id, { id: 'a2', role: 'assistant', content: text('alt') }));
+    reply.content = text('again');
+    flushTapSync(() => rt.setMessages([reply]));
+    expect(shown()).toEqual([{ id, text: 'again' }]);
+    release();
+  });
+
   it('keeps the surviving active descendant when an interior message is deleted', async () => {
     const rt = createTestRuntime();
     flushTapSync(() => {
