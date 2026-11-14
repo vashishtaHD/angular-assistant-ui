@@ -18,7 +18,11 @@ import {
   type Unsubscribe,
 } from '@assistant-ui/store/client';
 import { AUI_CONTEXT, type AuiContext } from '../context/aui-context';
-import { createAuiContext } from '../context/create-aui-context';
+import {
+  createAuiContext,
+  registerForwardingSource,
+  type CreatedAuiContext,
+} from '../context/create-aui-context';
 
 interface PendingSubscription {
   listener: () => void;
@@ -71,7 +75,7 @@ export class AuiProviderDirective implements OnChanges {
   private readonly injected = inject(AUI_CONTEXT, { skipSelf: true, optional: true });
   private readonly configListeners = new Set<() => void>();
   private readonly pending = new Set<PendingSubscription>();
-  private inner: { context: AuiContext; release: () => void } | undefined;
+  private inner: CreatedAuiContext | undefined;
   private destroyed = false;
 
   private readonly source: AssistantClientSource = {
@@ -97,6 +101,10 @@ export class AuiProviderDirective implements OnChanges {
   readonly context: AuiContext = { source: this.source, aui: createClientFacade(this.source) };
 
   constructor() {
+    // Nested providers and scopes receive `this.source` as their parent; let
+    // `createAuiContext` unwrap it to the real handle (the store's
+    // parent-snapshot fast path only applies to real handles).
+    registerForwardingSource(this.source, () => this.inner?.handle);
     inject(DestroyRef).onDestroy(() => {
       this.destroyed = true;
       this.pending.clear();
