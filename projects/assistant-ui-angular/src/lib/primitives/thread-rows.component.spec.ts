@@ -1,4 +1,5 @@
 // Ported from packages/core/src/react/primitives/thread/ThreadRow.test.tsx @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
+import { readFileSync } from 'node:fs';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -12,6 +13,7 @@ import {
   AuiThreadRowTemplateDirective,
   AuiThreadRowsComponent,
   createThreadRowsSelector,
+  type ThreadRowsOptions,
 } from './thread-rows.component';
 
 @Component({
@@ -102,7 +104,97 @@ describe('aui-thread-rows', () => {
 });
 
 describe('createThreadRowsSelector', () => {
-  it('is re-exported from core', () => {
+  it('is exported as a function', () => {
     expect(typeof createThreadRowsSelector).toBe('function');
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadRowsComponent,
+    AuiThreadRowTemplateDirective,
+    AuiPartTemplateDirective,
+    NgTemplateOutlet,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div [auiProvider]="runtime().config">
+      <aui-thread-rows [options]="options">
+        <ng-template auiThreadRow let-info>
+          @if (info.type === 'part') {
+            @if (info.part.type.startsWith('group-')) {
+              <div
+                class="g"
+                [attr.data-g]="info.part.type"
+                [attr.data-n]="info.part.indices.length"
+              >
+                <ng-container *ngTemplateOutlet="info.children" />
+              </div>
+            } @else {
+              <ng-container *ngTemplateOutlet="info.children" />
+            }
+          }
+        </ng-template>
+        <ng-template auiPart="reasoning" let-part>
+          <i class="r">{{ part.type === 'reasoning' ? part.text : '' }}</i>
+        </ng-template>
+      </aui-thread-rows>
+    </div>
+  `,
+})
+class GroupedHostComponent {
+  readonly runtime = input.required<TestRuntime>();
+  readonly options: ThreadRowsOptions = {
+    groupBy: (part) =>
+      part.type === 'reasoning' ? ['group-outer', 'group-inner'] : part.type === 'text' ? [] : null,
+  };
+}
+
+describe('aui-thread-rows nested groups', () => {
+  it('renders the template once per node of the group subtree, nested', async () => {
+    const test = createTestRuntime();
+    flushTapSync(() => test.append({ id: 'u1', role: 'user', content: text('hi') }));
+    flushTapSync(() =>
+      test.append({
+        id: 'a1',
+        role: 'assistant',
+        content: [
+          { type: 'reasoning', text: 'r1' },
+          { type: 'reasoning', text: 'r2' },
+          { type: 'text', text: 'ok' },
+        ],
+      }),
+    );
+    configureTestBed({ imports: [GroupedHostComponent] });
+    const fixture = TestBed.createComponent(GroupedHostComponent);
+    fixture.componentRef.setInput('runtime', test);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+
+    const outer = root.querySelector('.g[data-g="group-outer"]') as HTMLElement;
+    expect(outer).not.toBeNull();
+    expect(outer.getAttribute('data-n')).toBe('2');
+    const inner = outer.querySelector('.g[data-g="group-inner"]') as HTMLElement;
+    expect(inner).not.toBeNull();
+    expect(Array.from(inner.querySelectorAll('.r')).map((el) => el.textContent)).toEqual([
+      'r1',
+      'r2',
+    ]);
+    // The ungrouped text part is a separate row with its default text view.
+    expect(root.querySelectorAll('.g').length).toBe(2);
+    expect(root.querySelector('p')?.textContent).toBe('ok');
+  });
+});
+
+describe('main entry dependency graph', () => {
+  it('does not import @assistant-ui/core/react at runtime from the row sources', () => {
+    for (const file of ['./thread-rows.component.ts', '../utils/thread-rows.ts']) {
+      const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+      expect(source).not.toMatch(/^import\s+(?!type\b)[^;]*from\s+'@assistant-ui\/core\/react'/m);
+      expect(source).not.toMatch(/^export\s+[^;]*from\s+'@assistant-ui\/core\/react'/m);
+    }
   });
 });

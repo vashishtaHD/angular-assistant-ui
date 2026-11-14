@@ -1,5 +1,5 @@
 // Ported from packages/core/src/react/primitives/thread/ThreadRow.tsx @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-// (selector and types: packages/core/src/react/utils/threadRows.ts, re-exported from @assistant-ui/core/react)
+// (selector and types: ../utils/thread-rows.ts, ported because @assistant-ui/core/react evaluates React)
 import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -13,17 +13,21 @@ import {
   inject,
   input,
 } from '@angular/core';
-import {
-  createThreadRowsSelector,
-  type ThreadRow,
-  type ThreadRowsOptions,
-} from '@assistant-ui/core/react';
 import type { AssistantState, AuiConfig } from '@assistant-ui/store/client';
 import { hasMessage, messageScopeConfig } from '../scope/message-scope';
 import { partScopeConfig } from '../scope/part-scope';
 import { AuiScopeOutletComponent } from '../scope/scope-outlet.component';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
+import {
+  createThreadRowsSelector,
+  getGroupSummary,
+  getThreadRowNode,
+  type GroupCounts,
+  type GroupNode,
+  type ThreadRow,
+  type ThreadRowsOptions,
+} from '../utils/thread-rows';
 import { AuiPartTemplateDirective } from './message-parts.component';
 import {
   AuiPartViewComponent,
@@ -32,6 +36,23 @@ import {
 } from './part-view.component';
 
 export { createThreadRowsSelector, type ThreadRow, type ThreadRowsOptions };
+
+/**
+ * A coalesced group of adjacent parts, surfaced through the same `part` field
+ * as a leaf part so a template can dispatch on `part.type`.
+ */
+export interface AuiThreadRowGroupPart {
+  /** The group key `groupBy` returned (always `group-…`). */
+  readonly type: `group-${string}`;
+  /** Running when any contained part runs, otherwise the last part's status. */
+  readonly status: AssistantState['part']['status'];
+  /** Per-status tallies over `indices`. */
+  readonly counts: GroupCounts;
+  /** Indices of the contained parts. */
+  readonly indices: readonly number[];
+  /** Wall-clock span of the group's timed parts. */
+  readonly timing?: { startedAt: number; completedAt?: number };
+}
 
 /**
  * What an `ng-template auiThreadRow` receives (`let-info`), discriminated by
@@ -47,12 +68,16 @@ export type AuiThreadRowInfo =
   | {
       readonly type: 'part';
       readonly row: Extract<ThreadRow, { type: 'part' }>;
-      /** The row's parts, in order (one part, or the parts a group coalesced). */
-      readonly parts: readonly AssistantState['message']['parts'][number][];
       /**
-       * Renders the row's parts, each in its own part scope, using the
-       * `ng-template auiPart` templates given to the row or to `aui-thread-rows`.
-       * Render it with `ngTemplateOutlet`.
+       * A group part for a node that coalesced parts, or the leaf part. The
+       * template renders once per node of the row's group subtree, so nested
+       * groups wrap their children recursively.
+       */
+      readonly part: AuiThreadRowGroupPart | AssistantState['part'];
+      /**
+       * For a group, its rendered subtree. For a leaf, the part's default view
+       * (its registered tool or data UI, a matching `ng-template auiPart`, or
+       * the built-in text rendering). Render it with `ngTemplateOutlet`.
        */
       readonly children: TemplateRef<unknown>;
     }
@@ -72,8 +97,8 @@ export interface AuiThreadRowTemplateContext {
 
 /**
  * Marks the `<ng-template>` that {@link AuiThreadRowComponent} and
- * {@link AuiThreadRowsComponent} render once per row; its context is
- * {@link AuiThreadRowTemplateContext}.
+ * {@link AuiThreadRowsComponent} render once per row (once per group-subtree
+ * node for a part row); its context is {@link AuiThreadRowTemplateContext}.
  */
 @Directive({
   selector: 'ng-template[auiThreadRow]',
@@ -94,52 +119,119 @@ export class AuiThreadRowTemplateDirective {
   }
 }
 
+type PartRow = Extract<ThreadRow, { type: 'part' }>;
+
+const fallbackNode = (indices: readonly number[]): GroupNode =>
+  indices.length === 1
+    ? { type: 'part', index: indices[0]!, nodeKey: '0', idKey: undefined }
+    : {
+        type: 'group',
+        key: 'group-row',
+        nodeKey: '0',
+        idKey: undefined,
+        indices,
+        children: indices.map((index, position) => ({
+          type: 'part' as const,
+          index,
+          nodeKey: `0.${position}`,
+          idKey: undefined,
+        })),
+      };
+
 /**
- * Internal: renders the row template inside the row's message scope.
+ * Internal: renders the row template for one leaf part, inside the part scope.
  */
 @Component({
-  selector: 'aui-thread-row-view',
+  selector: 'aui-thread-row-leaf',
   standalone: true,
-  imports: [NgTemplateOutlet, AuiScopeOutletComponent, AuiPartViewComponent],
+  imports: [NgTemplateOutlet, AuiPartViewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
-    <ng-template #children>
-      @for (index of partIndices(); track index) {
-        <aui-scope-outlet [config]="partConfig(index)" [template]="partView" />
+    <ng-template #defaultView><aui-part-view [templates]="partTemplates()" /></ng-template>
+    <ng-container *ngTemplateOutlet="template(); context: context(defaultView)" />
+  `,
+})
+export class AuiThreadRowLeafComponent {
+  /** The part row. */
+  readonly row = input.required<PartRow>();
+  /** The row template. */
+  readonly template = input.required<TemplateRef<AuiThreadRowTemplateContext>>();
+  /** Part templates for the default view. */
+  readonly partTemplates = input.required<AuiPartTemplates>();
+
+  private readonly part = injectAuiState((s) => s.part);
+
+  /** Builds the template context for the current part. */
+  protected context(children: TemplateRef<unknown>): AuiThreadRowTemplateContext {
+    return { $implicit: { type: 'part', row: this.row(), part: this.part(), children } };
+  }
+}
+
+/**
+ * Internal: renders one node of a part row's group subtree inside the message
+ * scope, recursing into group children.
+ */
+@Component({
+  selector: 'aui-thread-row-node',
+  standalone: true,
+  imports: [NgTemplateOutlet, AuiScopeOutletComponent, AuiThreadRowLeafComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
+  template: `
+    <ng-template #kids>
+      @for (child of children(); track childKey(child)) {
+        <aui-thread-row-node
+          [node]="child"
+          [row]="row()"
+          [template]="template()"
+          [partTemplates]="partTemplates()"
+        />
       }
     </ng-template>
-    <ng-template #partView><aui-part-view [templates]="partTemplates()" /></ng-template>
-    @if (present()) {
-      <ng-container *ngTemplateOutlet="template(); context: context(children)" />
+    <ng-template #leaf>
+      <aui-thread-row-leaf
+        [row]="row()"
+        [template]="template()"
+        [partTemplates]="partTemplates()"
+      />
+    </ng-template>
+    @if (group(); as group) {
+      <ng-container *ngTemplateOutlet="template(); context: groupContext(group, kids)" />
+    } @else {
+      @if (leafIndex() !== null) {
+        <aui-scope-outlet [config]="partConfig(leafIndex()!)" [template]="leaf" />
+      }
     }
   `,
 })
-export class AuiThreadRowViewComponent {
-  /** The row to render. */
-  readonly row = input.required<ThreadRow>();
+export class AuiThreadRowNodeComponent {
+  /** The group-tree node to render. */
+  readonly node = input.required<GroupNode>();
+  /** The part row the node belongs to. */
+  readonly row = input.required<PartRow>();
   /** The row template. */
   readonly template = input.required<TemplateRef<AuiThreadRowTemplateContext>>();
-  /** Part templates for `children`. */
+  /** Part templates for leaf default views. */
   readonly partTemplates = input.required<AuiPartTemplates>();
 
   private readonly aui = injectAui();
-  private readonly message = injectAuiState((s) => s.message);
   private readonly parts = injectAuiState((s) => s.message.parts);
   private readonly partConfigs = new Map<number, AuiConfig>();
   private destroyed = false;
 
-  /** Part indices of a part row, else none. */
-  protected readonly partIndices = computed<readonly number[]>(() => {
-    const row = this.row();
-    return row.type === 'part' ? row.indices : [];
+  /** The node when it is a group. */
+  protected readonly group = computed(() => {
+    const node = this.node();
+    return node.type === 'group' ? node : null;
   });
-
-  /** False when a part row's parts are gone (a row can outlive its parts for a frame). */
-  protected readonly present = computed(() => {
-    const row = this.row();
-    return row.type !== 'part' || row.indices.every((index) => index < this.parts().length);
+  /** The part index when the node is a leaf. */
+  protected readonly leafIndex = computed(() => {
+    const node = this.node();
+    return node.type === 'part' && node.index < this.parts().length ? node.index : null;
   });
+  /** The group's child nodes. */
+  protected readonly children = computed(() => this.group()?.children ?? []);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -148,21 +240,27 @@ export class AuiThreadRowViewComponent {
     });
   }
 
-  /** Builds the template context for the current row. */
-  protected context(children: TemplateRef<unknown>): AuiThreadRowTemplateContext {
-    const row = this.row();
-    if (row.type === 'part') {
-      const parts = this.parts();
-      return {
-        $implicit: {
-          type: 'part',
-          row,
-          parts: row.indices.map((index) => parts[index]).filter((part) => part !== undefined),
-          children,
-        },
-      };
-    }
-    return { $implicit: { type: row.type, row, message: this.message() } as AuiThreadRowInfo };
+  /** A stable `@for` key for a child node. */
+  protected childKey(child: GroupNode): string {
+    return child.type === 'part'
+      ? `part-${child.idKey ?? child.index}`
+      : JSON.stringify([child.key, child.idKey ?? child.nodeKey]);
+  }
+
+  /** Builds the template context for a group node. */
+  protected groupContext(
+    group: Extract<GroupNode, { type: 'group' }>,
+    children: TemplateRef<unknown>,
+  ): AuiThreadRowTemplateContext {
+    const { status, counts, timing } = getGroupSummary(this.parts(), group.indices);
+    const part: AuiThreadRowGroupPart = {
+      type: group.key as `group-${string}`,
+      status,
+      counts,
+      indices: group.indices,
+      ...(timing && { timing }),
+    };
+    return { $implicit: { type: 'part', row: this.row(), part, children } };
   }
 
   /** Returns the memoised scope config for the part at `index`. */
@@ -178,6 +276,65 @@ export class AuiThreadRowViewComponent {
       this.partConfigs.set(index, config);
     }
     return config;
+  }
+}
+
+/**
+ * Internal: renders the row template inside the row's message scope.
+ */
+@Component({
+  selector: 'aui-thread-row-view',
+  standalone: true,
+  imports: [NgTemplateOutlet, AuiThreadRowNodeComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
+  template: `
+    @if (partRow(); as partRow) {
+      <aui-thread-row-node
+        [node]="node(partRow)"
+        [row]="partRow"
+        [template]="template()"
+        [partTemplates]="partTemplates()"
+      />
+    } @else if (plainRow()) {
+      <ng-container *ngTemplateOutlet="template(); context: context()" />
+    }
+  `,
+})
+export class AuiThreadRowViewComponent {
+  /** The row to render. */
+  readonly row = input.required<ThreadRow>();
+  /** The row template. */
+  readonly template = input.required<TemplateRef<AuiThreadRowTemplateContext>>();
+  /** Part templates for leaf default views. */
+  readonly partTemplates = input.required<AuiPartTemplates>();
+
+  private readonly message = injectAuiState((s) => s.message);
+  private readonly parts = injectAuiState((s) => s.message.parts);
+
+  /** The row when it is a part row whose parts still exist. */
+  protected readonly partRow = computed<PartRow | null>(() => {
+    const row = this.row();
+    if (row.type !== 'part') return null;
+    // A row can outlive its parts for a frame (a virtualizer): render nothing.
+    return row.indices.every((index) => index < this.parts().length) ? row : null;
+  });
+
+  /** The row when it is a message or turn-end row. */
+  protected readonly plainRow = computed(() => {
+    const row = this.row();
+    return row.type === 'part' ? null : row;
+  });
+
+  /** The group subtree of a part row. */
+  protected node(row: PartRow): GroupNode {
+    return getThreadRowNode(row) ?? fallbackNode(row.indices);
+  }
+
+  /** Builds the template context for a message or turn-end row. */
+  protected context(): AuiThreadRowTemplateContext {
+    const row = this.plainRow()!;
+    return { $implicit: { type: row.type, row, message: this.message() } as AuiThreadRowInfo };
   }
 }
 

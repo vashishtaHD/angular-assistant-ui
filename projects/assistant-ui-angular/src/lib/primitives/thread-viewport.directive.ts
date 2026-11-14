@@ -93,6 +93,13 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
   private destroyed = false;
   private detachScroller: (() => void) | undefined;
   private disposeTopAnchor: (() => void) | undefined;
+  /** `turnAnchor` and the clamp as bound at init: both are initial-only (as upstream). */
+  private snapshot:
+    { turnAnchor: 'top' | 'bottom'; clamp: AuiTopAnchorMessageClamp | undefined } | undefined;
+  private marked: { anchor: HTMLElement | null; target: HTMLElement | null } = {
+    anchor: null,
+    target: null,
+  };
   private topAnchorTurn: TopAnchorTurn | null = null;
   private readonly topAnchorListeners = new Set<() => void>();
   private previousFirst: {
@@ -102,7 +109,7 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
   private readonly scroller = createThreadViewportAutoScroll({
     getOptions: () =>
       untracked(() => {
-        const top = this.turnAnchor() === 'top';
+        const top = this.config().turnAnchor === 'top';
         return {
           autoScroll: this.autoScroll() ?? !top,
           holdFollow: top && this.isRunning() && this.findAnchorElements().anchor !== null,
@@ -143,6 +150,7 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
       this.destroyed = true;
       unsubscribe();
       this.disposeTopAnchor?.();
+      this.markElements(null, null);
       this.detachScroller?.();
       this.scroller.dispose();
     });
@@ -152,20 +160,54 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
   }
 
   ngOnInit(): void {
+    // The first moment the initial bindings are in place (the first render
+    // hook can run before them), so this is where the config is frozen.
+    this.snapshot = {
+      turnAnchor: untracked(() => this.turnAnchor()),
+      clamp: untracked(() => this.topAnchorMessageClamp()),
+    };
     this.syncHasMessages();
+    this.syncTopAnchorTurn();
+    this.mountTopAnchor();
   }
 
   ngOnChanges(): void {
     this.syncHasMessages();
-    // Inputs can arrive after the first render hook, so check on both.
-    this.mountTopAnchor();
+  }
+
+  /** The frozen initial config, or the live bindings before it is frozen. */
+  private config(): { turnAnchor: 'top' | 'bottom'; clamp: AuiTopAnchorMessageClamp | undefined } {
+    return (
+      this.snapshot ?? {
+        turnAnchor: untracked(() => this.turnAnchor()),
+        clamp: untracked(() => this.topAnchorMessageClamp()),
+      }
+    );
   }
 
   /** Mounts the top-anchor reserve once, when attached with `turnAnchor="top"`. */
   private mountTopAnchor(): void {
-    if (this.disposeTopAnchor || this.destroyed || !this.detachScroller) return;
-    if (this.untrackedTurnAnchor() !== 'top') return;
-    this.disposeTopAnchor = mountTopAnchorReserve(this.topAnchorStore());
+    if (this.disposeTopAnchor || this.destroyed || !this.detachScroller || !this.snapshot) return;
+    if (this.snapshot.turnAnchor !== 'top') return;
+    const dispose = mountTopAnchorReserve(this.topAnchorStore());
+    this.disposeTopAnchor = () => {
+      dispose();
+      this.markElements(null, null);
+    };
+  }
+
+  /** Sets `data-aui-top-anchor-user` / `-target` on the eligible elements only. */
+  private markElements(anchor: HTMLElement | null, target: HTMLElement | null): void {
+    const previous = this.marked;
+    if (previous.anchor !== anchor) {
+      previous.anchor?.removeAttribute('data-aui-top-anchor-user');
+      anchor?.setAttribute('data-aui-top-anchor-user', '');
+    }
+    if (previous.target !== target) {
+      previous.target?.removeAttribute('data-aui-top-anchor-target');
+      target?.setAttribute('data-aui-top-anchor-target', '');
+    }
+    this.marked = { anchor, target };
   }
 
   private syncHasMessages(): void {
@@ -197,7 +239,7 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
 
   /** Tracks the live user/assistant pair; drops it once it stops being the trailing turn. */
   private syncTopAnchorTurn(): void {
-    if (this.untrackedTurnAnchor() !== 'top') return;
+    if (this.config().turnAnchor !== 'top') return;
     const thread = getProxiedAssistantState(this.context.source.getClient()).optional.thread;
     if (!thread) return;
     const messages = thread.messages;
@@ -215,30 +257,37 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
     for (const listener of this.topAnchorListeners) listener();
   }
 
-  private untrackedTurnAnchor(): 'top' | 'bottom' {
-    return untracked(() => this.turnAnchor());
-  }
-
   /**
-   * The anchor (previous user message) and target (streaming reply) elements:
-   * the trailing user/assistant pair while a run is active or while it is the
-   * stored turn.
+   * The anchor (previous user message) and target (streaming reply) elements.
+   * Eligibility is upstream's, per element: the anchor is the second-to-last
+   * message, a user message that is not the first message, followed by an
+   * assistant message; the target is the last message, an assistant reply to a
+   * user message. Each also needs a running thread or to be the stored turn.
    */
   private findAnchorElements(): { anchor: HTMLElement | null; target: HTMLElement | null } {
     const thread = getProxiedAssistantState(this.context.source.getClient()).optional.thread;
     const messages = thread?.messages ?? [];
     const last = messages.at(-1);
     const prev = messages.at(-2);
-    if (prev?.role !== 'user' || last?.role !== 'assistant') return { anchor: null, target: null };
     const running = thread?.isRunning ?? false;
     const turn = this.topAnchorTurn;
+    const isAnchor =
+      prev?.role === 'user' &&
+      messages.length - 2 > 0 &&
+      last?.role === 'assistant' &&
+      (prev.id === turn?.anchorId || running);
+    const isTarget =
+      last?.role === 'assistant' &&
+      messages.length - 1 >= 1 &&
+      prev?.role === 'user' &&
+      (last.id === turn?.targetId || running);
     const byId = (id: string) =>
       Array.from(this.element.querySelectorAll<HTMLElement>('[data-message-id]')).find(
         (el) => el.dataset['messageId'] === id,
       ) ?? null;
     return {
-      anchor: running || turn?.anchorId === prev.id ? byId(prev.id) : null,
-      target: running || turn?.targetId === last.id ? byId(last.id) : null,
+      anchor: isAnchor ? byId(prev.id) : null,
+      target: isTarget ? byId(last.id) : null,
     };
   }
 
@@ -252,7 +301,8 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
     return {
       getState: () => {
         const { anchor, target } = this.findAnchorElements();
-        const clamp = untracked(() => this.topAnchorMessageClamp());
+        const clamp = this.config().clamp;
+        this.markElements(anchor, target);
         return {
           turnAnchor: 'top' as const,
           element: { viewport, anchor, target },
