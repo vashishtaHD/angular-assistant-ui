@@ -31,9 +31,9 @@ Status is one of `ported`, `planned`, `n/a`.
 | useAuiState                             | ported  |
 | useAuiEvent                             | ported  |
 | useScrollLock                           | planned |
-| MessageByIdProvider                     | planned |
-| PartByIndexProvider                     | planned |
-| ThreadPrimitiveMessages                 | planned |
+| MessageByIdProvider                     | n/a (internal: aui-scope-outlet + messageScopeConfig) |
+| PartByIndexProvider                     | n/a (internal: aui-scope-outlet + partScopeConfig) |
+| ThreadPrimitiveMessages                 | ported  |
 | ThreadPrimitiveViewport                 | ported  |
 | ThreadPrimitiveViewportFooter           | planned |
 | ThreadPrimitiveScrollToBottom           | planned |
@@ -73,8 +73,8 @@ Status is one of `ported`, `planned`, `n/a`.
 | MessagePrimitiveAttachments             | planned |
 | ErrorPrimitiveRoot                      | planned |
 | ErrorPrimitiveMessage                   | planned |
-| ThreadPrimitiveRoot                     | planned |
-| MessagePrimitiveRoot                    | planned |
+| ThreadPrimitiveRoot                     | ported  |
+| MessagePrimitiveRoot                    | ported  |
 | ThreadListPrimitiveLoadMore             | planned |
 | ThreadListItemPrimitiveArchive          | planned |
 | ThreadListItemPrimitiveUnarchive        | planned |
