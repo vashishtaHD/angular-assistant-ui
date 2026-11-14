@@ -6,7 +6,8 @@
       "angular-assistant-ui/testing": ["./dist/assistant-ui-angular/testing"],
       "angular-assistant-ui/ui": ["./dist/assistant-ui-angular/ui"],
       "angular-assistant-ui/mastra": ["./dist/assistant-ui-angular/mastra"],
-      "angular-assistant-ui/markdown": ["./dist/assistant-ui-angular/markdown"]
+      "angular-assistant-ui/markdown": ["./dist/assistant-ui-angular/markdown"],
+      "angular-assistant-ui/shiki": ["./dist/assistant-ui-angular/shiki"]
     },
     "outDir": "./dist/out-tsc",
     "strict": true,

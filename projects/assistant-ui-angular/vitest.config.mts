@@ -28,6 +28,7 @@ const reactAliases = [
 const entryAliases = [
   { find: /^angular-assistant-ui$/, replacement: lib('src/public-api.ts') },
   { find: /^angular-assistant-ui\/markdown$/, replacement: lib('markdown/src/public-api.ts') },
+  { find: /^angular-assistant-ui\/shiki$/, replacement: lib('shiki/src/public-api.ts') },
 ];
 
 function project(name: 'zone' | 'zoneless') {
@@ -45,6 +46,7 @@ function project(name: 'zone' | 'zoneless') {
         'ui/**/*.spec.ts',
         'mastra/**/*.spec.ts',
         'markdown/**/*.spec.ts',
+        'shiki/**/*.spec.ts',
         'markdown/src/vendor/**/*.test.ts',
       ],
       // Inline so the react aliases also apply inside @assistant-ui/* packages
