@@ -79,17 +79,42 @@ Status is one of `ported`, `planned`, `n/a`.
 | ThreadListItemPrimitiveArchive          | planned |
 | ThreadListItemPrimitiveUnarchive        | planned |
 | ThreadListItemPrimitiveDelete           | planned |
-| AuiConfig                               | planned |
-| Derived                                 | planned |
-| createAssistantClient                   | planned |
-| AssistantClient (type)                  | planned |
-| AssistantClientHandle (type)            | planned |
-| AssistantClientSource (type)            | planned |
-| AssistantConfigSource (type)            | planned |
-| AssistantState (type)                   | planned |
-| AssistantEventCallback (type)           | planned |
-| AssistantEventName (type)               | planned |
-| AssistantEventSelector (type)           | planned |
-| Unsubscribe (type)                      | planned |
+| AuiConfig                               | ported  |
+| Derived                                 | ported  |
+| createAssistantClient                   | ported  |
+| AssistantClient (type)                  | ported  |
+| AssistantClientHandle (type)            | ported  |
+| AssistantClientSource (type)            | ported  |
+| AssistantConfigSource (type)            | ported  |
+| AssistantState (type)                   | ported  |
+| AssistantEventCallback (type)           | ported  |
+| AssistantEventName (type)               | ported  |
+| AssistantEventSelector (type)           | ported  |
+| Unsubscribe (type)                      | ported  |
 | DataUIProps (type)                      | ported  |
 | ToolUIProps (type)                      | ported  |
+
+`AuiConfig`, `Derived`, `createAssistantClient` and the store types are re-exports
+of `@assistant-ui/store/client`, as upstream's Vue binding does. The
+`testing` secondary entry point (`createScriptedChatTransport`) has no upstream
+counterpart.
+
+## Porting the next primitive
+
+1. Find the Vue source in `packages/vue/src` and its tests (also check
+   `packages/svelte/src` for extra cases). Start the Angular file with
+   `// Ported from packages/vue/src/<path> @ <sha>`.
+2. Apply the translation rules above. Library code may use only Angular APIs
+   available in 18.2: no `effect()`, `linkedSignal`, `resource` or `afterRender`.
+3. Make it standalone with `ChangeDetectionStrategy.OnPush`, `inject()` only,
+   `host: {}` metadata (no `@HostBinding`/`@HostListener`) and the `aui` selector
+   prefix. Prefer attribute directives on the user's own elements over wrapper
+   components.
+4. Flow state as store subscription, then signal, then `computed`. Never read store
+   state in a constructor: the client is created on the provider's first
+   `ngOnChanges`. Under zoneless, call `markForCheck()` when creating or
+   destroying views from a callback.
+5. Port the relevant tests. They must pass in both the `zone` and `zoneless`
+   projects (`npm run test:lib`) with pristine output.
+6. Add TSDoc, export from `projects/assistant-ui-angular/src/public-api.ts`, flip the
+   parity row to `ported`, and run `npm run lint` and `npm run build:lib`.
