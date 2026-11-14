@@ -104,11 +104,48 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
     // Hand the new state back so the thread publishes it (as a real host does).
     sync();
   };
+  // Deleting removes the node, relinks its children to its parent (as core's
+  // repository does) and keeps the siblings so branch selection still works.
+  const onCoreDelete = (messageId: string) => {
+    if (!tree) {
+      messages = messages.filter((message) => message.id !== messageId);
+      sync();
+      return;
+    }
+    const removed = tree.find((entry) => entry.message.id === messageId);
+    if (!removed) return;
+    const inActiveChain = (id: string | null) => {
+      for (let cursor = id; cursor;) {
+        if (cursor === messageId) return true;
+        cursor = tree?.find((entry) => entry.message.id === cursor)?.parentId ?? null;
+      }
+      return false;
+    };
+    const headWasDeleted = inActiveChain(headId);
+    tree = tree
+      .filter((entry) => entry.message.id !== messageId)
+      .map((entry) =>
+        entry.parentId === messageId ? { ...entry, parentId: removed.parentId } : entry,
+      );
+    if (headWasDeleted) {
+      // Fall back to the parent's last remaining branch, down to its leaf.
+      let cursor = removed.parentId;
+      for (;;) {
+        const children = tree.filter((entry) => entry.parentId === cursor);
+        const last = children.at(-1);
+        if (!last) break;
+        cursor = last.message.id;
+      }
+      headId = cursor;
+    }
+    sync();
+  };
   const makeAdapter = (): ExternalStoreAdapter<DemoMessage> => {
     const common = {
       isRunning,
       suggestions,
       setMessages: onCoreSetMessages,
+      onDelete: onCoreDelete,
       ...(adapters ? { adapters } : {}),
       onNew: async () => undefined,
       ...callbacks,

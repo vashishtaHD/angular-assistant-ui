@@ -43,7 +43,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | AuiConfig | yes | ported (re-export of `@assistant-ui/store/client`) |  |
 | AssistantClient, AssistantState, AssistantEventSelector, AssistantEventName, AssistantEventCallback, Unsubscribe | yes | ported (re-exports of `@assistant-ui/store/client`) |  |
 | AssistantEventScope, AssistantEventPayload | no | planned (Task 22) (type re-exports) | Task 22 |
-| AssistantRuntimeProvider | yes (`AssistantRuntimeProvider` is not in Vue) | n/a (replaced by `[auiProvider]` with `AuiConfig({ threads: RuntimeAdapter(runtime) })`) |  |
+| AssistantRuntimeProvider | no | n/a (replaced by `[auiProvider]` with `AuiConfig({ threads: RuntimeAdapter(runtime) })`) |  |
 | MessageByIndexProvider | yes | n/a (replaced by `aui-thread-messages` + `messageScopeConfig`) |  |
 | PartByIndexProvider | yes | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
 | SuggestionByIndexProvider | yes | planned (Task 7) (via `indexScopeConfig` kind `suggestion`) | Task 7 |
@@ -129,8 +129,8 @@ Angular scope or directive replaces exactly are `n/a`.
 | useInlineRender | no | planned (Task 22) (Angular equivalent or documented template pattern) | Task 22 |
 | ModelContext, ModelContextOptions, ModelContextProvider, SystemPart, LanguageModelConfig, LanguageModelV1CallSettings, mergeModelContexts, ModelContextClient | no | planned (Task 22) (contracts and helpers re-exported) | Task 22 |
 | ModelContextRegistry, ModelContextRegistryToolHandle, ModelContextRegistryInstructionHandle, ModelContextRegistryProviderHandle, SerializedTool, SerializedModelContext | no | planned (Task 22) | Task 22 |
-| AssistantFrameHost, AssistantFrameProvider, useAssistantFrameHost, FRAME_MESSAGE_CHANNEL, FrameMessageType, FrameMessage | no | n/a (MCP / generative UI — out of scope by agreement) | |
-| unstable_useWebMcpProvider, unstable_defaultWebMcpFilter, Unstable_WebMcpProviderOptions, Unstable_WebMcpProviderResult | no | n/a (MCP / generative UI — out of scope by agreement) | |
+| AssistantFrameHost, AssistantFrameProvider, useAssistantFrameHost, FRAME_MESSAGE_CHANNEL, FrameMessageType, FrameMessage | no | n/a (MCP / generative UI — out of scope by agreement) |  |
+| unstable_useWebMcpProvider, unstable_defaultWebMcpFilter, Unstable_WebMcpProviderOptions, Unstable_WebMcpProviderResult | no | n/a (MCP / generative UI — out of scope by agreement) |  |
 | Interactables, unstable_Interactables, useAssistantInteractable, AssistantInteractableProps | no | planned (Task 22) | Task 22 |
 | useInteractableState, unstable_useInteractable, unstable_useInteractableState, unstable_useInteractableVersions, unstable_interactableTool | no | planned (Task 22) | Task 22 |
 | unstable_getInteractableSnapshots, unstable_formatInteractableSnapshot, unstable_getInteractableVersions, Unstable_InteractableSnapshotEntry, Unstable_InteractableVersion | no | planned (Task 22) | Task 22 |
@@ -155,8 +155,8 @@ Angular scope or directive replaces exactly are `n/a`.
 | unstable_useComposerInputHistory, Unstable_ComposerInputHistory | no | planned (Task 5) | Task 5 |
 | unstable_useComposerInput, Unstable_UseComposerInputOptions, Unstable_ComposerInput | no | planned (Task 5) | Task 5 |
 | unstable_useComposerRunStartFocusGuard, Unstable_ComposerRunStartFocusGuard | no | planned (Task 5) | Task 5 |
-| ComposerPrimitive.TriggerPopoverRoot, TriggerPopover, TriggerPopoverCategories, TriggerPopoverCategoryItem, TriggerPopoverItems, TriggerPopoverItem, TriggerPopoverBack | no | planned (Task 10) | Task 10 |
-| ComposerPrimitive.Unstable_TriggerPopoverRoot, Unstable_TriggerPopover, Unstable_TriggerPopoverCategories, Unstable_TriggerPopoverCategoryItem, Unstable_TriggerPopoverItems, Unstable_TriggerPopoverItem, Unstable_TriggerPopoverBack | no | planned (Task 10) (deprecated aliases of the rows above, exported under the same Angular names) | Task 10 |
+| ComposerPrimitive.TriggerPopoverRoot, ComposerPrimitive.TriggerPopover, ComposerPrimitive.TriggerPopoverCategories, ComposerPrimitive.TriggerPopoverCategoryItem, ComposerPrimitive.TriggerPopoverItems, ComposerPrimitive.TriggerPopoverItem, ComposerPrimitive.TriggerPopoverBack | no | planned (Task 10) | Task 10 |
+| ComposerPrimitive.Unstable_TriggerPopoverRoot, ComposerPrimitive.Unstable_TriggerPopover, ComposerPrimitive.Unstable_TriggerPopoverCategories, ComposerPrimitive.Unstable_TriggerPopoverCategoryItem, ComposerPrimitive.Unstable_TriggerPopoverItems, ComposerPrimitive.Unstable_TriggerPopoverItem, ComposerPrimitive.Unstable_TriggerPopoverBack | no | planned (Task 10) (deprecated aliases of the rows above, exported under the same Angular names) | Task 10 |
 | unstable_useTriggerPopoverRootContext, unstable_useTriggerPopoverRootContextOptional, unstable_useTriggerPopoverScopeContext, unstable_useTriggerPopoverScopeContextOptional, unstable_useTriggerPopoverTriggers, unstable_useTriggerPopoverTriggersOptional | no | planned (Task 10) (as `inject*` functions) | Task 10 |
 | unstable_useTriggerPopoverAriaProps, Unstable_TriggerPopoverAriaProps | no | planned (Task 10) | Task 10 |
 | unstable_useMentionAdapter, Unstable_UseMentionAdapterOptions, Unstable_Mention, Unstable_MentionCategory, Unstable_MentionDirective, Unstable_IconComponent, Unstable_ModelContextToolsOptions | no | planned (Task 10) | Task 10 |
@@ -250,8 +250,9 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| SelectionToolbarPrimitive.Root (and its type export), SelectionToolbarPrimitive.Quote (and its type export), getSelectionMessageId | no | planned (Task 10) | Task 10 |
+| SelectionToolbarPrimitive.Root, SelectionToolbarPrimitive.SelectionToolbarPrimitiveRoot, SelectionToolbarPrimitive.Quote, SelectionToolbarPrimitive.SelectionToolbarPrimitiveQuote, getSelectionMessageId | no | planned (Task 10) | Task 10 |
 | AssistantModalPrimitive.Root, AssistantModalPrimitive.Trigger, AssistantModalPrimitive.Anchor, AssistantModalPrimitive.Content | no | planned (Task 10) | Task 10 |
+| DropdownMenuRenderTrigger, DropdownMenuRenderContent, DropdownMenuRenderItem, DropdownMenuRenderSeparator | no | n/a (replaced by the Task 10 `button[auiMenuTrigger]`, `[auiMenuContent]`, `[auiMenuItem]` and the menu separator directive) | Task 10 |
 
 ### Runtimes, external store and transport
 

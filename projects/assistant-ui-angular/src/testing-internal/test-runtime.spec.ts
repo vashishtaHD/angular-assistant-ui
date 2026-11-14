@@ -85,6 +85,59 @@ describe('createTestRuntime extras', () => {
     release();
   });
 
+  it('keeps a deleted branch message deleted across later syncs', async () => {
+    const rt = createTestRuntime();
+    flushTapSync(() => {
+      rt.append({ id: 'u1', role: 'user', content: text('hi') });
+      rt.append({ id: 'a1', role: 'assistant', content: text('first') });
+      rt.appendBranch('u1', { id: 'a2', role: 'assistant', content: text('second') });
+    });
+    const { client, release } = mountClient(rt.config);
+    const ids = () => client.thread.getState().messages.map((m) => m.id);
+    expect(ids()).toEqual(['u1', 'a2']);
+
+    await client.thread.deleteMessage('a2');
+    await settle();
+    expect(ids()).toEqual(['u1', 'a1']);
+
+    flushTapSync(() => rt.setRunning(true));
+    flushTapSync(() => rt.setRunning(false));
+    expect(ids()).toEqual(['u1', 'a1']);
+    flushTapSync(() => rt.setSuggestions([{ prompt: 'p' }]));
+    expect(ids()).toEqual(['u1', 'a1']);
+    flushTapSync(() => rt.append({ id: 'u2', role: 'user', content: text('more') }));
+    expect(ids()).toEqual(['u1', 'a1', 'u2']);
+    expect(client.thread.message({ id: 'a1' }).getState().branchCount).toBe(1);
+    release();
+  });
+
+  it('relinks children when an interior message is deleted and keeps siblings', async () => {
+    const rt = createTestRuntime();
+    flushTapSync(() => {
+      rt.append({ id: 'u1', role: 'user', content: text('hi') });
+      rt.append({ id: 'a1', role: 'assistant', content: text('first') });
+      rt.append({ id: 'u2', role: 'user', content: text('more') });
+      rt.appendBranch('u1', { id: 'a2', role: 'assistant', content: text('alt') });
+      rt.setMessages([
+        { id: 'u1', role: 'user', content: text('hi') },
+        { id: 'a1', role: 'assistant', content: text('first') },
+        { id: 'u2', role: 'user', content: text('more') },
+      ]);
+    });
+    const { client, release } = mountClient(rt.config);
+    const ids = () => client.thread.getState().messages.map((m) => m.id);
+    expect(ids()).toEqual(['u1', 'a1', 'u2']);
+
+    await client.thread.deleteMessage('a1');
+    await settle();
+    expect(ids()).toEqual(['u1', 'u2']);
+    flushTapSync(() => rt.setRunning(false));
+    expect(ids()).toEqual(['u1', 'u2']);
+    flushTapSync(() => rt.append({ id: 'a3', role: 'assistant', content: text('later') }));
+    expect(ids()).toEqual(['u1', 'u2', 'a3']);
+    release();
+  });
+
   it('appendBranch rejects an unknown parent', () => {
     const rt = createTestRuntime();
     expect(() => rt.appendBranch('nope', { id: 'x', role: 'user', content: text('x') })).toThrow(
