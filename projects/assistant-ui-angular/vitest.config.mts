@@ -29,7 +29,7 @@ function project(name: 'zone' | 'zoneless') {
       globals: true,
       environment: 'jsdom',
       setupFiles: [`src/test-setup.${name}.ts`],
-      include: ['src/**/*.spec.ts', 'testing/**/*.spec.ts'],
+      include: ['src/**/*.spec.ts', 'testing/**/*.spec.ts', 'ui/**/*.spec.ts'],
       // Inline so the react aliases also apply inside @assistant-ui/* packages.
       server: { deps: { inline: [/@assistant-ui\//] } },
     },

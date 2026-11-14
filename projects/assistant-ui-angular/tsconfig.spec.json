@@ -7,6 +7,7 @@
   "include": [
     "src/**/*.spec.ts",
     "testing/**/*.spec.ts",
+    "ui/**/*.spec.ts",
     "src/**/*.d.ts",
     "src/test-setup.*.ts",
     "src/testing-internal/**/*.ts"
