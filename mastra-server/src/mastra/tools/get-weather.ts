@@ -1,7 +1,7 @@
-import { createTool } from "@mastra/core/tools";
-import { z } from "zod";
+import { createTool } from '@mastra/core/tools';
+import { z } from 'zod';
 
-const conditions = ["sunny", "cloudy", "rainy"] as const;
+const conditions = ['sunny', 'cloudy', 'rainy'] as const;
 
 export type WeatherData = {
   city: string;
@@ -30,9 +30,9 @@ export function getWeatherData(city: string): WeatherData {
 }
 
 export const getWeather = createTool({
-  id: "getWeather",
-  description: "Get the current weather for a city.",
-  inputSchema: z.object({ city: z.string().describe("City name") }),
+  id: 'getWeather',
+  description: 'Get the current weather for a city.',
+  inputSchema: z.object({ city: z.string().describe('City name') }),
   outputSchema: z.object({
     city: z.string(),
     temperatureC: z.number(),

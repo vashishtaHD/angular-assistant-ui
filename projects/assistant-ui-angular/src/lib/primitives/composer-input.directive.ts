@@ -10,10 +10,7 @@ import {
   input,
 } from '@angular/core';
 import { flushTapSync } from '@assistant-ui/tap';
-import {
-  composerInputDisabled,
-  composerSendDisabled,
-} from '@assistant-ui/core/store/internal';
+import { composerInputDisabled, composerSendDisabled } from '@assistant-ui/core/store/internal';
 import { injectAuiContext } from '../context/aui-context';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';

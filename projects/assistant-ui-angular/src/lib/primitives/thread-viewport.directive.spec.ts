@@ -76,7 +76,7 @@ async function mount(
 const viewportOf = (fixture: ComponentFixture<HostComponent>) =>
   (fixture.nativeElement as HTMLElement).querySelector('div.viewport') as HTMLElement;
 
-const flushFrame = async (fixture: ComponentFixture<HostComponent>) => {
+const flushFrame = async (fixture: ComponentFixture<unknown>) => {
   await fixture.whenStable();
   await new Promise((resolve) => setTimeout(resolve));
   vi.advanceTimersToNextFrame();
