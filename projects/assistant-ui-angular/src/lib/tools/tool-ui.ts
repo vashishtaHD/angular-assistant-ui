@@ -15,7 +15,7 @@ import {
   type AssistantState,
   type Unsubscribe,
 } from '@assistant-ui/store/client';
-import { injectAuiContext } from '../context/aui-context';
+import { AUI_CONTEXT, injectAuiContext } from '../context/aui-context';
 
 /**
  * The value of the single `tool` input passed to a tool UI registered in the
@@ -67,7 +67,8 @@ export type ToolsScopeRender = Parameters<AssistantClient['tools']['setToolUI']>
  * nearest provider's `tools` scope, for the lifetime of the current injection
  * context (it unregisters on destroy). Must be called in an injection context
  * under an {@link AuiProviderDirective} whose config mounts a `tools` scope
- * (`RuntimeAdapter` mounts one automatically).
+ * (`RuntimeAdapter` mounts one automatically). Outside any provider it does
+ * nothing, and warns once per call in development mode.
  *
  * The registration follows the provider's current client: it is made once the
  * client exists (constructors run before the provider creates it) and moves
@@ -86,6 +87,12 @@ export type ToolsScopeRender = Parameters<AssistantClient['tools']['setToolUI']>
  */
 export function registerToolUI(toolName: string, component: Type<ToolUIComponent>): void {
   assertInInjectionContext(registerToolUI);
+  if (isDevMode() && !inject(AUI_CONTEXT, { optional: true })) {
+    console.warn(
+      `registerToolUI('${toolName}') was called outside an AuiProvider, so the tool UI will never render. ` +
+        'Call it from a component or directive inside an [auiProvider] subtree.',
+    );
+  }
   const { source } = injectAuiContext();
   // The tools scope types renderers as React components. The Angular face
   // stores an Angular component class there and casts it back at render
