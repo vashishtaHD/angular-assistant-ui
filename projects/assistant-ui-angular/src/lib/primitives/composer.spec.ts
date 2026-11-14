@@ -260,4 +260,51 @@ describe('composer primitives', () => {
     await t.settle();
     expect(t.textarea.style.height).toMatch(/px$/);
   });
+
+  function countMeasurements(t: Setup): { count: () => number } {
+    let n = 0;
+    Object.defineProperty(t.textarea, 'scrollHeight', {
+      configurable: true,
+      get: () => ++n,
+    });
+    return { count: () => n };
+  }
+
+  it('does not re-measure on store notifications that leave the text unchanged', async () => {
+    const t = await setup();
+    type(t, 'hello');
+    await t.settle();
+    const m = countMeasurements(t);
+
+    t.host.rt.setRunning(true);
+    await t.settle();
+    t.host.rt.setRunning(false);
+    await t.settle();
+    expect(m.count()).toBe(0);
+  });
+
+  it('measures once for several text changes in one tick', async () => {
+    const t = await setup();
+    await t.settle();
+    const m = countMeasurements(t);
+
+    flushTapSync(() => t.aui.composer.setText('a'));
+    flushTapSync(() => t.aui.composer.setText('ab'));
+    flushTapSync(() => t.aui.composer.setText('abc'));
+    await t.settle();
+    expect(m.count()).toBe(1);
+  });
+
+  it('measures the initial value once after first render', async () => {
+    let n = 0;
+    const proto = HTMLTextAreaElement.prototype;
+    Object.defineProperty(proto, 'scrollHeight', { configurable: true, get: () => ++n });
+    try {
+      const t = await setup();
+      await t.settle();
+      expect(n).toBe(1);
+    } finally {
+      delete (proto as { scrollHeight?: number }).scrollHeight;
+    }
+  });
 });

@@ -55,11 +55,17 @@ export class AuiComposerInputDirective {
   readonly text = injectAuiState((s) => (s.composer.isEditing ? s.composer.text : ''));
   private readonly threadDisabled = injectAuiState(composerInputDisabled);
   private readonly sendDisabled = injectAuiState(composerSendDisabled);
+  private lastText: string | undefined;
+  private resizePending = false;
 
   constructor() {
-    // Recompute the height whenever the store changes (text set elsewhere).
-    // The scheduled callback runs after the next render has applied `[value]`.
-    const unsubscribe = injectAuiContext().source.subscribe(() => this.scheduleResize());
+    // Recompute the height when the composer text differs from the last
+    // measured value (text set elsewhere). The initial value counts as a
+    // change. The callback runs after the next render has applied `[value]`.
+    this.scheduleResize();
+    const unsubscribe = injectAuiContext().source.subscribe(() => {
+      if (this.text() !== this.lastText) this.scheduleResize();
+    });
     inject(DestroyRef).onDestroy(unsubscribe);
   }
 
@@ -76,6 +82,7 @@ export class AuiComposerInputDirective {
       return;
     }
     flushTapSync(() => this.aui.composer.setText(target.value, { origin: 'user' }));
+    this.lastText = target.value;
     this.resize();
   }
 
@@ -91,7 +98,24 @@ export class AuiComposerInputDirective {
   }
 
   private scheduleResize(): void {
-    afterNextRender(() => this.resize(), { injector: this.injector });
+    if (this.resizePending) return;
+    this.resizePending = true;
+    afterNextRender(
+      () => {
+        this.resizePending = false;
+        let text: string;
+        try {
+          text = this.text();
+        } catch {
+          // The provider's client does not exist yet; its first store
+          // notification re-schedules because the text is still unmeasured.
+          return;
+        }
+        this.lastText = text;
+        this.resize();
+      },
+      { injector: this.injector },
+    );
   }
 
   private resize(): void {
