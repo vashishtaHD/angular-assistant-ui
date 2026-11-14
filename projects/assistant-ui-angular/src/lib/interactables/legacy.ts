@@ -29,21 +29,23 @@ export interface AssistantInteractableProps {
 
 /**
  * Registers an interactable with the assistant for the injector's lifetime
- * and returns its instance id (React's `useAssistantInteractable`). Read and
+ * and returns its instance id as a signal (React's `useAssistantInteractable`). Read and
  * write its state with {@link injectInteractableState}. `config` may be an
- * object or a function returning one (re-read on every store change and
- * after first render). Needs the `interactables` scope
- * (`Interactables()` from `@assistant-ui/core/react` in `AuiConfig`).
+ * object or a function returning one; the function is first read after the
+ * component's inputs are set (so it may read signal inputs) and re-read on
+ * every store change. The id signal follows the config's `id`. Needs the
+ * `interactables` scope (`Interactables()` from `angular-assistant-ui/react-interop`
+ * in `AuiConfig`).
  *
  * @deprecated Since 2026-06-14, migrate to the unstable interactables API.
  */
 export function injectAssistantInteractable(
   name: string,
   config: AssistantInteractableProps | (() => AssistantInteractableProps),
-): string {
+): Signal<string> {
   const getConfig = typeof config === 'function' ? config : () => config;
   const autoId = nextInteractableId();
-  const id = getConfig().id ?? autoId;
+  const id = computed(() => getConfig().id ?? autoId);
   bindToClient(
     injectAssistantInteractable,
     (client) => {

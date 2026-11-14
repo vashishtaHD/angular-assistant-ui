@@ -15,7 +15,7 @@ import type {
   Unstable_InteractableStateSchema,
   Unstable_InteractableVersionInfo,
 } from '@assistant-ui/core/react';
-import { toolResultRecord, UPDATE_TOOL_PREFIX } from './helpers';
+import { sanitizedName, toolResultRecord, UPDATE_TOOL_PREFIX } from './helpers';
 import {
   unstable_injectInteractable,
   unstable_injectInteractableState,
@@ -83,8 +83,12 @@ export interface Unstable_InteractableToolConfig<TSchema extends Unstable_Intera
 
 type AnyConfig = Unstable_InteractableToolConfig<Unstable_InteractableStateSchema>;
 
-/** Configs by tool name (toolkit key and interactable name), filled by `registerToolkit`. */
-const configs = new Map<string, AnyConfig>();
+/**
+ * Configs by tool name (toolkit key, interactable name and its sanitized update
+ * name), filled by `registerToolkit`. Each key holds the registrations that
+ * claimed it, so a toolkit mounted twice survives one copy being destroyed.
+ */
+const configs = new Map<string, { config: AnyConfig; token: object }[]>();
 
 /** Marker property carrying the config on a definition made by {@link unstable_interactableTool}. */
 export const INTERACTABLE_TOOL_CONFIG = Symbol.for('assistant-ui-angular.interactableToolConfig');
@@ -101,19 +105,30 @@ export function registerInteractableToolConfig(
 ): () => void {
   const config = (tool as { [INTERACTABLE_TOOL_CONFIG]?: AnyConfig })[INTERACTABLE_TOOL_CONFIG];
   if (!config) return () => undefined;
-  const keys = [toolName, config.name].filter((k): k is string => !!k);
-  for (const key of keys) configs.set(key, config);
+  // `update_*` calls carry the sanitized name, so register that spelling too.
+  const names = [toolName, config.name].filter((k): k is string => !!k);
+  const keys = names.flatMap((n) => [n, sanitizedName(n)]);
+  const token = {};
+  for (const key of new Set(keys))
+    configs.set(key, [...(configs.get(key) ?? []), { config, token }]);
   return () => {
-    for (const key of keys) if (configs.get(key) === config) configs.delete(key);
+    for (const key of new Set(keys)) {
+      const rest = (configs.get(key) ?? []).filter((entry) => entry.token !== token);
+      if (rest.length > 0) configs.set(key, rest);
+      else configs.delete(key);
+    }
   };
 }
 
 const noop = () => undefined;
 
-/** Resolves the config for `toolName`, warning once in dev when it is missing. */
+const warnedMissing = new Set<string>();
+
+/** Resolves the config for `toolName`, warning once per name in dev when it is missing. */
 function configFor(toolName: string): AnyConfig | undefined {
-  const config = configs.get(toolName);
-  if (!config && isDevMode()) {
+  const config = configs.get(toolName)?.at(-1)?.config;
+  if (!config && isDevMode() && !warnedMissing.has(toolName)) {
+    warnedMissing.add(toolName);
     console.warn(
       `unstable_interactableTool: no config found for "${toolName}". Register the toolkit with registerToolkit() (or registerInteractableToolConfig()).`,
     );

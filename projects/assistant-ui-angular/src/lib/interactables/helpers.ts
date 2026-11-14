@@ -3,7 +3,12 @@
 
 /** The model-facing tool name for an interactable `name`. One tool per name. */
 export function interactableToolName(name: string): string {
-  return `update_${name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  return `update_${sanitizedName(name)}`;
+}
+
+/** `name` as it appears inside a model-facing tool name. */
+export function sanitizedName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
 /** The prefix of every interactable update tool name. */

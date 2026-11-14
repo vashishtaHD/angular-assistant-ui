@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, signal, type Signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import {
   Interactables,
@@ -22,6 +22,7 @@ import {
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
 import { injectAui } from '../state/inject-aui';
 import { registerToolkit } from '../tools/toolkit';
+import { registerInteractableToolConfig } from './interactable-tool';
 import {
   unstable_injectInteractable,
   unstable_injectInteractableState,
@@ -54,7 +55,7 @@ let rt: TestRuntime;
 let aui: AssistantClient;
 let owner: InteractableHandle<{ text: string }>;
 let reader: InteractableStateHandle<{ text: string }>;
-let legacyId: string;
+let legacyId: Signal<string>;
 let legacyState: ReturnType<typeof injectInteractableState<{ text: string }>>;
 let register: () => void = () => undefined;
 
@@ -204,7 +205,7 @@ describe('interactables', () => {
       legacyState = injectInteractableState<{ text: string }>('legacy-1', { text: 'fallback' });
     };
     const fixture = await mount();
-    expect(legacyId).toBe('legacy-1');
+    expect(legacyId()).toBe('legacy-1');
     await vi.waitFor(() => expect(legacyState.state()).toEqual({ text: 'x' }));
     legacyState.setState({ text: 'y' });
     await vi.waitFor(() => expect(legacyState.state()).toEqual({ text: 'y' }));
@@ -212,6 +213,33 @@ describe('interactables', () => {
     await vi.waitFor(() =>
       expect(aui.interactables().getState().definitions['legacy-1']?.selected).toBe(true),
     );
+    fixture.destroy();
+  });
+
+  it('evaluates a legacy function config lazily and keeps the returned id reactive', async () => {
+    // Inputs are unavailable while the constructor runs, available from first render.
+    const ready = signal(false);
+    const idSource = signal('legacy-a');
+    register = () => {
+      legacyId = injectAssistantInteractable('legacy', () => {
+        // Like reading a required input: not available during construction.
+        if (!ready()) throw new Error('inputs are not set yet');
+        return {
+          description: 'Legacy',
+          stateSchema: schema,
+          initialState: { text: 'x' },
+          id: idSource(),
+        };
+      });
+      ready.set(true);
+    };
+    const fixture = await mount();
+    expect(legacyId()).toBe('legacy-a');
+    await vi.waitFor(() =>
+      expect(aui.interactables().getState().definitions['legacy-a']).toBeDefined(),
+    );
+    idSource.set('legacy-b');
+    expect(legacyId()).toBe('legacy-b');
     fixture.destroy();
   });
 
@@ -260,6 +288,39 @@ describe('interactables', () => {
     await vi.waitFor(async () => {
       await settle(fixture);
       expect(root.querySelector('p.note')?.textContent).toBe('edited|false');
+    });
+    fixture.destroy();
+  });
+  it('keeps a toolkit mounted twice working when one copy is destroyed', async () => {
+    const tool = unstable_interactableTool({
+      description: 'A notepad',
+      stateSchema: schema,
+      render: NotepadComponent,
+    });
+    register = () => registerToolkit({ refcounted: tool });
+    const fixture = await mount();
+    const releaseA = registerInteractableToolConfig('refcounted', tool);
+    // Another copy of the same toolkit goes away; the mounted one must survive.
+    releaseA();
+    const root = fixture.nativeElement as HTMLElement;
+    // The surviving registration still resolves the config: the UI renders.
+    flushTapSync(() =>
+      rt.append({
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'call-r',
+            toolName: 'refcounted',
+            args: { text: 'still here' },
+            result: { success: true },
+          },
+        ],
+      }),
+    );
+    await vi.waitFor(async () => {
+      await settle(fixture);
+      expect(root.querySelector('p.note')?.textContent).toBe('still here|false');
     });
     fixture.destroy();
   });

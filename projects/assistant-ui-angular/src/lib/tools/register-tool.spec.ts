@@ -181,6 +181,8 @@ describe('registerTool with a scripted transport', () => {
 
     send('do it?');
     await vi.waitFor(() => expect(toolPart()).toMatchObject({ toolName: 'confirm' }));
+    // The turn has ended and the tool keeps waiting for the user.
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(toolPart()).not.toHaveProperty('result');
 
     aui.thread().message({ index: 1 }).part({ index: 0 }).addToolResult({ ok: true });

@@ -2,15 +2,19 @@
 // and packages/core/src/react/runtimes/assistant-transport/commandQueue.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
 // and packages/core/src/react/runtimes/assistant-transport/runManager.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
 // and packages/core/src/react/runtimes/assistant-transport/replayBoundaryStream.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- the ambient types must reach the ng-packagr build, which only compiles files reachable from the entry
+/// <reference path="./tap-react-shim.d.ts" />
 import { assertInInjectionContext, computed, type Signal } from '@angular/core';
-import type {
-  AddToolResultOptions,
-  AppendMessage,
-  AssistantRuntime,
-  ThreadMessage,
-  ThreadMessageLike,
-  ToolExecutionStatus,
-  UserExternalState,
+import {
+  InMemoryThreadListAdapter,
+  createRequestHeaders,
+  type AddToolResultOptions,
+  type AppendMessage,
+  type RemoteThreadListAdapter,
+  type ThreadMessage,
+  type ThreadMessageLike,
+  type ToolExecutionStatus,
+  type UserExternalState,
 } from '@assistant-ui/core';
 import {
   AssistantRuntimeImpl,
@@ -19,12 +23,16 @@ import {
   invokeUserCallback,
   raceWithAbortSignal,
 } from '@assistant-ui/core/internal';
-import {
-  createRuntimeExtras,
-  type AssistantTransportCommand,
-  type AssistantTransportOptions,
-  type SendCommandsRequestBody,
+import { RemoteThreadList, createRuntimeExtrasBrand } from '@assistant-ui/core/store';
+import { ThreadClient } from '@assistant-ui/core/store/internal';
+import type {
+  AssistantTransportCommand,
+  AssistantTransportOptions,
+  SendCommandsRequestBody,
 } from '@assistant-ui/core/react';
+import { AuiConfig, useAssistantClientRef } from '@assistant-ui/store/client';
+import { resource, useResource, withKey } from '@assistant-ui/tap';
+import { useEffect, useState } from '@assistant-ui/tap/react-shim';
 import {
   AssistantMessageAccumulator,
   AssistantTransportDecoder,
@@ -48,17 +56,17 @@ type QueuedCommand = AssistantTransportCommand;
  */
 export type AssistantTransportRuntimeOptions<T> = Omit<AssistantTransportOptions<T>, 'cloud'>;
 
-/** The runtime and controls returned by {@link createAssistantTransportRuntime}. */
+/** What {@link createAssistantTransportRuntime} returns. */
 export interface AssistantTransportRuntime<T> {
-  /** The runtime; mount it with `AuiConfig({ threads: RuntimeAdapter(runtime) })`. */
-  readonly runtime: AssistantRuntime;
-  /** Queues a command for the next request (React's `useAssistantTransportSendCommand`). */
-  sendCommand(command: AssistantTransportCommand): void;
-  /** The current agent state. */
-  getState(): T;
-  /** Replaces the options (for example a new `converter` or `headers`). */
+  /**
+   * The config for `[auiProvider]`: a thread list (by default in memory) whose
+   * every thread runs its own transport runtime. Each thread gets its own id,
+   * which is posted as `threadId`.
+   */
+  readonly config: AuiConfig;
+  /** Replaces the options (for example a new `converter` or `headers`) on every thread. */
   update(options: AssistantTransportRuntimeOptions<T>): void;
-  /** Aborts the current run and detaches the runtime. */
+  /** Aborts every thread's current run and detaches them. */
   destroy(): void;
 }
 
@@ -67,7 +75,9 @@ interface TransportExtras {
   state: UserExternalState;
 }
 
-const transportExtras = createRuntimeExtras<TransportExtras>('createAssistantTransportRuntime');
+const transportExtras = createRuntimeExtrasBrand<TransportExtras>(
+  'createAssistantTransportRuntime',
+);
 
 const convertAppendMessageToCommand = (message: AppendMessage): AddMessageCommand | null => {
   if (message.role !== 'user') throw new Error('Only user messages are supported');
@@ -115,23 +125,19 @@ const readResumeState = async <T>(
   return { runId: value.runId, state: value.state as T };
 };
 
-const createRequestHeaders = async (
-  headersValue: AssistantTransportOptions<unknown>['headers'],
-): Promise<Headers> => {
-  const resolved = typeof headersValue === 'function' ? await headersValue() : headersValue;
-  const headers = new Headers(resolved);
-  headers.set('Content-Type', 'application/json');
-  return headers;
-};
+/** @internal Exported for specs. */
+export const REPLAY_CONTENT_LENGTH_HEADER = 'Aui-Replay-Content-Length';
 
-const REPLAY_CONTENT_LENGTH_HEADER = 'Aui-Replay-Content-Length';
-
-/** One macrotask: lets replayed state render before live bytes are released. */
+/**
+ * One macrotask: lets replayed state render before live bytes are released.
+ * Weaker than upstream's render-commit wait (a ticket resolved once React
+ * commits); Angular offers no equivalent hook for a plain function.
+ */
 const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 // Gates replay bytes until isReplaying:true is published, then releases live
 // bytes after isReplaying:false is published.
-const createReplayBoundaryStream = async (
+export const createReplayBoundaryStream = async (
   response: Response,
   {
     setReplaying,
@@ -229,35 +235,17 @@ const createReplayBoundaryStream = async (
 
 const disposeReason = Symbol('assistant-transport-dispose');
 
-/**
- * Creates a runtime for a server that owns the agent state and streams state
- * updates back (React's `useAssistantTransportRuntime`, without Assistant
- * Cloud). Commands (`add-message`, `add-tool-result`, your own) are queued
- * and posted to `options.api`; the streamed state is turned into messages by
- * `options.converter`.
- *
- * Read the agent state with {@link injectAssistantTransportState} and queue
- * commands with {@link injectAssistantTransportSendCommand} (or
- * `sendCommand` on the returned handle).
- *
- * @alpha This is an experimental API that is subject to change.
- *
- * @example
- * ```ts
- * const transport = createAssistantTransportRuntime({
- *   api: '/api/agent',
- *   initialState: { messages: [] },
- *   headers: {},
- *   converter: (state, { isSending }) => ({ messages: state.messages, isRunning: isSending }),
- * });
- * const config = AuiConfig({ threads: RuntimeAdapter(transport.runtime) });
- * ```
- */
-export function createAssistantTransportRuntime<T>(
-  initialOptions: AssistantTransportRuntimeOptions<T>,
-): AssistantTransportRuntime<T> {
-  let options = initialOptions;
-  let agentState = options.initialState;
+interface ThreadItemHandle {
+  getState(): { remoteId?: string | undefined };
+  initialize(): Promise<{ remoteId: string }>;
+}
+
+/** One thread's transport runtime. */
+function createTransportThread<T>(
+  getOptions: () => AssistantTransportRuntimeOptions<T>,
+  getThreadItem: () => ThreadItemHandle,
+) {
+  let agentState = getOptions().initialState;
   let queue: { queued: QueuedCommand[]; inTransit: QueuedCommand[] } = {
     queued: [],
     inTransit: [],
@@ -320,7 +308,11 @@ export function createAssistantTransportRuntime<T>(
         }
       } finally {
         if (!disposeAborted() && !disposed) {
-          void invokeUserCallback('assistant-ui', 'Assistant transport onFinish', options.onFinish);
+          void invokeUserCallback(
+            'assistant-ui',
+            'Assistant transport onFinish',
+            getOptions().onFinish,
+          );
         }
         if (!disposed && pending) {
           startRun();
@@ -384,6 +376,7 @@ export function createAssistantTransportRuntime<T>(
 
   // --- run ---
   const onRun = async (signal: AbortSignal): Promise<void> => {
+    const options = getOptions();
     const isResume = resumeFlag;
     resumeFlag = false;
     isReplaying = false;
@@ -395,7 +388,7 @@ export function createAssistantTransportRuntime<T>(
     const runParentId = isResume ? undefined : parentId;
     if (!isResume) parentId = undefined;
 
-    const mainItem = runtime.threads.mainItem;
+    const mainItem = getThreadItem();
     const threadId =
       mainItem.getState().remoteId ??
       (isResume
@@ -532,7 +525,7 @@ export function createAssistantTransportRuntime<T>(
     const cmds = cancelledCommands;
     cancelledCommands = [];
     if (afterError && cmds.length === 0) return;
-    options.onCancel?.({ commands: cmds, updateState });
+    getOptions().onCancel?.({ commands: cmds, updateState });
   };
 
   const onError = async (error: Error) => {
@@ -543,9 +536,9 @@ export function createAssistantTransportRuntime<T>(
     resetQueue();
     parentId = undefined;
     try {
-      await options.onError?.(error, { commands: inTransitCmds, updateState });
+      await getOptions().onError?.(error, { commands: inTransitCmds, updateState });
     } finally {
-      options.onCancel?.({ commands: queuedCmds, updateState, error });
+      getOptions().onCancel?.({ commands: queuedCmds, updateState, error });
     }
   };
 
@@ -560,7 +553,7 @@ export function createAssistantTransportRuntime<T>(
   // --- adapter ---
   const buildAdapter = () => {
     const pendingCommands = [...queue.inTransit, ...queue.queued];
-    const converted = options.converter(agentState, {
+    const converted = getOptions().converter(agentState, {
       pendingCommands,
       isSending: isRunning,
       toolStatuses,
@@ -584,9 +577,9 @@ export function createAssistantTransportRuntime<T>(
       messages: messages as ThreadMessageLike[],
       state: converted.state,
       isRunning: converted.isRunning,
-      canResume: !!options.canResume && !!options.resumeApi && !isRunning,
+      canResume: !!getOptions().canResume && !!getOptions().resumeApi && !isRunning,
       isLoading: isReplaying,
-      adapters: options.adapters,
+      adapters: getOptions().adapters,
       unstable_enableToolInvocations: true,
       setToolStatuses: (statuses: Record<string, ToolExecutionStatus>) => {
         toolStatuses = statuses;
@@ -597,7 +590,7 @@ export function createAssistantTransportRuntime<T>(
         state: agentState as UserExternalState,
       }),
       onNew: async (message: AppendMessage): Promise<void> => enqueueAppendMessage(message),
-      ...(options.capabilities?.edit && {
+      ...(getOptions().capabilities?.edit && {
         onEdit: async (message: AppendMessage): Promise<void> => enqueueAppendMessage(message),
       }),
       ...(queue.queued.length > 0 && {
@@ -614,7 +607,8 @@ export function createAssistantTransportRuntime<T>(
         parentId = undefined;
       },
       onResume: async () => {
-        if (!options.resumeApi) throw new Error('Must pass resumeApi to options to resume runs');
+        if (!getOptions().resumeApi)
+          throw new Error('Must pass resumeApi to options to resume runs');
         resumeFlag = true;
         schedule();
       },
@@ -641,18 +635,103 @@ export function createAssistantTransportRuntime<T>(
   const runtime = new AssistantRuntimeImpl(core);
 
   return {
+    core,
     runtime,
     sendCommand,
+    publish,
     getState: () => agentState,
-    update: (next) => {
-      options = next;
-      publish();
+    // Tap's development strict mode mounts, unmounts and re-mounts a body, so
+    // a destroyed host must be able to come back (as upstream's run manager does).
+    revive: () => {
+      disposed = false;
     },
     destroy: () => {
       if (disposed) return;
       pending = false;
       disposed = true;
       abortController?.abort(disposeReason);
+    },
+  };
+}
+
+interface TransportShared<T> {
+  getOptions: () => AssistantTransportRuntimeOptions<T>;
+  hosts: Set<{ publish: () => void; destroy: () => void }>;
+}
+
+/** The per-thread body: the transport runtime wired to the thread list client. */
+const TransportThread = resource(function useTransportThread<T>({
+  shared,
+}: {
+  shared: TransportShared<T>;
+}) {
+  const clientRef = useAssistantClientRef();
+  const [host] = useState(() =>
+    createTransportThread<T>(shared.getOptions, () => clientRef.current!.threadListItem()),
+  );
+  useEffect(() => {
+    host.revive();
+    shared.hosts.add(host);
+    // Tools and instructions registered in the client's model context reach
+    // this thread's runtime (and its tool invocations).
+    const off = host.core.registerModelContextProvider(clientRef.current!.modelContext());
+    return () => {
+      off();
+      shared.hosts.delete(host);
+      host.destroy();
+    };
+  }, [host, shared, clientRef]);
+  return useResource(ThreadClient({ runtime: host.runtime.thread }));
+});
+
+/**
+ * Creates the runtime config for a server that owns the agent state and
+ * streams state updates back (React's `useAssistantTransportRuntime`, without
+ * Assistant Cloud). Commands (`add-message`, `add-tool-result`, your own) are
+ * queued and posted to `options.api`; the streamed state is turned into
+ * messages by `options.converter`.
+ *
+ * As upstream does, the threads live in a thread list (an
+ * `InMemoryThreadListAdapter` unless you pass `adapter`), and each thread runs
+ * its own transport runtime. The thread's id is posted as `threadId`; new
+ * thread and thread switching work out of the box.
+ *
+ * Read the agent state with {@link injectAssistantTransportState} and queue
+ * commands with {@link injectAssistantTransportSendCommand}.
+ *
+ * @alpha This is an experimental API that is subject to change.
+ *
+ * @example
+ * ```ts
+ * const transport = createAssistantTransportRuntime({
+ *   api: '/api/agent',
+ *   initialState: { messages: [] },
+ *   headers: {},
+ *   converter: (state, { isSending }) => ({ messages: state.messages, isRunning: isSending }),
+ * });
+ * // <ng-container [auiProvider]="transport.config">
+ * ```
+ */
+export function createAssistantTransportRuntime<T>(
+  initialOptions: AssistantTransportRuntimeOptions<T>,
+  threadList: { adapter?: RemoteThreadListAdapter } = {},
+): AssistantTransportRuntime<T> {
+  let options = initialOptions;
+  const shared: TransportShared<T> = { getOptions: () => options, hosts: new Set() };
+  const adapter = threadList.adapter ?? new InMemoryThreadListAdapter();
+  return {
+    config: AuiConfig({
+      threads: RemoteThreadList({
+        adapter,
+        thread: (threadId) => withKey(threadId, TransportThread({ shared })),
+      }),
+    }),
+    update: (next) => {
+      options = next;
+      for (const host of shared.hosts) host.publish();
+    },
+    destroy: () => {
+      for (const host of [...shared.hosts]) host.destroy();
     },
   };
 }
@@ -668,7 +747,7 @@ export function injectAssistantTransportSendCommand(): (
 ) => void {
   assertInInjectionContext(injectAssistantTransportSendCommand);
   const aui = injectAui();
-  return (command) => transportExtras.get(aui).sendCommand(command);
+  return (command) => transportExtras.assert(aui.thread().getState().extras).sendCommand(command);
 }
 
 /**

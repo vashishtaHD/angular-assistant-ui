@@ -28,16 +28,9 @@ export { ModelContext as ModelContextClient } from '@assistant-ui/core/store';
 // Tools and toolkits.
 export { tool, type ToolExecutionStatus } from '@assistant-ui/core';
 export type { Tool } from 'assistant-stream';
+export { defineMcpToolkit, defineToolkit } from '@assistant-ui/core/store';
+export { externalTool, hitl, hitlTool, humanTool, providerTool, stubTool } from '../tools/markers';
 export {
-  Tools,
-  defineMcpToolkit,
-  defineToolkit,
-  externalTool,
-  hitl,
-  hitlTool,
-  humanTool,
-  providerTool,
-  stubTool,
   type McpToolkitDefinition,
   type McpToolkitEntry,
   type McpToolkitToolConfig,
@@ -49,10 +42,9 @@ export {
   type ToolkitDefinitionEntry,
 } from '@assistant-ui/core/react';
 
-// Interactables: scope resources and types.
+// Interactables types. The `Tools`, `Interactables` and `unstable_Interactables`
+// scope resources need the React barrel and live in `angular-assistant-ui/react-interop`.
 export {
-  Interactables,
-  unstable_Interactables,
   type InteractableDefinition,
   type InteractablePersistedState,
   type InteractablePersistenceAdapter,
@@ -122,7 +114,7 @@ export type {
   ThreadListState,
 } from '@assistant-ui/core';
 export type { ThreadListItemState } from '@assistant-ui/core/store';
-export { createSimpleTitleAdapter, type TitleGenerationAdapter } from '@assistant-ui/core/react';
+export { createSimpleTitleAdapter, type TitleGenerationAdapter } from './title-adapter';
 export type { JoinStrategy } from '@assistant-ui/core/store';
 
 // Runtime option and adapter contracts (the hook-free half of the runtime hooks).
@@ -146,9 +138,9 @@ export type { LocalRuntimeOptions } from '@assistant-ui/core/react';
 export {
   convertExternalMessages as unstable_convertExternalMessages,
   createExternalMessageConversionCache as unstable_createExternalMessageConversionCache,
-  createMessageConverter as unstable_createMessageConverter,
   type ExternalMessageConversionCache as Unstable_ExternalMessageConversionCache,
-} from '@assistant-ui/core/react';
+} from '@assistant-ui/core/store';
+export { createMessageConverter as unstable_createMessageConverter } from './message-converter';
 
 // Message and runtime helpers and types.
 export {

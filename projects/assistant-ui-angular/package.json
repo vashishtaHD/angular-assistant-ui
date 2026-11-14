@@ -23,6 +23,7 @@
     "@assistant-ui/store": "~0.3.23",
     "@assistant-ui/tap": "~0.9.26",
     "@types/react": "*",
+    "assistant-stream": "^0.3.57",
     "ai": "^7.0.0"
   },
   "peerDependenciesMeta": {

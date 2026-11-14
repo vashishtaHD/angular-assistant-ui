@@ -158,11 +158,13 @@ describe('runtime factories', () => {
     local.destroy();
   });
 
-  it('remoteThreadListConfig builds a thread list from per-thread runtimes', async () => {
+  it('remoteThreadListConfig gives each thread its own runtime and follows switches', async () => {
     const runtimes = new Map<string, ReturnType<typeof createTestRuntime>>();
-    const config = remoteThreadListConfig({
+    const requested: string[] = [];
+    hostConfig = remoteThreadListConfig({
       adapter: new InMemoryThreadListAdapter(),
       runtime: (id) => {
+        requested.push(id);
         let rt = runtimes.get(id);
         if (!rt) {
           rt = createTestRuntime();
@@ -171,32 +173,74 @@ describe('runtime factories', () => {
         return rt.runtime;
       },
     });
-    hostConfig = config;
     scopeConfig = AuiConfig({});
     configureTestBed({ imports: [HostComponent] });
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
     await settle(fixture);
-    expect(outer.threads().getState().isLoading).toBeDefined();
+
+    // The main thread is served by the runtime requested for its id.
+    const mainId = outer.threads().getState().mainThreadId;
+    expect(requested).toContain(mainId);
+    flushTapSync(() => runtimes.get(mainId)!.append({ id: 'm1', role: 'user', content: 'first' }));
+    await vi.waitFor(() =>
+      expect(
+        outer
+          .thread()
+          .getState()
+          .messages.map((m) => m.id),
+      ).toEqual(['m1']),
+    );
+
+    // Once the first thread exists, a new thread asks for a different runtime and starts empty.
+    await outer.threadListItem().initialize();
+    await outer.threads().switchToNewThread();
+    await vi.waitFor(() => {
+      const id = outer.threads().getState().mainThreadId;
+      expect(id).not.toBe(mainId);
+      expect(requested).toContain(id);
+      expect(outer.thread().getState().messages).toHaveLength(0);
+    });
+
+    // Switching back shows the first thread's messages again.
+    await outer.threads().switchToThread(mainId);
+    await vi.waitFor(() =>
+      expect(
+        outer
+          .thread()
+          .getState()
+          .messages.map((m) => m.id),
+      ).toEqual(['m1']),
+    );
     fixture.destroy();
   });
 
-  it('createExternalMessageConverter caches unchanged messages', () => {
+  it('createExternalMessageConverter caches unchanged messages and honours joinStrategy', () => {
     interface Source {
       id: string;
       role: 'user' | 'assistant';
       text: string;
     }
-    const convert = createExternalMessageConverter<Source>((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.text,
-    }));
+    const callback = (m: Source) => ({ id: m.id, role: m.role, content: m.text });
+    const convert = createExternalMessageConverter<Source>({ callback });
     const a: Source = { id: 'a', role: 'user', text: 'one' };
     const first = convert([a], false);
     const second = convert([a, { id: 'b', role: 'assistant', text: 'two' }], false);
     expect(second[0]).toBe(first[0]);
     expect(second.map((m) => m.id)).toEqual(['a', 'b']);
+
+    // Adjacent assistant messages join by default; 'none' keeps them apart.
+    const pair: Source[] = [
+      { id: 'x', role: 'assistant', text: 'one' },
+      { id: 'y', role: 'assistant', text: 'two' },
+    ];
+    const joined = createExternalMessageConverter<Source>({ callback })(pair, false);
+    const apart = createExternalMessageConverter<Source>({ callback, joinStrategy: 'none' })(
+      pair,
+      false,
+    );
+    expect(joined).toHaveLength(1);
+    expect(apart).toHaveLength(2);
   });
 });
 
@@ -275,7 +319,6 @@ describe('re-exports', () => {
       'isMessageNotSentError',
       'toolApprovalAcceptsText',
       'tool',
-      'Tools',
       'defineToolkit',
       'defineMcpToolkit',
       'stubTool',
@@ -290,8 +333,6 @@ describe('re-exports', () => {
       'SingleThreadList',
       'ChainOfThoughtClient',
       'ModelContextClient',
-      'Interactables',
-      'unstable_Interactables',
       'createSimpleTitleAdapter',
       'unstable_convertExternalMessages',
       'unstable_createExternalMessageConversionCache',

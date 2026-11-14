@@ -130,6 +130,7 @@ export {
 export {
   createExternalMessageConverter,
   type ExternalMessageConverter,
+  type ExternalMessageConverterOptions,
   type ExternalMessageConverterCallback,
   type ExternalMessageConverterMetadata,
 } from './lib/runtime/external-message-converter';

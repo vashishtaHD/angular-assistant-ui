@@ -106,6 +106,10 @@ export function setToolDisplay(
  * it is also installed as the tool-call UI (the same registry as
  * `registerToolUI`). Everything unregisters on destroy.
  *
+ * A tool UI is an ordinary component, so it reads host state through
+ * injection (a signal in a service or token) rather than a stable-wrapper
+ * hook like React's `useInlineRender`.
+ *
  * Must be called in an injection context under an `[auiProvider]` whose
  * config mounts `modelContext` and `tools` scopes (`RuntimeAdapter` mounts
  * both).
