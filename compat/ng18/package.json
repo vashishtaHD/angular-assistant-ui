@@ -1,0 +1,31 @@
+{
+  "name": "compat-ng18",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "build": "ng build"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^18.2.0",
+    "@angular/compiler": "^18.2.0",
+    "@angular/core": "^18.2.0",
+    "@angular/platform-browser": "^18.2.0",
+    "@assistant-ui/ai-sdk": "0.0.18",
+    "@assistant-ui/core": "~0.3.36",
+    "@assistant-ui/store": "~0.3.23",
+    "@assistant-ui/tap": "~0.9.26",
+    "ai": "^7.0.173",
+    "react": "^19.3.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.14.10"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^18.2.21",
+    "@angular/cli": "^18.2.21",
+    "@angular/compiler-cli": "^18.2.0",
+    "@types/react": "^19.3.0",
+    "typescript": "~5.5.2"
+  }
+}
