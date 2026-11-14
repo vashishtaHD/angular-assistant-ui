@@ -60,3 +60,10 @@ export {
   type ToolUIComponent,
   type ToolUIProps,
 } from './lib/tools/tool-ui';
+
+// Task 1: shared action-button infrastructure (host directive for button primitives).
+export {
+  AuiActionButtonHostDirective,
+  injectActionButton,
+  type ActionButtonOptions,
+} from './lib/primitives/action-button';

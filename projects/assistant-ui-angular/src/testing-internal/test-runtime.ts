@@ -1,8 +1,19 @@
 // Ported from packages/vue/src/__tests__/primitives-content.test.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-import type { ExternalStoreAdapter, ThreadMessageLike } from '@assistant-ui/core';
+import {
+  ExportedMessageRepository,
+  InMemoryThreadListAdapter,
+  type AttachmentAdapter,
+  type ExternalStoreAdapter,
+  type FeedbackAdapter,
+  type RemoteThreadListAdapter,
+  type ThreadMessageLike,
+  type ThreadSuggestion,
+} from '@assistant-ui/core';
 import { AssistantRuntimeImpl, ExternalStoreRuntimeCore } from '@assistant-ui/core/internal';
-import { RuntimeAdapter } from '@assistant-ui/core/store';
+import { RemoteThreadList, RuntimeAdapter } from '@assistant-ui/core/store';
+import { ThreadClient } from '@assistant-ui/core/store/internal';
 import { AuiConfig } from '@assistant-ui/store/client';
+import { withKey } from '@assistant-ui/tap';
 
 /** A minimal message accepted by the test runtime's external store adapter. */
 export interface DemoMessage {
@@ -21,6 +32,36 @@ export interface TestRuntime {
   setRunning(value: boolean): void;
   /** Replaces the whole message list (update in place, remove, reorder). */
   setMessages(next: DemoMessage[]): void;
+  /**
+   * Adds `message` as a new child of `parentId` and makes it the head, so the
+   * parent now has a second branch. Switches the runtime to repository mode
+   * (messages without an id get one first). Pass `null` to branch off the root.
+   */
+  appendBranch(parentId: string | null, message: DemoMessage & { id: string }): void;
+  /** Sets the thread's suggestions (what `aui.suggestions` reads). */
+  setSuggestions(list: readonly ThreadSuggestion[]): void;
+  /** Installs an attachment adapter; the composer can then add attachments. */
+  withAttachments(adapter: AttachmentAdapter): void;
+  /** Installs a feedback adapter; the action bar feedback buttons then submit to it. */
+  withFeedback(adapter: FeedbackAdapter): void;
+  /**
+   * Builds a thread list on core's `RemoteThreadList` over `adapter` (default:
+   * a fresh `InMemoryThreadListAdapter`), each thread a real external-store
+   * runtime behind `ThreadClient`. It does not touch this runtime or `config`:
+   * mount the returned `config` in place of `config`. `runtimeFor(threadId)`
+   * returns that thread's `TestRuntime` (created lazily).
+   */
+  withThreadList(adapter?: RemoteThreadListAdapter): TestThreadList;
+}
+
+/** A thread list built by {@link TestRuntime.withThreadList}. */
+export interface TestThreadList {
+  /** `AuiConfig({ threads: RemoteThreadList(...) })`. */
+  config: AuiConfig;
+  /** The adapter the list runs on. */
+  adapter: RemoteThreadListAdapter;
+  /** The per-thread runtime for `threadId` (created on first use). */
+  runtimeFor(threadId: string): TestRuntime;
 }
 
 /** Optional adapter callbacks forwarded to every adapter the runtime builds. */
@@ -29,16 +70,38 @@ export type TestRuntimeCallbacks = Pick<
   'onAddToolResult' | 'onResumeToolCall' | 'onRespondToToolApproval'
 >;
 
+let generatedIds = 0;
+
 /**
  * Creates an `ExternalStoreRuntimeCore`-backed runtime plus helpers that push
  * new messages, replace the list or toggle `isRunning` by replacing the adapter.
  */
 export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRuntime {
   let messages: DemoMessage[] = [];
+  // Set once `appendBranch` is used: the whole tree, in repository mode.
+  let tree: { message: DemoMessage & { id: string }; parentId: string | null }[] | undefined;
+  let headId: string | null = null;
   let isRunning = false;
+  let suggestions: readonly ThreadSuggestion[] = [];
+  let adapters: ExternalStoreAdapter<DemoMessage>['adapters'];
+
+  const toLike = (message: DemoMessage & { id: string }): ThreadMessageLike => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+  });
   const makeAdapter = (): ExternalStoreAdapter<DemoMessage> => ({
-    messages,
+    ...(tree
+      ? {
+          messageRepository: ExportedMessageRepository.fromBranchableArray(
+            tree.map(({ message, parentId }) => ({ message: toLike(message), parentId })),
+            { headId },
+          ),
+        }
+      : { messages }),
     isRunning,
+    suggestions,
+    ...(adapters ? { adapters } : {}),
     convertMessage: (message) => ({
       ...(message.id === undefined ? {} : { id: message.id }),
       role: message.role,
@@ -49,17 +112,91 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
   });
   const core = new ExternalStoreRuntimeCore(makeAdapter());
   const runtime = new AssistantRuntimeImpl(core);
+  const sync = () => core.setAdapter(makeAdapter());
+  const withId = (message: DemoMessage): DemoMessage & { id: string } => ({
+    ...message,
+    id: message.id ?? `test-msg-${++generatedIds}`,
+  });
   const append = (message: DemoMessage) => {
-    messages = [...messages, message];
-    core.setAdapter(makeAdapter());
+    if (tree) {
+      const next = withId(message);
+      tree = [...tree, { message: next, parentId: headId }];
+      headId = next.id;
+    } else {
+      messages = [...messages, message];
+    }
+    sync();
   };
   const setRunning = (value: boolean) => {
     isRunning = value;
-    core.setAdapter(makeAdapter());
+    sync();
   };
   const setMessages = (next: DemoMessage[]) => {
-    messages = next;
-    core.setAdapter(makeAdapter());
+    if (tree) {
+      // Replace the active chain; branches off it are dropped.
+      let parentId: string | null = null;
+      tree = next.map((message) => {
+        const entry = { message: withId(message), parentId };
+        parentId = entry.message.id;
+        return entry;
+      });
+      headId = parentId;
+    } else {
+      messages = next;
+    }
+    sync();
+  };
+  const appendBranch = (parentId: string | null, message: DemoMessage & { id: string }) => {
+    if (!tree) {
+      let previous: string | null = null;
+      tree = messages.map((existing) => {
+        const entry = { message: withId(existing), parentId: previous };
+        previous = entry.message.id;
+        return entry;
+      });
+      headId = previous;
+    }
+    if (parentId !== null && !tree.some((entry) => entry.message.id === parentId)) {
+      throw new Error(`appendBranch: no message with id "${parentId}".`);
+    }
+    tree = [...tree, { message, parentId }];
+    headId = message.id;
+    sync();
+  };
+  const setSuggestions = (list: readonly ThreadSuggestion[]) => {
+    suggestions = list;
+    sync();
+  };
+  const withAttachments = (adapter: AttachmentAdapter) => {
+    adapters = { ...adapters, attachments: adapter };
+    sync();
+  };
+  const withFeedback = (adapter: FeedbackAdapter) => {
+    adapters = { ...adapters, feedback: adapter };
+    sync();
+  };
+  const withThreadList = (listAdapter?: RemoteThreadListAdapter): TestThreadList => {
+    const adapter = listAdapter ?? new InMemoryThreadListAdapter();
+    const runtimes = new Map<string, TestRuntime>();
+    const runtimeFor = (threadId: string) => {
+      let existing = runtimes.get(threadId);
+      if (!existing) {
+        existing = createTestRuntime(callbacks);
+        runtimes.set(threadId, existing);
+      }
+      return existing;
+    };
+    return {
+      adapter,
+      runtimeFor,
+      config: AuiConfig({
+        threads: RemoteThreadList({
+          adapter,
+          thread: (threadId) =>
+            withKey(threadId, ThreadClient({ runtime: runtimeFor(threadId).runtime.thread })),
+        }),
+      }),
+    };
   };
   return {
     runtime,
@@ -67,5 +204,10 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
     append,
     setRunning,
     setMessages,
+    appendBranch,
+    setSuggestions,
+    withAttachments,
+    withFeedback,
+    withThreadList,
   };
 }
