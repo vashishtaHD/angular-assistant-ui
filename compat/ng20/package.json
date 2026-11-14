@@ -1,0 +1,31 @@
+{
+  "name": "compat-ng20",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "build": "ng build"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^20.3.0",
+    "@angular/compiler": "^20.3.0",
+    "@angular/core": "^20.3.0",
+    "@angular/platform-browser": "^20.3.0",
+    "@assistant-ui/ai-sdk": "0.0.18",
+    "@assistant-ui/core": "~0.3.36",
+    "@assistant-ui/store": "~0.3.23",
+    "@assistant-ui/tap": "~0.9.26",
+    "ai": "^7.0.173",
+    "react": "^19.3.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^20.3.43",
+    "@angular/cli": "^20.3.43",
+    "@angular/compiler-cli": "^20.3.0",
+    "@types/react": "^19.3.0",
+    "typescript": "~5.9.2"
+  }
+}

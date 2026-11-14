@@ -14,6 +14,7 @@
     "build:lib": "ng build assistant-ui-angular",
     "build:demo": "ng build demo",
     "typecheck:mastra": "npm run typecheck -w mastra-server --if-present",
+    "compat": "node scripts/compat.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
