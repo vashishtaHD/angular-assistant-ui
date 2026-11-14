@@ -35,6 +35,23 @@ class HostComponent {
   readonly onRunStart = input(true);
 }
 
+@Component({
+  standalone: true,
+  imports: [AuiProviderDirective, AuiThreadViewportDirective],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div [auiProvider]="runtime().config">
+      @if (show()) {
+        <div class="viewport" auiThreadViewport><p>row</p></div>
+      }
+    </div>
+  `,
+})
+class LateHostComponent {
+  readonly runtime = input.required<TestRuntime>();
+  readonly show = input(false);
+}
+
 const mockViewportGeometry = (div: HTMLElement) => {
   Object.defineProperty(div, 'scrollHeight', { get: () => 500, configurable: true });
   Object.defineProperty(div, 'clientHeight', { get: () => 100, configurable: true });
@@ -166,6 +183,32 @@ describe('AuiThreadViewportDirective', () => {
     div.dispatchEvent(new Event('scroll'));
     await flushFrame(fixture);
     expect(viewport.isAtBottom()).toBe(true);
+  });
+
+  it('scrolls on initialize without bound inputs when the client already exists', async () => {
+    const test = createTestRuntime();
+    flushTapSync(() => test.append(userMessage));
+    configureTestBed({ imports: [LateHostComponent] });
+    const fixture = TestBed.createComponent(LateHostComponent);
+    fixture.componentRef.setInput('runtime', test);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+
+    fixture.componentRef.setInput('show', true);
+    await fixture.whenStable();
+    const div = (fixture.nativeElement as HTMLElement).querySelector('div.viewport') as HTMLElement;
+    const scrollTo = mockViewportGeometry(div);
+    await flushFrame(fixture);
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 500, behavior: 'instant' });
+  });
+
+  it('does not attach or throw when destroyed before the first render', () => {
+    const test = createTestRuntime();
+    configureTestBed({ imports: [HostComponent] });
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentRef.setInput('runtime', test);
+    expect(() => fixture.destroy()).not.toThrow();
   });
 
   it('detaches on destroy', async () => {

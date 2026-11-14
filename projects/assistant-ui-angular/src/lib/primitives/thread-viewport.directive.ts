@@ -12,6 +12,7 @@ import {
   signal,
   untracked,
   type OnChanges,
+  type OnInit,
 } from '@angular/core';
 import {
   createThreadViewportAutoScroll,
@@ -36,7 +37,7 @@ import { AUI_VIEWPORT, type AuiViewport } from './viewport-context';
     { provide: AUI_VIEWPORT, useFactory: () => inject(AuiThreadViewportDirective).viewport },
   ],
 })
-export class AuiThreadViewportDirective implements OnChanges {
+export class AuiThreadViewportDirective implements OnInit, OnChanges {
   /** Follow content growth while pinned to the bottom. */
   readonly autoScroll = input(true, { transform: booleanAttribute });
   /** Scroll to the bottom when the first messages appear. */
@@ -93,12 +94,18 @@ export class AuiThreadViewportDirective implements OnChanges {
     injectAuiEvent('threads.selectionChanged', () => this.scroller.threadSwitched());
   }
 
+  ngOnInit(): void {
+    this.syncHasMessages();
+  }
+
   ngOnChanges(): void {
     this.syncHasMessages();
   }
 
   private syncHasMessages(): void {
     const state = getProxiedAssistantState(this.context.source.getClient());
-    this.scroller.setHasMessages(state.thread.messages.length > 0);
+    // Before the provider attaches its client there is no thread scope yet.
+    const messages = state.optional.thread?.messages;
+    this.scroller.setHasMessages((messages?.length ?? 0) > 0);
   }
 }
