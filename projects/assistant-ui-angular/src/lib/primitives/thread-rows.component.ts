@@ -13,6 +13,8 @@ import {
   inject,
   input,
 } from '@angular/core';
+import { isMcpAppUri } from '@assistant-ui/core';
+import type { PartMethods } from '@assistant-ui/core/store';
 import type { AssistantState, AuiConfig } from '@assistant-ui/store/client';
 import { hasMessage, messageScopeConfig } from '../scope/message-scope';
 import { partScopeConfig } from '../scope/part-scope';
@@ -54,6 +56,33 @@ export interface AuiThreadRowGroupPart {
   readonly timing?: { startedAt: number; completedAt?: number };
 }
 
+type PartState = AssistantState['part'];
+
+/**
+ * A leaf part as a row template receives it (upstream's `EnrichedPartState`).
+ * A tool-call part adds `toolUI` (the default view template when a tool UI is
+ * registered, else `null`) and the scoped tool actions; a data part adds
+ * `dataRendererUI` likewise. Other parts are the plain part state.
+ */
+export type AuiThreadRowLeafPart =
+  | (Extract<PartState, { type: 'tool-call' }> & {
+      /** The default view when a tool UI is registered, or `null`. */
+      readonly toolUI: TemplateRef<unknown> | null;
+      /** Adds the tool result for this call. */
+      addResult: PartMethods['addToolResult'];
+      /** Resumes a tool call waiting for human input. */
+      resume: PartMethods['resumeToolCall'];
+      /** Responds to a server-side tool approval gate. */
+      respondToApproval: PartMethods['respondToToolApproval'];
+      /** @deprecated Experimental since 2026-09-23. Not scheduled for removal; the API may change in any release. */
+      unstable_recordInteraction?: PartMethods['unstable_recordInteraction'];
+    })
+  | (Extract<PartState, { type: 'data' }> & {
+      /** The default view when a data renderer is registered, or `null`. */
+      readonly dataRendererUI: TemplateRef<unknown> | null;
+    })
+  | Exclude<PartState, { type: 'tool-call' } | { type: 'data' }>;
+
 /**
  * What an `ng-template auiThreadRow` receives (`let-info`), discriminated by
  * `type`, which repeats `row.type` so it narrows the rest.
@@ -73,7 +102,7 @@ export type AuiThreadRowInfo =
        * template renders once per node of the row's group subtree, so nested
        * groups wrap their children recursively.
        */
-      readonly part: AuiThreadRowGroupPart | AssistantState['part'];
+      readonly part: AuiThreadRowGroupPart | AuiThreadRowLeafPart;
       /**
        * For a group, its rendered subtree. For a leaf, the part's default view
        * (its registered tool or data UI, a matching `ng-template auiPart`, or
@@ -160,11 +189,47 @@ export class AuiThreadRowLeafComponent {
   /** Part templates for the default view. */
   readonly partTemplates = input.required<AuiPartTemplates>();
 
+  private readonly aui = injectAui();
   private readonly part = injectAuiState((s) => s.part);
+  /** Whether a tool or data UI is registered for the current part (as the default view resolves it). */
+  private readonly hasRegisteredUI = injectAuiState((s) => {
+    const part = s.part;
+    if (part.type === 'tool-call') {
+      return (
+        s.optional.tools?.toolUIs[part.toolName]?.[0] !== undefined ||
+        (isMcpAppUri(part.mcp?.app?.resourceUri) && !!s.optional.tools?.mcpApp?.render)
+      );
+    }
+    if (part.type === 'data') {
+      return (
+        s.optional.dataRenderers?.renderers[part.name]?.[0] !== undefined ||
+        s.optional.dataRenderers?.fallbacks[0] !== undefined
+      );
+    }
+    return false;
+  });
 
   /** Builds the template context for the current part. */
   protected context(children: TemplateRef<unknown>): AuiThreadRowTemplateContext {
-    return { $implicit: { type: 'part', row: this.row(), part: this.part(), children } };
+    const state = this.part();
+    const ui = this.hasRegisteredUI() ? children : null;
+    let part = state as AuiThreadRowLeafPart;
+    if (state.type === 'tool-call') {
+      const methods = this.aui.part;
+      part = {
+        ...state,
+        toolUI: ui,
+        addResult: methods.addToolResult,
+        resume: methods.resumeToolCall,
+        respondToApproval: methods.respondToToolApproval,
+        ...(methods.unstable_recordInteraction && {
+          unstable_recordInteraction: methods.unstable_recordInteraction,
+        }),
+      };
+    } else if (state.type === 'data') {
+      part = { ...state, dataRendererUI: ui };
+    }
+    return { $implicit: { type: 'part', row: this.row(), part, children } };
   }
 }
 

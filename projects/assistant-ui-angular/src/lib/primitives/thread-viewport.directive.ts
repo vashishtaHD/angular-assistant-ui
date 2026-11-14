@@ -164,7 +164,11 @@ export class AuiThreadViewportDirective implements OnInit, OnChanges {
     // hook can run before them), so this is where the config is frozen.
     this.snapshot = {
       turnAnchor: untracked(() => this.turnAnchor()),
-      clamp: untracked(() => this.topAnchorMessageClamp()),
+      // Copy the values: a later mutation of the bound object must not leak in.
+      clamp: {
+        tallerThan: untracked(() => this.topAnchorMessageClamp())?.tallerThan ?? '10em',
+        visibleHeight: untracked(() => this.topAnchorMessageClamp())?.visibleHeight ?? '6em',
+      },
     };
     this.syncHasMessages();
     this.syncTopAnchorTurn();

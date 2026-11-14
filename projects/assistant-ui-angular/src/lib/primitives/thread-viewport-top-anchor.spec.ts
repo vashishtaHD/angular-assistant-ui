@@ -269,6 +269,16 @@ describe('turnAnchor="top"', () => {
     expect(reserveOf(viewport)).toBeNull();
   });
 
+  it('copies the initial clamp so mutating the bound object cannot change it', async () => {
+    const test = createTestRuntime();
+    const clamp = { tallerThan: '10px', visibleHeight: '20px' };
+    const fixture = await mount(test, { clamp });
+    clamp.tallerThan = '1000px';
+    const { viewport } = await run(test, fixture, 500);
+
+    expect(reserveOf(viewport)?.style.height).toBe('40px');
+  });
+
   it('keeps the initial clamp after the input changes', async () => {
     const test = createTestRuntime();
     const fixture = await mount(test, { clamp: { tallerThan: '10px', visibleHeight: '20px' } });

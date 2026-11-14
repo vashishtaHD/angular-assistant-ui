@@ -4,7 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { flushTapSync } from '@assistant-ui/tap';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
 import { configureTestBed } from '../../testing-internal/test-bed';
 import { createTestRuntime, type TestRuntime } from '../../testing-internal/test-runtime';
@@ -186,6 +186,85 @@ describe('aui-thread-rows nested groups', () => {
     // The ungrouped text part is a separate row with its default text view.
     expect(root.querySelectorAll('.g').length).toBe(2);
     expect(root.querySelector('p')?.textContent).toBe('ok');
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadRowsComponent,
+    AuiThreadRowTemplateDirective,
+    NgTemplateOutlet,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div [auiProvider]="runtime().config">
+      <aui-thread-rows>
+        <ng-template auiThreadRow let-info>
+          @if (info.type === 'part' && info.part.type === 'tool-call') {
+            <span class="tool" [attr.data-ui]="info.part.toolUI ? 'yes' : 'no'">
+              {{ info.part.toolName }}
+            </span>
+            <button class="add" (click)="info.part.addResult('72F')">add</button>
+            <button class="resume" (click)="info.part.resume('go')">resume</button>
+            <button class="approve" (click)="info.part.respondToApproval({ approved: true })">
+              approve
+            </button>
+          }
+        </ng-template>
+      </aui-thread-rows>
+    </div>
+  `,
+})
+class ToolLeafHostComponent {
+  readonly runtime = input.required<TestRuntime>();
+}
+
+describe('aui-thread-rows enriched leaf', () => {
+  it('gives a tool-call leaf its actions and routes them to the runtime', async () => {
+    const onAddToolResult = vi.fn();
+    const onResumeToolCall = vi.fn();
+    const onRespondToToolApproval = vi.fn();
+    const test = createTestRuntime({ onAddToolResult, onResumeToolCall, onRespondToToolApproval });
+    flushTapSync(() => test.append({ id: 'u1', role: 'user', content: text('hi') }));
+    flushTapSync(() =>
+      test.append({
+        id: 'a1',
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'call-1',
+            toolName: 'weather',
+            args: {},
+            approval: { id: 'approval-1' },
+          },
+        ],
+      }),
+    );
+    configureTestBed({ imports: [ToolLeafHostComponent] });
+    const fixture = TestBed.createComponent(ToolLeafHostComponent);
+    fixture.componentRef.setInput('runtime', test);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.tool')?.getAttribute('data-ui')).toBe('no');
+    (root.querySelector('button.add') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(onAddToolResult).toHaveBeenCalledTimes(1));
+    expect(onAddToolResult.mock.calls[0]![0]).toMatchObject({
+      toolCallId: 'call-1',
+      result: '72F',
+    });
+    (root.querySelector('button.resume') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(onResumeToolCall).toHaveBeenCalledTimes(1));
+    (root.querySelector('button.approve') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(onRespondToToolApproval).toHaveBeenCalledTimes(1));
+    expect(onRespondToToolApproval.mock.calls[0]![0]).toMatchObject({
+      approvalId: 'approval-1',
+      approved: true,
+    });
   });
 });
 
