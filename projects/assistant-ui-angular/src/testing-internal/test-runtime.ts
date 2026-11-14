@@ -90,26 +90,50 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
     role: message.role,
     content: message.content,
   });
-  const makeAdapter = (): ExternalStoreAdapter<DemoMessage> => ({
-    ...(tree
-      ? {
-          messageRepository: ExportedMessageRepository.fromBranchableArray(
-            tree.map(({ message, parentId }) => ({ message: toLike(message), parentId })),
-            { headId },
-          ),
-        }
-      : { messages }),
-    isRunning,
-    suggestions,
-    ...(adapters ? { adapters } : {}),
-    convertMessage: (message) => ({
-      ...(message.id === undefined ? {} : { id: message.id }),
-      role: message.role,
-      content: message.content,
-    }),
-    onNew: async () => undefined,
-    ...callbacks,
-  });
+  // Core calls this with the active chain after a branch switch or delete.
+  // Its presence is what enables `switchToBranch`. In tree mode keep every
+  // branch and only move the head, so later syncs keep the chosen branch.
+  const onCoreSetMessages = (list: readonly unknown[]) => {
+    if (tree) {
+      const last = list.at(-1) as { id?: string } | undefined;
+      if (last?.id && tree.some((entry) => entry.message.id === last.id)) headId = last.id;
+      else if (list.length === 0) headId = null;
+    } else {
+      messages = list as DemoMessage[];
+    }
+    // Hand the new state back so the thread publishes it (as a real host does).
+    sync();
+  };
+  const makeAdapter = (): ExternalStoreAdapter<DemoMessage> => {
+    const common = {
+      isRunning,
+      suggestions,
+      setMessages: onCoreSetMessages,
+      ...(adapters ? { adapters } : {}),
+      onNew: async () => undefined,
+      ...callbacks,
+    };
+    if (tree) {
+      // Repository mode holds ThreadMessages already; a converter here would
+      // make core report no external messages to `setMessages`.
+      return {
+        ...common,
+        messageRepository: ExportedMessageRepository.fromBranchableArray(
+          tree.map(({ message, parentId }) => ({ message: toLike(message), parentId })),
+          { headId },
+        ),
+      } as unknown as ExternalStoreAdapter<DemoMessage>;
+    }
+    return {
+      ...common,
+      messages,
+      convertMessage: (message: DemoMessage) => ({
+        ...(message.id === undefined ? {} : { id: message.id }),
+        role: message.role,
+        content: message.content,
+      }),
+    };
+  };
   const core = new ExternalStoreRuntimeCore(makeAdapter());
   const runtime = new AssistantRuntimeImpl(core);
   const sync = () => core.setAdapter(makeAdapter());

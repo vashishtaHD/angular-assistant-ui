@@ -48,6 +48,43 @@ describe('createTestRuntime extras', () => {
     release();
   });
 
+  it('lets the branch picker select between siblings and keeps the chosen head', () => {
+    const rt = createTestRuntime();
+    flushTapSync(() => {
+      rt.append({ id: 'u1', role: 'user', content: text('hi') });
+      rt.append({ id: 'a1', role: 'assistant', content: text('first') });
+      rt.appendBranch('u1', { id: 'a2', role: 'assistant', content: text('second') });
+    });
+    const { client, release } = mountClient(rt.config);
+    const ids = () => client.thread.getState().messages.map((m) => m.id);
+    expect(client.thread.getState().capabilities.switchToBranch).toBe(true);
+    expect(ids()).toEqual(['u1', 'a2']);
+
+    flushTapSync(() =>
+      client.thread.message({ id: 'a2' }).switchToBranch({ position: 'previous' }),
+    );
+    expect(ids()).toEqual(['u1', 'a1']);
+    expect(client.thread.message({ id: 'a1' }).getState().branchCount).toBe(2);
+
+    // A later adapter sync keeps the chosen head instead of reverting to a2.
+    flushTapSync(() => rt.setRunning(false));
+    expect(ids()).toEqual(['u1', 'a1']);
+
+    flushTapSync(() => client.thread.message({ id: 'a1' }).switchToBranch({ position: 'next' }));
+    expect(ids()).toEqual(['u1', 'a2']);
+    flushTapSync(() => rt.setRunning(false));
+    expect(ids()).toEqual(['u1', 'a2']);
+
+    // Both branches survive, and an append continues from the selected head.
+    flushTapSync(() =>
+      client.thread.message({ id: 'a2' }).switchToBranch({ position: 'previous' }),
+    );
+    flushTapSync(() => rt.append({ id: 'u2', role: 'user', content: text('more') }));
+    expect(ids()).toEqual(['u1', 'a1', 'u2']);
+    expect(client.thread.message({ id: 'a1' }).getState().branchCount).toBe(2);
+    release();
+  });
+
   it('appendBranch rejects an unknown parent', () => {
     const rt = createTestRuntime();
     expect(() => rt.appendBranch('nope', { id: 'x', role: 'user', content: text('x') })).toThrow(

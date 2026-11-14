@@ -1,4 +1,5 @@
-// Generalises packages/vue/src/primitives/{AttachmentByIndexProvider,suggestions,threadList,ChainOfThoughtPrimitiveParts}.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
+// Ported from packages/vue/src/primitives/AttachmentByIndexProvider.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
+// Also generalises suggestions.ts, threadList.ts and ChainOfThoughtPrimitiveParts.ts in the same directory:
 // (the ByIndex providers) the same way message-scope.ts / part-scope.ts port MessageById / PartByIndex.
 import { AuiConfig, Derived, type AssistantClient } from '@assistant-ui/store/client';
 import type { MessageState } from '@assistant-ui/core/store';

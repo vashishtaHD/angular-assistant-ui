@@ -21,122 +21,169 @@ Vue specifics). Library code uses only Angular APIs stable in 18.2.
 
 ## Parity table
 
-Keyed by the **React** export (`packages/react/src/primitives/*.ts` and `packages/react/src/index.ts`),
-the public contract a chat app uses. Columns: the export, whether the upstream Vue binding has it, the
-Angular status and the phase 2 task that owns it.
+Keyed by the **React** export: every `packages/react/src/primitives/*.ts` barrel member and every
+name exported from `packages/react/src/index.ts` (including `export * from "./context"`). Names are
+listed individually; several names share a row only where they share a status and an owner. Columns:
+the export, whether the upstream Vue binding has it, the Angular status, and the phase 2 task that owns it.
 
 Status is `ported`, `planned (Task N)` or `n/a (<reason>)`. Each task flips only its own rows.
+Only the agreed out-of-scope list (voice, speech, dictation, generative UI, MCP apps, devtools, Assistant
+Cloud, cloud run state, LangGraph/A2A, props-only generative/agent elements) and names that an existing
+Angular scope or directive replaces exactly are `n/a`.
 
 ### Store, context and scope
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| AuiProvider | yes | ported |  |
+| AuiProvider | yes | ported (as `[auiProvider]`) |  |
 | AuiIf | yes | ported (as `*auiIf`) |  |
 | useAui | yes | ported (as `injectAui`) |  |
 | useAuiState | yes | ported (as `injectAuiState`) |  |
 | useAuiEvent | yes | ported (as `injectAuiEvent`) |  |
-| AuiConfig, Derived, createAssistantClient and the store types (`AssistantClient`, `AssistantState`, `AssistantEvent*`, `Unsubscribe`) | yes | ported (re-exports of `@assistant-ui/store/client`) |  |
-| MessageByIdProvider, `ThreadPrimitive.MessageByIndex`, `ThreadPrimitive.Unstable_MessageById` | yes | n/a (internal: `aui-scope-outlet` + `messageScopeConfig`) |  |
-| PartByIndexProvider, `MessagePrimitive.PartByIndex` | yes | n/a (internal: `aui-scope-outlet` + `partScopeConfig`) |  |
-| AttachmentByIndexProvider, `ComposerPrimitive.AttachmentByIndex`, `MessagePrimitive.AttachmentByIndex` | yes | planned (Task 6) (internal: `indexScopeConfig` kind `attachment`) | Task 6 |
-| SuggestionByIndexProvider, `ThreadPrimitive.SuggestionByIndex` | yes | planned (Task 7) (internal: `indexScopeConfig` kind `suggestion`) | Task 7 |
-| ThreadListItemByIndexProvider, `ThreadListPrimitive.ItemByIndex` | yes | planned (Task 8) (internal: `indexScopeConfig` kind `threadListItem`) | Task 8 |
-| QueueItemByIndexProvider (scope of `ComposerPrimitive.Queue`) | no | planned (Task 5) (internal: `indexScopeConfig` kind `queueItem`) | Task 5 |
-| ChainOfThoughtPartByIndexProvider (scope of `ChainOfThoughtPrimitive.Parts`) | yes | planned (Task 9) (internal: `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
-| `ThreadPrimitive.ViewportProvider`, `useThreadViewport`, `useThreadViewportStore`, `ThreadViewportState` | no | n/a (Angular has `AUI_VIEWPORT` / `injectAuiViewport`) |  |
-| `useThreadRootElementRef` (`ThreadRootElementContext`) | no | n/a (the root directive owns its element; consumers use their own template refs) |  |
-| `createActionButton`, `Primitive`, `withRenderProp`, `RequireAtLeastOne`, `DropdownMenuRender*` | no | n/a (React-only plumbing: attribute directives and `injectActionButton` replace asChild and render props) |  |
+| AuiConfig | yes | ported (re-export of `@assistant-ui/store/client`) |  |
+| AssistantClient, AssistantState, AssistantEventSelector, AssistantEventName, AssistantEventCallback, Unsubscribe | yes | ported (re-exports of `@assistant-ui/store/client`) |  |
+| AssistantEventScope, AssistantEventPayload | no | planned (Task 22) (type re-exports) | Task 22 |
+| AssistantRuntimeProvider | yes (`AssistantRuntimeProvider` is not in Vue) | n/a (replaced by `[auiProvider]` with `AuiConfig({ threads: RuntimeAdapter(runtime) })`) |  |
+| MessageByIndexProvider | yes | n/a (replaced by `aui-thread-messages` + `messageScopeConfig`) |  |
+| PartByIndexProvider | yes | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
+| SuggestionByIndexProvider | yes | planned (Task 7) (via `indexScopeConfig` kind `suggestion`) | Task 7 |
+| MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | planned (Task 6) (via `indexScopeConfig` kind `attachment`) | Task 6 |
+| ThreadListItemByIndexProvider | yes | planned (Task 8) (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
+| ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | planned (Task 9) (parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
+| ThreadListItemRuntimeProvider, MessageProvider, TextMessagePartProvider, ReadonlyThreadProvider | no | planned (Task 22) (scopes from a bare runtime or message objects, for read-only rendering) | Task 22 |
+| useThreadViewport, useThreadViewportStore, ThreadViewportState | no | n/a (replaced by `AUI_VIEWPORT`, `injectAuiViewport` and `AuiViewport`) |  |
+| INTERNAL | no | n/a (upstream-internal namespace, not public API) |  |
 
 ### Thread (`ThreadPrimitive`)
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ThreadPrimitive.Root | yes | ported |  |
+| ThreadPrimitive.Root | yes | ported (as `[auiThreadRoot]`) |  |
 | ThreadPrimitive.Viewport | partial (no turnAnchor or clamp) | ported; `turnAnchor` and `topAnchorMessageClamp` planned | Task 2 |
 | useThreadViewportAutoScroll | yes (via `createThreadViewportAutoScroll`) | ported (built into the viewport directive) |  |
+| ThreadPrimitive.ViewportProvider | no | n/a (replaced by `AUI_VIEWPORT`) |  |
 | ThreadPrimitive.ViewportFooter | yes | planned (Task 2) | Task 2 |
-| ThreadPrimitive.Messages | yes | ported |  |
-| ThreadPrimitive.Row, `createThreadRowsSelector`, `ThreadRow`, `ThreadRowsOptions` | no | n/a (virtualized-list API; optional, not in the agreed scope) |  |
+| ThreadPrimitive.Messages | yes | ported (as `aui-thread-messages`) |  |
+| ThreadPrimitive.MessageByIndex, ThreadPrimitive.Unstable_MessageById | provider only | n/a (replaced by `aui-thread-messages` + `messageScopeConfig`) |  |
+| ThreadPrimitive.Row, createThreadRowsSelector, ThreadRow, ThreadRowsOptions | no | planned (Task 2) | Task 2 |
 | ThreadPrimitive.ScrollToBottom | yes | planned (Task 2) | Task 2 |
 | ThreadPrimitive.LoadEarlier | no | planned (Task 2) | Task 2 |
 | ThreadPrimitive.Suggestions | yes | planned (Task 7) | Task 7 |
+| ThreadPrimitive.SuggestionByIndex | provider | planned (Task 7) | Task 7 |
 | ThreadPrimitive.Suggestion | no (use `SuggestionPrimitiveTrigger`) | planned (Task 7) (covered by `button[auiSuggestionTrigger]`) | Task 7 |
-| ThreadPrimitive.Empty, ThreadPrimitive.If (deprecated) | no | n/a (deprecated upstream; use `*auiIf`) |  |
+| ThreadPrimitive.Empty, ThreadPrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
 | useScrollLock | yes | planned (Task 2) | Task 2 |
-| `unstable_useThreadMessageIds`, `useThreadMessages`, `useThreadIsRunning` and the other thread selector hooks | no | n/a (read `injectAuiState((s) => s.thread...)`) |  |
+| unstable_useThreadMessageIds | no | planned (Task 22) (Angular accessor over `s.thread.messages`) | Task 22 |
+| useThreadRootElementRef | no | planned (Task 2) (exposed by the thread root directive) | Task 2 |
 
 ### Message (`MessagePrimitive`)
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| MessagePrimitive.Root | yes | ported |  |
-| MessagePrimitive.Parts / Content | yes | ported |  |
-| MessagePrimitive.GroupedParts, `groupPartByType`, `GroupByContext` | no | planned (Task 3) | Task 3 |
+| MessagePrimitive.Root | yes | ported (as `[auiMessageRoot]`) |  |
+| MessagePrimitive.Parts, MessagePrimitive.Content | yes | ported (as `aui-message-parts`) |  |
+| MessagePrimitive.PartByIndex | provider | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
+| MessagePrimitive.GroupedParts, groupPartByType, GroupByContext | no | planned (Task 3) | Task 3 |
 | MessagePrimitive.Attachments | yes | planned (Task 6) | Task 6 |
-| MessagePrimitive.Error, useMessageError | no | planned (Task 3) (via the `messageErrorText` predicate) | Task 3 |
-| MessagePrimitive.Quote, `useMessageQuote`, `getMessageQuote` | no | planned (Task 3) | Task 3 |
-| MessagePrimitive.If (deprecated) | no | n/a (deprecated upstream; use `*auiIf`) |  |
-| MessagePrimitive.GenerativeUI, `GenerativeUIRender`, `generativeUI` parts config | no | n/a (generative UI out of scope) |  |
-| MessagePrimitive.Unstable_PartsGrouped, Unstable_PartsGroupedByParentId | no | n/a (deprecated upstream; prefer GroupedParts) |  |
+| MessagePrimitive.AttachmentByIndex | provider | planned (Task 6) | Task 6 |
+| MessagePrimitive.Error | no | planned (Task 3) | Task 3 |
+| MessagePrimitive.Quote, useMessageQuote | no | planned (Task 3) | Task 3 |
+| MessagePrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
+| MessagePrimitive.GenerativeUI, GenerativeUIRender, GenerativeUIRenderError, GenerativeUIRenderProps, GenerativeUIComponentRegistry, GenerativeUIMessagePartComponent, GenerativeUIMessagePartProps, GenerativeUIMessagePart, GenerativeUINode, GenerativeUISpec | no | n/a (generative UI out of scope) |  |
+| MessagePrimitive.Unstable_PartsGrouped, MessagePrimitive.Unstable_PartsGroupedByParentId | no | planned (Task 3) (subsumed by `aui-message-grouped-parts`) | Task 3 |
 | useMessageTiming | no | planned (Task 18) | Task 18 |
 | useToolCallElapsed | no | planned (Task 17) | Task 17 |
-| `unstable_useMessageStallDetection` | no | n/a (experimental; no chat-app need) |  |
+| unstable_useMessageStallDetection, Unstable_MessageStallDetection, Unstable_MessageStallDetectionOptions | no | planned (Task 3) | Task 3 |
 
 ### Message part (`MessagePartPrimitive`) and tool UI
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| MessagePartPrimitive.Text, useSmooth, `SmoothOptions` | no | planned (Task 3) | Task 3 |
+| MessagePartPrimitive.Text, useSmooth, SmoothOptions | no | planned (Task 3) | Task 3 |
 | MessagePartPrimitive.Image | no | planned (Task 3) | Task 3 |
 | MessagePartPrimitive.InProgress | no | planned (Task 3) | Task 3 |
-| PartPrimitive.Messages | no | n/a (nested sub-thread messages; optional, not in the agreed scope) |  |
-| useMessagePartText, useMessagePartReasoning, useMessagePartSource, useMessagePartFile, useMessagePartImage, useMessagePartData | no | n/a (read `injectAuiState((s) => s.part)`) |  |
-| makeAssistantToolUI, useAssistantToolUI, `ToolCallMessagePartProps` | yes | ported (as `registerToolUI` and `ToolUIProps`) |  |
-| makeAssistantDataUI, useAssistantDataUI, `DataMessagePartProps` | yes | ported (as `registerToolUI` and `DataUIProps`) |  |
-| `unstable_recordInteraction` | no | ported (`ToolUIProps.unstable_recordInteraction`) |  |
-| useToolArgsStatus, `ToolArgsStatus` | no | planned (Task 17) | Task 17 |
-| makeAssistantTool, useAssistantTool, `tool`, `Tools`, `Toolkit`, `ToolDefinition`, `defineToolkit`, `defineMcpToolkit`, `humanTool`, `externalTool`, `useAuiToolOverrides`, `useInlineRender` | no | n/a (React tool-registration plumbing; Angular registers renderers with `registerToolUI` and tools live on the server) |  |
-| useAssistantInstructions, useAssistantContext, makeAssistantVisible, `ModelContext*`, `mergeModelContexts`, `ModelContextRegistry` | no | n/a (not needed by a chat app; reachable through `injectAui().modelContext`) |  |
-| Interactables (`unstable_Interactables`, `unstable_useInteractable*`, `unstable_interactableTool`) | no | n/a (experimental; no chat-app need) |  |
-| AssistantFrameHost, AssistantFrameProvider, `useAssistantFrameHost`, WebMCP `convertTools`, mcp-apps | no | n/a (MCP apps and frames out of scope) |  |
+| MessagePartPrimitive.Messages | no | planned (Task 3) (nested sub-thread messages) | Task 3 |
+| useMessagePartText, useMessagePartReasoning, useMessagePartSource, useMessagePartFile, useMessagePartImage, useMessagePartData | no | planned (Task 3) (Angular `inject*` readers over `s.part`) | Task 3 |
+| makeAssistantToolUI, useAssistantToolUI, AssistantToolUI, AssistantToolUIProps | yes | ported (as `registerToolUI` and `ToolUIProps`) |  |
+| makeAssistantDataUI, useAssistantDataUI, AssistantDataUI, AssistantDataUIProps, DataRenderers | yes | ported (as `registerToolUI` and `DataUIProps`) |  |
+| ToolCallMessagePartComponent, ToolCallMessagePartProps | yes | ported (as `ToolUIComponent` and `ToolUIProps`) |  |
+| EmptyMessagePartComponent, EmptyMessagePartProps, TextMessagePartComponent, TextMessagePartProps, ReasoningMessagePartComponent, ReasoningMessagePartProps, SourceMessagePartComponent, SourceMessagePartProps, ImageMessagePartComponent, ImageMessagePartProps, FileMessagePartComponent, FileMessagePartProps, DataMessagePartComponent, DataMessagePartProps, QuoteMessagePartComponent, QuoteMessagePartProps | yes | ported (as `AuiPartTemplateDirective` and `AuiPartTemplateContext`) |  |
+| Unstable_AudioMessagePartComponent, Unstable_AudioMessagePartProps | no | planned (Task 3) (audio part template slot) | Task 3 |
+| ReasoningGroupComponent, ReasoningGroupProps | no | planned (Task 3) (group template slot of `aui-message-grouped-parts`) | Task 3 |
+| useToolArgsStatus, ToolArgsStatus | no | planned (Task 17) | Task 17 |
+| EnrichedPartState, PartState | no | planned (Task 22) (type re-exports) | Task 22 |
+| ToolExecutionStatus | no | planned (Task 22) (type re-export) | Task 22 |
+| Unstable_InteractableToolRenderProps | no | planned (Task 22) | Task 22 |
+
+### Model context, frontend tools and interactables
+
+| React export | Vue has it | Angular status | Task |
+| --- | --- | --- | --- |
+| useAssistantInstructions | no | planned (Task 22) (as `injectAssistantInstructions`) | Task 22 |
+| useAssistantContext, AssistantContextConfig | no | planned (Task 22) (as `injectAssistantContext`) | Task 22 |
+| makeAssistantVisible | no | planned (Task 22) (as `[auiAssistantVisible]`) | Task 22 |
+| makeAssistantTool, useAssistantTool, AssistantTool, AssistantToolProps | no | planned (Task 22) (as `registerTool`) | Task 22 |
+| tool, Tool, stubTool, Tools, Toolkit, ToolDefinition, ToolkitDefinition, ToolkitDefinitionEntry, ProviderToolConfig, ToolCallText, defineToolkit, providerTool, externalTool, humanTool, hitl, hitlTool | no | planned (Task 22) (as `registerToolkit` and plain-object equivalents) | Task 22 |
+| defineMcpToolkit, McpToolkitEntry, McpToolkitDefinition, McpToolkitToolConfig | no | planned (Task 22) | Task 22 |
+| useAuiToolOverrides | no | planned (Task 22) | Task 22 |
+| useInlineRender | no | planned (Task 22) (Angular equivalent or documented template pattern) | Task 22 |
+| ModelContext, ModelContextOptions, ModelContextProvider, SystemPart, LanguageModelConfig, LanguageModelV1CallSettings, mergeModelContexts, ModelContextClient | no | planned (Task 22) (contracts and helpers re-exported) | Task 22 |
+| ModelContextRegistry, ModelContextRegistryToolHandle, ModelContextRegistryInstructionHandle, ModelContextRegistryProviderHandle, SerializedTool, SerializedModelContext | no | planned (Task 22) | Task 22 |
+| AssistantFrameHost, AssistantFrameProvider, useAssistantFrameHost, FRAME_MESSAGE_CHANNEL, FrameMessageType, FrameMessage | no | planned (Task 22) (model-context frame bridge; not an MCP app) | Task 22 |
+| unstable_useWebMcpProvider, unstable_defaultWebMcpFilter, Unstable_WebMcpProviderOptions, Unstable_WebMcpProviderResult | no | planned (Task 22) (WebMCP tool bridge, distinct from MCP apps) | Task 22 |
+| Interactables, unstable_Interactables, useAssistantInteractable, AssistantInteractableProps | no | planned (Task 22) | Task 22 |
+| useInteractableState, unstable_useInteractable, unstable_useInteractableState, unstable_useInteractableVersions, unstable_interactableTool | no | planned (Task 22) | Task 22 |
+| unstable_getInteractableSnapshots, unstable_formatInteractableSnapshot, unstable_getInteractableVersions, Unstable_InteractableSnapshotEntry, Unstable_InteractableVersion | no | planned (Task 22) | Task 22 |
+| Unstable_InteractableConfig, Unstable_InferInteractableState, Unstable_InteractableVersionInfo, Unstable_InteractableToolConfig, Unstable_InteractableStateSchema, Unstable_InteractablesState, Unstable_InteractableDefinition, Unstable_InteractableRegistration, Unstable_InteractablesMethods, Unstable_InteractablePersistedState, Unstable_InteractablePersistenceAdapter, Unstable_InteractablePersistenceStatus, Unstable_InteractablesClientSchema, Unstable_InteractablesConfig | no | planned (Task 22) (interactable types) | Task 22 |
+| McpAppRenderer, McpAppsRemoteHost, getMcpAppFromToolPart, McpAppPartOptions, McpAppRendererOptions, McpAppMetadata, McpAppResource, McpAppResourceMeta, McpAppResourceCSP, McpAppSandboxConfig, McpAppHostInfo, McpAppHostContext, McpAppDisplayMode, McpAppsHost, McpAppsRemoteHostOptions, McpAppToolCallParams, McpAppInitializeParams, McpAppBridgeHandlers, ToolCallMessagePartMcpMetadata, McpAppResourceOutput, ShimLoadError, ShimLoadErrorCode | no | n/a (MCP apps out of scope) |  |
 
 ### Composer (`ComposerPrimitive`, `QueueItemPrimitive`)
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ComposerPrimitive.Root | no | ported; form submit handling planned | Task 5 |
-| ComposerPrimitive.Input | partial (`submitOnEnter`) | ported; full props planned | Task 5 |
-| ComposerPrimitive.Send | yes | ported |  |
-| ComposerPrimitive.Cancel | yes | ported |  |
+| ComposerPrimitive.Root | no | ported (as `[auiComposerRoot]`); form submit handling planned | Task 5 |
+| ComposerPrimitive.Input | partial (`submitOnEnter`) | ported (as `[auiComposerInput]`); full props planned | Task 5 |
+| ComposerPrimitive.Send | yes | ported (as `button[auiComposerSend]`) |  |
+| ComposerPrimitive.Cancel | yes | ported (as `button[auiComposerCancel]`) |  |
 | ComposerPrimitive.AddAttachment | yes | planned (Task 6) | Task 6 |
 | ComposerPrimitive.Attachments | yes | planned (Task 6) | Task 6 |
+| ComposerPrimitive.AttachmentByIndex | provider | planned (Task 6) | Task 6 |
 | ComposerPrimitive.AttachmentDropzone | yes | planned (Task 6) | Task 6 |
-| ComposerPrimitive.Quote, QuoteText, QuoteDismiss | no | planned (Task 5) | Task 5 |
+| ComposerPrimitive.Quote, ComposerPrimitive.QuoteText, ComposerPrimitive.QuoteDismiss | no | planned (Task 5) | Task 5 |
 | ComposerPrimitive.Queue | no | planned (Task 5) | Task 5 |
-| QueueItemPrimitive.Text, Steer, Remove | no | planned (Task 5) | Task 5 |
-| ComposerPrimitive.TriggerPopoverRoot, TriggerPopover, TriggerPopoverCategories, TriggerPopoverCategoryItem, TriggerPopoverItems, TriggerPopoverItem, TriggerPopoverBack, `TriggerMatch`, `TriggerMatcher` | no | planned (Task 10) | Task 10 |
-| `Unstable_TriggerPopover*` aliases and `unstable_useTriggerPopover*Context` hooks | no | n/a (deprecated aliases and React context hooks) |  |
+| QueueItemPrimitive.Text, QueueItemPrimitive.Steer, QueueItemPrimitive.Remove | no | planned (Task 5) | Task 5 |
+| unstable_useComposerInputHistory, Unstable_ComposerInputHistory | no | planned (Task 5) | Task 5 |
+| unstable_useComposerInput, Unstable_UseComposerInputOptions, Unstable_ComposerInput | no | planned (Task 5) | Task 5 |
+| unstable_useComposerRunStartFocusGuard, Unstable_ComposerRunStartFocusGuard | no | planned (Task 5) | Task 5 |
+| ComposerPrimitive.TriggerPopoverRoot, TriggerPopover, TriggerPopoverCategories, TriggerPopoverCategoryItem, TriggerPopoverItems, TriggerPopoverItem, TriggerPopoverBack | no | planned (Task 10) | Task 10 |
+| ComposerPrimitive.Unstable_TriggerPopoverRoot, Unstable_TriggerPopover, Unstable_TriggerPopoverCategories, Unstable_TriggerPopoverCategoryItem, Unstable_TriggerPopoverItems, Unstable_TriggerPopoverItem, Unstable_TriggerPopoverBack | no | planned (Task 10) (deprecated aliases of the rows above, exported under the same Angular names) | Task 10 |
+| unstable_useTriggerPopoverRootContext, unstable_useTriggerPopoverRootContextOptional, unstable_useTriggerPopoverScopeContext, unstable_useTriggerPopoverScopeContextOptional, unstable_useTriggerPopoverTriggers, unstable_useTriggerPopoverTriggersOptional | no | planned (Task 10) (as `inject*` functions) | Task 10 |
+| unstable_useTriggerPopoverAriaProps, Unstable_TriggerPopoverAriaProps | no | planned (Task 10) | Task 10 |
+| unstable_useMentionAdapter, Unstable_UseMentionAdapterOptions, Unstable_Mention, Unstable_MentionCategory, Unstable_MentionDirective, Unstable_IconComponent, Unstable_ModelContextToolsOptions | no | planned (Task 10) | Task 10 |
+| unstable_useSlashCommandAdapter, Unstable_UseSlashCommandAdapterOptions, Unstable_SlashCommand, Unstable_SlashCommandAction | no | planned (Task 10) | Task 10 |
+| unstable_useLiveCompletionAdapter, Unstable_UseLiveCompletionAdapterOptions | no | planned (Task 10) | Task 10 |
+| defaultDirectiveFormatter, unstable_defaultDirectiveFormatter, DirectiveFormatter, DirectiveSegment, TriggerAdapter, TriggerCategory, TriggerItem, Unstable_DirectiveFormatter, Unstable_DirectiveSegment, Unstable_TriggerItem, Unstable_RegisteredTrigger, TriggerMatch, TriggerMatcher, Unstable_TriggerMatch, Unstable_TriggerMatcher, Unstable_TriggerBehavior | no | planned (Task 10) (contracts and the default formatter) | Task 10 |
 | ComposerPrimitive.Resume | no | n/a (cloud and resumable run state out of scope) |  |
-| ComposerPrimitive.Dictate, StopDictation, DictationTranscript, `DictationAdapter`, `WebSpeechDictationAdapter` | no | n/a (dictation out of scope) |  |
-| ComposerPrimitive.If (deprecated) | no | n/a (deprecated upstream; use `*auiIf`) |  |
-| useComposerSend, useComposerCancel, useComposerResume, useComposerAddAttachment, useEditComposerSend, useEditComposerCancel | no | n/a (the directives use the core predicates; other code calls `injectAui().composer`) |  |
+| ComposerPrimitive.Dictate, ComposerPrimitive.StopDictation, ComposerPrimitive.DictationTranscript, DictationAdapter, DictationState, WebSpeechDictationAdapter | no | n/a (dictation out of scope) |  |
+| ComposerPrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
+| ComposerSubmission, ComposerSendOptions, ComposerTextOrigin, ComposerState, ThreadComposerState, EditComposerState, ComposerRuntimeState | no | planned (Task 22) (type re-exports) | Task 22 |
+| createMessageQueue, MessageQueueDriver, MessageQueueController, ExternalThreadQueueAdapter, ExternalThreadBranchAdapter, QueueItemState, QueueItemMethods, TaskState, TaskMethods | no | planned (Task 22) (queue helpers and types re-exported) | Task 22 |
 
 ### Action bar and branch picker (`ActionBarPrimitive`, `ActionBarMorePrimitive`, `BranchPickerPrimitive`)
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
 | ActionBarPrimitive.Root | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.Copy, useActionBarCopy, useCopyToClipboard | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.Reload, useMessageReload | yes | planned (Task 4) | Task 4 |
+| ActionBarPrimitive.Copy | yes | planned (Task 4) | Task 4 |
+| ActionBarPrimitive.Reload | yes | planned (Task 4) | Task 4 |
 | ActionBarPrimitive.Edit | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.FeedbackPositive, FeedbackNegative, `FeedbackAdapter`, `SubmitFeedbackOptions` | no | planned (Task 4) | Task 4 |
+| ActionBarPrimitive.FeedbackPositive, ActionBarPrimitive.FeedbackNegative, FeedbackAdapter, SubmitFeedbackOptions | no | planned (Task 4) | Task 4 |
 | ActionBarPrimitive.ExportMarkdown | no | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.Speak, StopSpeaking, `SpeechSynthesisAdapter`, `WebSpeechSynthesisAdapter` | no | n/a (speech out of scope) |  |
-| ActionBarPrimitive.Resume, RefreshRun | no | n/a (cloud and resumable run state out of scope) |  |
-| ActionBarMorePrimitive.Root, Trigger, Content, Item, Separator | no | planned (Task 10) | Task 10 |
+| ActionBarPrimitive.Speak, ActionBarPrimitive.StopSpeaking, SpeechSynthesisAdapter, WebSpeechSynthesisAdapter | no | n/a (speech out of scope) |  |
+| ActionBarPrimitive.Resume, ActionBarPrimitive.RefreshRun | no | n/a (cloud and resumable run state out of scope) |  |
+| ActionBarMorePrimitive.Root, ActionBarMorePrimitive.Trigger, ActionBarMorePrimitive.Content, ActionBarMorePrimitive.Item, ActionBarMorePrimitive.Separator | no | planned (Task 10) | Task 10 |
 | BranchPickerPrimitive.Root | no | planned (Task 4) | Task 4 |
-| BranchPickerPrimitive.Previous, Next, useMessageBranching | yes | planned (Task 4) | Task 4 |
+| BranchPickerPrimitive.Previous, BranchPickerPrimitive.Next | yes | planned (Task 4) | Task 4 |
 | BranchPickerPrimitive.Number | yes | planned (Task 4) | Task 4 |
 | BranchPickerPrimitive.Count | yes | planned (Task 4) | Task 4 |
 
@@ -155,18 +202,19 @@ Status is `ported`, `planned (Task N)` or `n/a (<reason>)`. Each task flips only
 | AttachmentPrimitive.Name | yes | planned (Task 6) | Task 6 |
 | AttachmentPrimitive.unstable_Thumb | yes (`AttachmentPrimitiveThumb`) | planned (Task 6) | Task 6 |
 | AttachmentPrimitive.Remove | yes | planned (Task 6) | Task 6 |
-| `AttachmentAdapter`, `SimpleImageAttachmentAdapter`, `SimpleTextAttachmentAdapter`, `CompositeAttachmentAdapter` | no | planned (Task 6) (re-exported from core) | Task 6 |
-| `CloudFileAttachmentAdapter` | no | n/a (Assistant Cloud out of scope) |  |
+| AttachmentAdapter, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter | no | planned (Task 6) (re-exported from core) | Task 6 |
+| Attachment, PendingAttachment, CompleteAttachment, AttachmentStatus, CreateAttachment, AttachmentRuntime, AttachmentState, AttachmentRuntimeState | no | planned (Task 6) (type re-exports) | Task 6 |
+| CloudFileAttachmentAdapter | no | n/a (Assistant Cloud out of scope) |  |
 | useAttachmentSrc (kit hook) | no | planned (Task 17) | Task 17 |
 
 ### Suggestions (`SuggestionPrimitive`)
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| SuggestionPrimitive.Trigger, useSuggestionTrigger | yes | planned (Task 7) | Task 7 |
+| SuggestionPrimitive.Trigger | yes | planned (Task 7) | Task 7 |
 | SuggestionPrimitive.Title | yes | planned (Task 7) | Task 7 |
 | SuggestionPrimitive.Description | yes | planned (Task 7) | Task 7 |
-| Suggestions (client), `SuggestionConfig`, `ThreadSuggestion`, createSuggestionAdapter, `SuggestionAdapter` | yes (`Suggestions`) | planned (Task 7) (re-exported from core) | Task 7 |
+| Suggestions, SuggestionConfig, ThreadSuggestion, createSuggestionAdapter, SuggestionAdapter, SuggestionAdapterGenerateOptions, CreateSuggestionAdapterOptions | yes (`Suggestions`) | planned (Task 7) (re-exported from core) | Task 7 |
 
 ### Thread list (`ThreadListPrimitive`, `ThreadListItemPrimitive`)
 
@@ -175,43 +223,58 @@ Status is `ported`, `planned (Task N)` or `n/a (<reason>)`. Each task flips only
 | ThreadListPrimitive.Root | yes | planned (Task 8) | Task 8 |
 | ThreadListPrimitive.New | yes | planned (Task 8) | Task 8 |
 | ThreadListPrimitive.Items | yes | planned (Task 8) | Task 8 |
+| ThreadListPrimitive.ItemByIndex | provider | planned (Task 8) | Task 8 |
 | ThreadListPrimitive.LoadMore | yes | planned (Task 8) | Task 8 |
 | ThreadListItemPrimitive.Root | yes | planned (Task 8) | Task 8 |
-| ThreadListItemPrimitive.Trigger (and the thread list focus group) | yes | planned (Task 8) | Task 8 |
+| ThreadListItemPrimitive.Trigger | yes | planned (Task 8) | Task 8 |
+| ThreadListCollection, useThreadListCollection, ThreadListItemFocusProvider, useThreadListItemFocus | yes (`threadListFocusGroup`) | planned (Task 8) (thread list focus group) | Task 8 |
 | ThreadListItemPrimitive.Title | yes | planned (Task 8) | Task 8 |
-| ThreadListItemPrimitive.Archive, Unarchive, Delete | yes | planned (Task 8) | Task 8 |
-| ThreadListItemMorePrimitive.Root, Trigger, Content, Item, Separator | no | planned (Task 10) | Task 10 |
-| InMemoryThreadListAdapter, `RemoteThreadListAdapter`, `ThreadHistoryAdapter` | no | planned (Task 14) (Mastra entry builds on core `RemoteThreadList`) | Task 14 |
-| useRemoteThreadListRuntime | no | n/a (React hook; Angular uses `RemoteThreadList` through the Mastra entry) |  |
-| useCloudThreadListRuntime, useCloudThreadListAdapter, `AssistantCloud` | no | n/a (Assistant Cloud out of scope) |  |
+| ThreadListItemPrimitive.Archive, ThreadListItemPrimitive.Unarchive, ThreadListItemPrimitive.Delete | yes | planned (Task 8) | Task 8 |
+| ThreadListItemMorePrimitive.Root, ThreadListItemMorePrimitive.Trigger, ThreadListItemMorePrimitive.Content, ThreadListItemMorePrimitive.Item, ThreadListItemMorePrimitive.Separator | no | planned (Task 10) | Task 10 |
+| InMemoryThreadListAdapter, RemoteThreadListAdapter, RemoteThreadListProviderComponent, RemoteThreadListOptions, ThreadHistoryAdapter, GenericThreadHistoryAdapter, MessageFormatAdapter, MessageFormatItem, MessageFormatRepository, MessageStorageEntry, RuntimeAdapters, RuntimeAdapterProvider, useRuntimeAdapters | no | planned (Task 14) (Mastra entry builds on core `RemoteThreadList`) | Task 14 |
+| ExternalThread, ExternalThreadProps, ExternalThreadMessage, InMemoryThreadList, InMemoryThreadListProps, RemoteThreadList, RemoteThreadListProps, SingleThreadList, ChainOfThoughtClient | no | planned (Task 22) (core store clients re-exported) | Task 22 |
+| ThreadListRuntime, ThreadListState, ThreadListItemRuntime, ThreadListItemState, ThreadListItemRuntimeState, ThreadListItemStatus, ThreadsState | no | planned (Task 22) (type re-exports) | Task 22 |
+| createSimpleTitleAdapter, TitleGenerationAdapter, JoinStrategy | no | planned (Task 22) | Task 22 |
+| useRemoteThreadListRuntime | no | planned (Task 22) (Angular factory over core `RemoteThreadList`) | Task 22 |
+| useCloudThreadListRuntime, useCloudThreadListAdapter, AssistantCloud, readAnonymousRefreshToken | no | n/a (Assistant Cloud out of scope) |  |
 
 ### Chain of thought (`ChainOfThoughtPrimitive`)
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ChainOfThoughtPrimitive.Root | yes (via scope) | planned (Task 9) | Task 9 |
-| ChainOfThoughtPrimitive.AccordionTrigger | yes | planned (Task 9) | Task 9 |
-| ChainOfThoughtPrimitive.Parts | yes | planned (Task 9) | Task 9 |
+| ChainOfThoughtPrimitive.Root, ChainOfThoughtPrimitive.RootPrimitive | yes (via scope) | planned (Task 9) | Task 9 |
+| ChainOfThoughtPrimitive.AccordionTrigger, ChainOfThoughtPrimitive.AccordionTriggerPrimitive | yes | planned (Task 9) | Task 9 |
+| ChainOfThoughtPrimitive.Parts, ChainOfThoughtPrimitive.PartsPrimitive | yes | planned (Task 9) | Task 9 |
 
 ### Selection toolbar and assistant modal
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| SelectionToolbarPrimitive.Root, Quote, `getSelectionMessageId` | no | planned (Task 10) | Task 10 |
-| AssistantModalPrimitive.Root, Trigger, Anchor, Content | no | planned (Task 10) | Task 10 |
+| SelectionToolbarPrimitive.Root (and its type export), SelectionToolbarPrimitive.Quote (and its type export), getSelectionMessageId | no | planned (Task 10) | Task 10 |
+| AssistantModalPrimitive.Root, AssistantModalPrimitive.Trigger, AssistantModalPrimitive.Anchor, AssistantModalPrimitive.Content | no | planned (Task 10) | Task 10 |
 
-### Runtimes, adapters and utilities re-exported by the React index
+### Runtimes, external store and transport
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| useLocalRuntime, useExternalStoreRuntime, useAISDKRuntime, useChatRuntime, useAssistantTransportRuntime | no | n/a (React runtime hooks; Angular binds `AssistantRuntimeImpl` through the provider and the Mastra entry) |  |
-| `ExternalStoreAdapter` and related types, `ExportedMessageRepository`, `ThreadMessageLike`, `fromThreadMessageLike`, `generateId` | no | n/a (import from `@assistant-ui/core`) |  |
-| Runtime, message, part and attachment types (`AssistantRuntime`, `ThreadRuntime`, `ComposerRuntime`, ...) | no | n/a (import from `@assistant-ui/core`) |  |
-| `MessageNotSentError`, `isMessageNotSentError`, `toolApprovalAcceptsText` | no | n/a (import from `@assistant-ui/core`) |  |
-| useMediaQuery | no | n/a (use `matchMedia` or the CDK `BreakpointObserver`) |  |
-| OpenAIRealtimeVoiceAdapter, GeminiLiveVoiceAdapter, createVoiceSession, useVoiceState, useVoiceVolume, useVoiceControls, `RealtimeVoiceAdapter` | no | n/a (voice out of scope) |  |
-| DevToolsHooks | no | n/a (devtools out of scope) |  |
-| LangGraph and A2A runtimes | no | n/a (out of scope) |  |
+| useLocalRuntime, LocalRuntimeOptions, LocalRuntimeOptionsBase, ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ChatModelRunUpdate | no | planned (Task 22) (local runtime factory) | Task 22 |
+| useExternalStoreRuntime, useExternalStoreSharedOptions, ExternalStoreAdapter, ExternalStoreMessageConverter, ExternalStoreSharedOptions, ExternalStoreThreadListAdapter, ExternalStoreThreadData, ExternalStoreBranchChange, pickExternalStoreSharedOptions, getExternalStoreMessages, bindExternalStoreMessage | no | planned (Task 22) (external-store runtime factory and contracts) | Task 22 |
+| useExternalMessageConverter, unstable_convertExternalMessages, unstable_createExternalMessageConversionCache, unstable_createMessageConverter, Unstable_ExternalMessageConversionCache | no | planned (Task 22) | Task 22 |
+| useAssistantTransportRuntime, useAssistantTransportSendCommand, useAssistantTransportState, AssistantTransportConnectionMetadata, AssistantTransportCommand, AssistantTransportProtocol, SendCommandsRequestBody | no | planned (Task 22) | Task 22 |
+| ThreadMessageLike, fromThreadMessageLike, generateId, ExportedMessageRepository, ExportedMessageRepositoryItem, MessageNotSentError, isMessageNotSentError, toolApprovalAcceptsText, AddToolResultOptions, RunConfig, RuntimeCapabilities, MessageRole | no | planned (Task 22) (core helpers and types re-exported) | Task 22 |
+| AssistantRuntime, ThreadRuntime, ThreadState, ThreadRuntimeState, CreateAppendMessage, CreateStartRunConfig, CreateResumeRunConfig, MessageRuntime, MessageState, MessageRuntimeState, MessagePartRuntime, MessagePartState, ComposerRuntime, ThreadComposerRuntime, EditComposerRuntime | no | planned (Task 22) (runtime type re-exports) | Task 22 |
+| AppendMessage, TextMessagePart, ReasoningMessagePart, PartProviderMetadata, SourceProviderMetadata, SourceMessagePart, ImageMessagePart, FileMessagePart, DataMessagePart, Unstable_AudioMessagePart, ToolCallMessagePart, MessagePartTiming, ToolCallTiming, ToolModelContentPart, MessageStatus, MessagePartStatus, MessagePartStreamStatus, ToolCallMessagePartStatus, MessageTiming, MessageModality, ThreadUserMessagePart, ThreadAssistantMessagePart, ThreadSystemMessage, ThreadAssistantMessage, ThreadUserMessage, ThreadMessage, QuoteInfo | no | planned (Task 22) (message and part type re-exports) | Task 22 |
+| RespondToToolApprovalOptions, ToolApprovalDisplay, ToolApprovalOption, ToolApprovalOptionKind, ToolApprovalAnswer, ToolApprovalQuestion, ToolApprovalQuestionOption, ToolApprovalResponse | no | planned (Task 22) (approval type re-exports) | Task 22 |
+| useMediaQuery | no | n/a (not exported from the React index; use `matchMedia` or the CDK `BreakpointObserver`) |  |
+
+### Out of scope by agreement
+
+| React export | Vue has it | Angular status | Task |
+| --- | --- | --- | --- |
+| createVoiceSession, OpenAIRealtimeVoiceAdapter, GeminiLiveVoiceAdapter, useVoiceState, useVoiceVolume, useVoiceControls, RealtimeVoiceAdapter, OpenAIRealtimeVoiceAdapterOptions, GeminiLiveVoiceAdapterOptions, VoiceSessionControls, VoiceSessionHelpers, VoiceSessionState | no | n/a (voice out of scope) |  |
+| DevToolsHooks, DevToolsProviderApi | no | n/a (devtools out of scope) |  |
+| CloudRendererHost, CloudRendererHostProps | no | n/a (Assistant Cloud out of scope) |  |
+| Assistant | no | planned (Task 22) (type augmentation point for typed registrations) | Task 22 |
 
 ### Entry points added in phase 2
 
@@ -228,9 +291,6 @@ here so the table covers them.
 | `angular-assistant-ui/ui` (tools and media) | `aui-tool-fallback` (approval card, ask-user form), `aui-tool-group`, `aui-reasoning`, `aui-composer-attachments-styled`, `aui-composer-add-attachment-styled`, `aui-message-attachments-styled` | planned (Task 17) |
 | `angular-assistant-ui/ui` (thread list and extras) | `aui-thread-list`, `aui-thread-list-sidebar`, `aui-assistant-modal`, `aui-quote-composer`, `aui-selection-toolbar-styled`, `aui-follow-up-suggestions`, `aui-message-timing`, `aui-composer-trigger-popover-styled` | planned (Task 18) |
 | `angular-assistant-ui/testing` | `createScriptedChatTransport` (no upstream counterpart); approval, ask-user, attachment and thread-list helpers | ported; extensions planned (Tasks 4-9, 14) |
-
-The store re-exports (`AuiConfig`, `Derived`, `createAssistantClient` and the store types) are
-`@assistant-ui/store/client` re-exports, as upstream's Vue binding does.
 
 ## Porting the next primitive
 
