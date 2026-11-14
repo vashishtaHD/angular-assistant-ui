@@ -291,7 +291,7 @@ here so the table covers them.
 | Entry | Planned exports | Status |
 | --- | --- | --- |
 | `angular-assistant-ui/markdown` | `aui-markdown-text` (inputs `smooth`, `preprocess`, `components`, `componentsByLanguage`), `AuiCodeHeader`, `AUI_SYNTAX_HIGHLIGHTER`, `AuiSyntaxHighlighter`, `AuiMarkdownComponents`, vendored `createMarkdownSession`, `normalizeMathDelimiters`, `escapeCurrencyDollars` | ported |
-| `angular-assistant-ui/shiki` | `provideShikiHighlighter` | planned (Task 12) |
+| `angular-assistant-ui/shiki` | `provideShikiHighlighter` | ported |
 | `angular-assistant-ui/mastra` | `MastraThreads`, `createMastraTransport`, `mastraThreadListAdapter`, `MASTRA_AUTH`, `MastraAuth` (and `createMockMastraServer` in the testing entry) | planned (Task 14) |
 | `angular-assistant-ui/ui` (foundation) | `styles.css` tokens, `aui-icon`, `button[auiButton]`, `aui-tooltip-icon-button`, collapsible, dialog, dropdown menu | ported (limits: the dropdown menu runs on an internal headless menu until Task 10 lands, Ruling R10; Tailwind classes become `aui-*` CSS in `ui/styles.css`) |
 | `angular-assistant-ui/ui` (thread) | `aui-thread`, `AUI_THREAD_COMPONENTS`, `AuiThreadComponents`, `aui-markdown-text-styled` (`AuiStyledMarkdownText`) | planned (Task 16) |
