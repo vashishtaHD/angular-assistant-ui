@@ -21,7 +21,9 @@ export type AuiMarkdownNodeOf<TType extends AuiMarkdownRenderedNode['type']> = E
  *   …) replaces the default element of that node. The component receives the
  *   node as its required `node` input and renders the node's children, if it
  *   wants them, with `[auiMdNodes]="node().children"` (see
- *   `AuiMarkdownNodesComponent`).
+ *   `AuiMarkdownNodesComponent`). Unlike upstream's Vue slot, a task list
+ *   checkbox is not passed to a `paragraph` override: it renders just before
+ *   the override, inside the `<li>`.
  * - `codeHeader` renders above every fenced code block; the default renders
  *   nothing (see `AuiCodeHeader`).
  * - `highlighter` renders the body of every fenced code block in place of the

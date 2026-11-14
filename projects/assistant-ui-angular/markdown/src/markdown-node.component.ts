@@ -58,15 +58,13 @@ const isSafeUrl = (url: string): boolean => {
   return !UNSAFE_URL.test(trimmed) || SAFE_DATA_URL.test(trimmed);
 };
 
-/** Replaces links that carry no safe destination by their children. */
+/** Replaces links with an unsafe destination by their children (an empty one stays, as upstream). */
 const withSafeLinks = (nodes: readonly AuiMarkdownChildNode[]): readonly AuiMarkdownChildNode[] => {
-  if (!nodes.some((node) => node.type === 'link' && !(node.url && isSafeUrl(node.url)))) {
+  if (!nodes.some((node) => node.type === 'link' && !isSafeUrl(node.url))) {
     return nodes;
   }
   return nodes.flatMap((node) =>
-    node.type === 'link' && !(node.url && isSafeUrl(node.url))
-      ? withSafeLinks(node.children)
-      : [node],
+    node.type === 'link' && !isSafeUrl(node.url) ? withSafeLinks(node.children) : [node],
   );
 };
 
@@ -75,8 +73,9 @@ const SOFT_BREAK = '\n';
 /**
  * The shared rendering of a list of markdown nodes: each block or inline
  * renders through a `@switch` on its type, or through its override from
- * `components`. Nodes are tracked by identity, so a block the streaming
- * session kept (it settled) keeps its view and DOM, and its `OnPush` children
+ * `components`. Nodes are tracked by position and type (see `keyOf`), so
+ * every block keeps its view and DOM while the message streams; a block the
+ * session kept (it settled) passes unchanged inputs, so its `OnPush` children
  * skip change detection.
  */
 export const NODES_TEMPLATE = `@if (task(); as task) {<input
@@ -84,7 +83,7 @@ export const NODES_TEMPLATE = `@if (task(); as task) {<input
     disabled
     [checked]="task.checked"
     [attr.aria-label]="task.label"
-  />@if (task.space) {<ng-container>{{ space }}</ng-container>}}@for (node of items(); track byIdentity($index, node); let first = $first) {@if (overrideOf(node); as override) {<ng-container
+  />@if (task.space) {<ng-container>{{ space }}</ng-container>}}@for (node of items(); track keyOf($index, node); let first = $first) {@if (overrideOf(node); as override) {<ng-container
       *ngComponentOutlet="override; inputs: { node: node }"
     />} @else {@switch (node.type) {
       @case ('text') {<ng-container>{{ value(node) }}</ng-container>}
@@ -144,24 +143,24 @@ export const NODES_TEMPLATE = `@if (task(); as task) {<input
       @case ('htmlBlock') {<p class="aui-md-p">{{ value(node) }}</p>}
       @case ('table') {<table class="aui-md-table">@if (table(node).children[0]; as head) {<thead><tr
             class="aui-md-tr"
-          >@for (cell of head.children; track byIdentity($index, cell); let column = $index) {<th
+          >@for (cell of head.children; track $index; let column = $index) {<th
               class="aui-md-th"
               [style.text-align]="table(node).align[column]"
               [auiMdNodes]="cell.children"
             ></th>}</tr></thead>}@if (table(node).children.length > 1) {<tbody>@for (
             row of table(node).children;
-            track byIdentity($index, row);
+            track $index;
             let index = $index
           ) {@if (index > 0) {<tr class="aui-md-tr">@for (
                 cell of row.children;
-                track byIdentity($index, cell);
+                track $index;
                 let column = $index
               ) {<td
                   class="aui-md-td"
                   [style.text-align]="table(node).align[column]"
                   [auiMdNodes]="cell.children"
                 ></td>}</tr>}}</tbody>}</table>}
-    }}}<ng-template #listItems let-list>@for (item of list.children; track byIdentity($index, item)) {@if (
+    }}}<ng-template #listItems let-list>@for (item of list.children; track $index) {@if (
       overrideOf(item);
       as override
     ) {<ng-container *ngComponentOutlet="override; inputs: { node: item }" />} @else {<li
@@ -187,11 +186,15 @@ export abstract class AuiMarkdownRenderer {
   protected readonly context = inject(AuiMarkdownRenderContext);
   protected readonly softBreak = SOFT_BREAK;
   /**
-   * Tracks a node by its identity. Written as a call rather than \`track node\`
-   * so Angular's dev-mode NG0956 warning stays quiet: a streaming block that is
-   * the only one in its list is replaced on every update, which is intended.
+   * Tracks a node by its position and type. The streaming session keeps the
+   * objects of settled blocks, so their views see unchanged inputs and their
+   * `OnPush` children skip change detection; the open trailing block gets a
+   * new object on every update and keeps its view (a code block keeps its
+   * component and its highlight), with its inputs updated in place.
    */
-  protected readonly byIdentity = (_index: number, node: unknown): unknown => node;
+  protected keyOf(index: number, node: AuiMarkdownChildNode): string {
+    return `${index}:${node.type}`;
+  }
   protected readonly space = ' ';
   private readonly listItems = new WeakMap<ListItemNode, ListItemView>();
 

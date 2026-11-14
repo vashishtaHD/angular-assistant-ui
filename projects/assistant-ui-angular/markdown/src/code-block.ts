@@ -9,6 +9,7 @@ import {
   input,
   isDevMode,
   signal,
+  untracked,
 } from '@angular/core';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { AUI_SYNTAX_HIGHLIGHTER } from './highlighter.token';
@@ -143,7 +144,10 @@ export class AuiMarkdownCodeBlockComponent {
     const sequence = ++this.sequence;
     let pending: Promise<string> | null;
     try {
-      pending = this.highlighter!.highlight(code, language);
+      // Outside the reactive context: the highlighter's own signal reads must
+      // not become dependencies, and its signal writes must be allowed.
+      const highlighter = this.highlighter!;
+      pending = untracked(() => highlighter.highlight(code, language));
     } catch (error) {
       this.warn(error);
       pending = null;

@@ -1,5 +1,12 @@
 // Ported from packages/markdown/src/vue/Markdown.test.ts @ 7d74276
-import { ChangeDetectionStrategy, Component, input, type Type } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  signal,
+  type OnChanges,
+  type Type,
+} from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import type { AuiConfig } from '@assistant-ui/store/client';
 import { flushTapSync } from '@assistant-ui/tap';
@@ -24,6 +31,7 @@ import {
 } from 'angular-assistant-ui/markdown';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../src/testing-internal/test-bed';
+import { AuiMarkdownRenderContext } from './markdown-context';
 import { createTestRuntime, type TestRuntime } from '../../src/testing-internal/test-runtime';
 
 const settle = async (fixture: ComponentFixture<unknown>) => {
@@ -244,6 +252,31 @@ describe('aui-markdown-text', () => {
     const { host } = await mount({ text: '[x](javascript:alert(1))' });
     expect(host().querySelector('a')).toBeNull();
     expect(host().textContent).toBe('[x](javascript:alert(1))');
+  });
+
+  it('refuses an unsafe link destination in the renderer too, keeping an empty one', async () => {
+    @Component({
+      standalone: true,
+      imports: [AuiMarkdownNodesComponent],
+      providers: [AuiMarkdownRenderContext],
+      changeDetection: ChangeDetectionStrategy.OnPush,
+      template: `<p [auiMdNodes]="nodes"></p>`,
+    })
+    class NodesHostComponent {
+      readonly nodes: InlineNode[] = [
+        { type: 'link', url: ' JavaScript:alert(1)', children: [{ type: 'text', value: 'x' }] },
+        { type: 'text', value: ' ' },
+        { type: 'link', url: '', children: [{ type: 'text', value: 'e' }] },
+      ];
+    }
+    TestBed.resetTestingModule();
+    configureTestBed({ imports: [NodesHostComponent] });
+    const fixture = TestBed.createComponent(NodesHostComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    expect(markup(fixture.nativeElement as HTMLElement)).toBe(
+      '<p>x <a class="aui-md-a" href="">e</a></p>',
+    );
   });
 
   it('renders an image with its alt text and no referrer before src', async () => {
@@ -498,6 +531,101 @@ describe('aui-markdown-text', () => {
       expect(host().querySelector('pre.shiki')?.textContent).toBe('new');
     });
 
+    it('keeps a streaming code block and its last highlight while a newer one is pending', async () => {
+      const warn = vi.spyOn(console, 'warn');
+      const pending: { code: string; resolve: (html: string) => void }[] = [];
+      const highlight = vi.fn(
+        (code: string) => new Promise<string>((resolve) => pending.push({ code, resolve })),
+      );
+      let text = 'intro\n\n```ts\nconst a';
+      const { fixture, host, stream } = await mount({
+        text,
+        running: true,
+        highlighter: { highlight },
+      });
+      const block = host().querySelector('aui-markdown-code-block');
+      expect(block).not.toBeNull();
+      pending.at(-1)!.resolve('<pre class="shiki">v1</pre>');
+      await settle(fixture);
+      expect(host().querySelector('pre.shiki')?.textContent).toBe('v1');
+
+      for (const chunk of [' = 1;', '\nconst b', ' = 2;\n']) {
+        const before = pending.length;
+        text += chunk;
+        await stream(text);
+        expect(pending.length).toBe(before + 1);
+        // The newer highlight is pending: the same block keeps the previous markup.
+        expect(host().querySelector('aui-markdown-code-block')).toBe(block);
+        expect(host().querySelector('pre.aui-md-pre')).toBeNull();
+        expect(host().querySelector('pre.shiki')).not.toBeNull();
+        const latest = pending.at(-1)!;
+        latest.resolve(`<pre class="shiki">${latest.code}</pre>`);
+        await settle(fixture);
+        expect(host().querySelector('pre.shiki')?.textContent).toBe(latest.code);
+      }
+      expect(highlight).toHaveBeenLastCalledWith('const a = 1;\nconst b = 2;\n', 'ts');
+      const ng0956 = warn.mock.calls.filter((call) => String(call[0]).includes('NG0956'));
+      expect(ng0956).toEqual([]);
+    });
+
+    it('keeps a per-language highlighter component while its block streams', async () => {
+      let created = 0;
+      @Component({
+        selector: 'aui-test-diagram',
+        standalone: true,
+        changeDetection: ChangeDetectionStrategy.OnPush,
+        template: `<figure>{{ code() }}</figure>`,
+      })
+      class DiagramComponent {
+        readonly language = input.required<string>();
+        readonly code = input.required<string>();
+        constructor() {
+          created++;
+        }
+      }
+      const { host, stream } = await mount({
+        text: '```mermaid\ngraph',
+        running: true,
+        componentsByLanguage: { mermaid: { highlighter: DiagramComponent } },
+      });
+      await stream('```mermaid\ngraph TD');
+      await stream('```mermaid\ngraph TD\nA-->B');
+      expect(created).toBe(1);
+      expect(host().querySelector('figure')?.textContent).toBe('graph TD\nA-->B');
+    });
+
+    it('falls back to plain code when the highlighter throws or rejects', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const throwing = await html('```ts\nx\n```', {
+        highlighter: {
+          highlight: () => {
+            throw new Error('boom');
+          },
+        },
+      });
+      expect(throwing).toBe(CODE_BLOCK('ts', 'x\n'));
+      const rejecting = await html('```ts\ny\n```', {
+        highlighter: { highlight: () => Promise.reject(new Error('nope')) },
+      });
+      expect(rejecting).toBe(CODE_BLOCK('ts', 'y\n'));
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(String(warn.mock.calls[0]![0])).toContain('syntax highlighter failed');
+    });
+
+    it('runs the highlighter outside the reactive context', async () => {
+      // A highlighter with its own signal state (a cache, a load counter)
+      // must be able to read and write it.
+      const calls = signal(0);
+      const highlight = vi.fn(() => {
+        calls.set(calls() + 1);
+        return null;
+      });
+      expect(await html('```ts\nx\n```', { highlighter: { highlight } })).toBe(
+        CODE_BLOCK('ts', 'x\n'),
+      );
+      expect(calls()).toBe(1);
+    });
+
     it('lets componentsByLanguage.mermaid override only mermaid blocks', async () => {
       const highlight = vi.fn(() => null);
       expect(
@@ -549,18 +677,45 @@ describe('aui-markdown-text', () => {
   });
 
   it('keeps a separate session for each part', async () => {
+    const seen: HeadingNode[] = [];
+    @Component({
+      selector: 'aui-test-probe',
+      standalone: true,
+      imports: [AuiMarkdownNodesComponent],
+      changeDetection: ChangeDetectionStrategy.OnPush,
+      template: `<h1 [auiMdNodes]="node().children"></h1>`,
+    })
+    class ProbeComponent implements OnChanges {
+      readonly node = input.required<HeadingNode>();
+      ngOnChanges(): void {
+        seen.push(this.node());
+      }
+    }
+    TestBed.resetTestingModule();
     const rt = createTestRuntime();
-    rt.append({ id: 'a1', role: 'assistant', content: [{ type: 'text', text: '# One' }] });
-    rt.append({ id: 'a2', role: 'assistant', content: [{ type: 'text', text: '# Two' }] });
+    const messages = (one: string, two: string) => [
+      { id: 'a1', role: 'assistant' as const, content: [{ type: 'text' as const, text: one }] },
+      { id: 'a2', role: 'assistant' as const, content: [{ type: 'text' as const, text: two }] },
+    ];
+    rt.setMessages(messages('# One\n\nbody', '# Two\n\nbody'));
     hostConfig = rt.config;
     configureTestBed({ imports: [HostComponent] });
     const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentRef.setInput('components', { heading: ProbeComponent });
     fixture.detectChanges();
     await settle(fixture);
+    // Alternating updates: a shared session would reparse each text in full
+    // and hand the settled headings new node objects.
+    const update = async (one: string, two: string) => {
+      flushTapSync(() => rt.setMessages(messages(one, two)));
+      await settle(fixture);
+    };
+    await update('# One\n\nbody 1', '# Two\n\nbody');
+    await update('# One\n\nbody 1', '# Two\n\nbody 2');
+    await update('# One\n\nbody 1 2', '# Two\n\nbody 2');
+    const titles = seen.map((node) => (node.children[0] as { value: string }).value);
+    expect(titles.sort()).toEqual(['One', 'Two']);
     const hosts = (fixture.nativeElement as HTMLElement).querySelectorAll('aui-markdown-text');
-    expect(Array.from(hosts).map((h) => markup(h))).toEqual([
-      '<h1 class="aui-md-h1">One</h1>',
-      '<h1 class="aui-md-h1">Two</h1>',
-    ]);
+    expect(Array.from(hosts).map((h) => h.textContent)).toEqual(['Onebody 1 2', 'Twobody 2']);
   });
 });
