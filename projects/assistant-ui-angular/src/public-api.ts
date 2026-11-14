@@ -194,3 +194,8 @@ export {
   AuiBranchPickerRootDirective,
 } from './lib/primitives/branch-picker/branch-picker';
 export { AuiEditComposerDirective } from './lib/primitives/edit-composer/edit-composer.directive';
+// Task 9: chain of thought primitives and reasoning grouping.
+export { AuiChainOfThoughtAccordionTriggerDirective } from './lib/primitives/chain-of-thought/accordion-trigger';
+export { AuiChainOfThoughtPartsComponent } from './lib/primitives/chain-of-thought/parts';
+export { AuiChainOfThoughtRootDirective } from './lib/primitives/chain-of-thought/root';
+export { AuiChainOfThoughtTemplateDirective } from './lib/primitives/message-parts.component';
