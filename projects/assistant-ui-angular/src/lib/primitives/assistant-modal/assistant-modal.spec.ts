@@ -76,9 +76,12 @@ describe('assistant modal', () => {
 
   it('the trigger toggles and focus moves into the content', async () => {
     const t = await setup();
+    // An inline display:none backs [hidden], so author CSS (e.g. a .flex class) cannot show it.
+    expect(t.content.style.display).toBe('none');
     t.trigger.click();
     await t.settle();
     expect(t.content.hidden).toBe(false);
+    expect(t.content.style.display).toBe('');
     expect(t.trigger.getAttribute('aria-expanded')).toBe('true');
     expect(t.trigger.getAttribute('aria-controls')).toBe(t.content.id);
     expect(document.activeElement).toBe(t.field);

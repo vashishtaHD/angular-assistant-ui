@@ -23,7 +23,10 @@ import { AuiActionButtonHostDirective, injectActionButton } from '../action-butt
 @Directive({
   selector: '[auiBranchPickerRoot]',
   standalone: true,
-  host: { '[attr.hidden]': 'hidden() ? "" : null' },
+  host: {
+    '[attr.hidden]': 'hidden() ? "" : null',
+    '[style.display]': 'hidden() ? "none" : null',
+  },
 })
 export class AuiBranchPickerRootDirective {
   /** Hide while the message has fewer than two branches. */

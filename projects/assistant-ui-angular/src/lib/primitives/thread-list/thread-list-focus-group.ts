@@ -69,8 +69,9 @@ export function injectThreadListCollection(): ThreadListCollection | null {
 
 /**
  * The buttons of one thread list item that take part in keyboard navigation.
- * Provided by `AuiThreadListItemRootDirective`. `more` is reserved for the
- * item's "more" menu trigger.
+ * Provided by `AuiThreadListItemRootDirective`. `trigger` is registered by
+ * `button[auiThreadListItemTrigger]` and `more` by
+ * `button[auiThreadListItemMoreTrigger]`.
  */
 @Injectable()
 export class ThreadListItemFocus {

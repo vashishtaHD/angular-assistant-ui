@@ -31,8 +31,10 @@ export interface AuiMenuSetOpenOptions {
  * `[auiMenuItem]` and `[auiMenuSeparator]`, which find it through
  * dependency injection.
  *
- * The content stays in the DOM and is hidden with the `hidden` attribute while
- * closed; wrap it in `@if (menu.open())` (or render it in an overlay) when the
+ * The content stays in the DOM and is hidden with the `hidden` attribute (plus
+ * a host `display: none` style binding that class-based CSS cannot override)
+ * while closed; wrap it in `@if (menu.open())` (or
+ * render it in an overlay, as the `ui` entry's dropdown menu does) when the
  * markup should not exist. Pointer-down outside the trigger and the content
  * closes the menu. Supports `[(open)]` two-way binding.
  *
@@ -78,7 +80,10 @@ export class AuiMenuRootDirective implements OnChanges {
   content: AuiMenuContentDirective | null = null;
 
   private lastOpen = false;
-  private pendingFocus: AuiMenuInitialFocus = 'content';
+  /** Where focus goes for the current opening. */
+  private focusTarget: AuiMenuInitialFocus = 'content';
+  private focusScheduled = false;
+  private readonly openListeners = new Set<(open: boolean) => void>();
 
   /** @internal */
   ngOnChanges(changes: SimpleChanges): void {
@@ -92,7 +97,7 @@ export class AuiMenuRootDirective implements OnChanges {
    * @param options - Focus behaviour; see {@link AuiMenuSetOpenOptions}.
    */
   setOpen(open: boolean, options: AuiMenuSetOpenOptions = {}): void {
-    if (open) this.pendingFocus = options.focus ?? 'content';
+    if (open && !this.lastOpen) this.focusTarget = options.focus ?? 'content';
     this.open.set(open);
     this.handleOpenState(open);
     if (!open && options.restoreFocus) this.trigger?.focus();
@@ -107,21 +112,44 @@ export class AuiMenuRootDirective implements OnChanges {
     this.setOpen(!this.open(), options);
   }
 
-  /** @internal Called by the content when it is created while already open. */
+  /**
+   * @internal Called by the content when it is created while already open (for
+   * example inside `@if (menu.open())` or an overlay): focuses it with the
+   * target requested for this opening.
+   */
   focusOnCreate(): void {
     if (this.open()) this.scheduleFocus();
+  }
+
+  /**
+   * @internal Calls `listener` on every open/closed transition, whether it came
+   * from a user interaction (`setOpen`) or from the `open` input binding.
+   * Returns the function that removes the listener.
+   */
+  watchOpenState(listener: (open: boolean) => void): () => void {
+    this.openListeners.add(listener);
+    return () => this.openListeners.delete(listener);
   }
 
   private handleOpenState(open: boolean): void {
     if (open === this.lastOpen) return;
     this.lastOpen = open;
     if (open) this.scheduleFocus();
+    else this.focusTarget = 'content';
+    for (const listener of [...this.openListeners]) listener(open);
   }
 
+  /** One pending focus per render: opening and content creation share it. */
   private scheduleFocus(): void {
-    const target = this.pendingFocus;
-    this.pendingFocus = 'content';
-    afterNextRender(() => this.content?.focusInitial(target), { injector: this.injector });
+    if (this.focusScheduled) return;
+    this.focusScheduled = true;
+    afterNextRender(
+      () => {
+        this.focusScheduled = false;
+        if (this.open()) this.content?.focusInitial(this.focusTarget);
+      },
+      { injector: this.injector },
+    );
   }
 
   /** @internal */

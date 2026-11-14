@@ -5,6 +5,7 @@ import type { AssistantClient } from '@assistant-ui/store/client';
 import { AuiConfig } from '@assistant-ui/store/client';
 import { flushTapSync } from '@assistant-ui/tap';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { displayOf, useFlexAuthorClass } from '../../../testing-internal/author-css';
 import { configureTestBed } from '../../../testing-internal/test-bed';
 import {
   createTestRuntime,
@@ -79,7 +80,7 @@ const copiedDuration = signal(3000);
           <div auiMessageRoot class="row">
             <div
               auiActionBarRoot
-              class="bar"
+              class="bar flex"
               [autohide]="autohide()"
               [autohideFloat]="float()"
               [hideWhenRunning]="hideWhenRunning()"
@@ -391,9 +392,14 @@ describe('action bar', () => {
     await settle(fixture);
     expect(q(0, '.bar').hasAttribute('hidden')).toBe(true);
     expect(q(1, '.bar').hasAttribute('hidden')).toBe(false);
+    // Upstream returns null while hidden; an author display class must not show it.
+    useFlexAuthorClass();
+    expect(displayOf(q(0, '.bar'))).toBe('none');
+    expect(displayOf(q(1, '.bar'))).toBe('flex');
     flushTapSync(() => rows()[0].dispatchEvent(new MouseEvent('mouseenter')));
     await settle(fixture);
     expect(q(0, '.bar').hasAttribute('hidden')).toBe(false);
+    expect(displayOf(q(0, '.bar'))).toBe('flex');
     flushTapSync(() => rows()[0].dispatchEvent(new MouseEvent('mouseleave')));
     await settle(fixture);
     expect(q(0, '.bar').hasAttribute('hidden')).toBe(true);
