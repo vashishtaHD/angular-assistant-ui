@@ -13,9 +13,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import {
   createReadStream,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
 } from 'node:fs';
@@ -124,10 +126,41 @@ if (!tarball) {
 //    touching its package.json or lockfile).
 log('installing dependencies and the packed library');
 ensureInstalled(appDir);
+// The tarball path and version never change, so npm would treat a previous
+// install as already satisfied; remove it so every run installs this pack.
+const installedLib = join(appDir, 'node_modules', 'angular-assistant-ui');
+if (existsSync(installedLib)) {
+  console.log(`  removing previously installed ${installedLib}`);
+  rmSync(installedLib, { recursive: true, force: true });
+}
 must(
   npm(['install', '--no-save', '--no-audit', '--no-fund', join(packDir, tarball)], appDir),
   'npm install <tarball>',
 );
+// Fail fast unless the installed library is a real copy of what was just packed.
+{
+  const fail = (why) => {
+    console.error(`\n[compat:${app}] FAIL: installed angular-assistant-ui ${why}`);
+    process.exit(1);
+  };
+  if (!existsSync(installedLib)) fail(`is missing (${installedLib})`);
+  const expectedReal = join(realpathSync(join(appDir, 'node_modules')), 'angular-assistant-ui');
+  if (lstatSync(installedLib).isSymbolicLink() || realpathSync(installedLib) !== expectedReal) {
+    fail(`is a link to ${realpathSync(installedLib)}, not a copy of the tarball`);
+  }
+  const packedVersion = JSON.parse(readFileSync(distManifest, 'utf8')).version;
+  const installedVersion = JSON.parse(
+    readFileSync(join(installedLib, 'package.json'), 'utf8'),
+  ).version;
+  if (installedVersion !== packedVersion) {
+    fail(`has version ${installedVersion}, expected the packed ${packedVersion}`);
+  }
+  const bundle = join('fesm2022', 'angular-assistant-ui.mjs');
+  if (!readFileSync(join(installedLib, bundle)).equals(readFileSync(join(libDist, bundle)))) {
+    fail(`${bundle} differs from dist/assistant-ui-angular (stale install)`);
+  }
+  console.log(`  verified: real copy of the packed ${tarball} (bundle matches dist)`);
+}
 for (const name of [
   '@angular/core',
   '@angular/cli',
