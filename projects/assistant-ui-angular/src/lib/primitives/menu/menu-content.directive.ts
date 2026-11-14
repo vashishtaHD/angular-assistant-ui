@@ -10,7 +10,8 @@ const TYPEAHEAD_RESET_MS = 500;
  * `[auiMenuItem]` children. ArrowDown/ArrowUp move (and wrap), Home/End jump to
  * the ends, printable characters run a typeahead search, Escape closes the menu
  * and returns focus to the trigger, and Tab closes it too. It is hidden while
- * the menu is closed.
+ * the menu is closed (`hidden`, plus an inline `display: none` so a utility
+ * class such as `.flex` cannot show it).
  *
  * Must be inside an `[auiMenuRoot]` (declared there, it can still be rendered
  * elsewhere, for example in an overlay).
@@ -23,6 +24,7 @@ const TYPEAHEAD_RESET_MS = 500;
     tabindex: '-1',
     '[id]': 'root.contentId',
     '[hidden]': '!root.open()',
+    '[style.display]': 'root.open() ? null : "none"',
     '[attr.data-state]': 'root.open() ? "open" : "closed"',
     '(keydown)': 'onKeydown($event)',
   },
@@ -56,9 +58,10 @@ export class AuiMenuContentDirective {
   /** @internal */
   focusInitial(target: AuiMenuInitialFocus): void {
     const items = this.items();
-    if (target === 'first') items[0]?.focus({ preventScroll: true });
-    else if (target === 'last') items[items.length - 1]?.focus({ preventScroll: true });
-    else this.el.focus({ preventScroll: true });
+    const item =
+      target === 'first' ? items[0] : target === 'last' ? items[items.length - 1] : undefined;
+    // With no enabled item, focus the content itself so Escape/Tab still reach it.
+    (item ?? this.el).focus({ preventScroll: true });
   }
 
   private items(): HTMLElement[] {

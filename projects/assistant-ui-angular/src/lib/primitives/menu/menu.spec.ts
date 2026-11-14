@@ -103,11 +103,14 @@ describe('headless menu', () => {
 
   it('click toggles and the open model two-way binds', async () => {
     const t = await setup();
+    // An inline display:none backs [hidden], so author CSS (e.g. a .flex class) cannot show it.
+    expect(t.content.style.display).toBe('none');
     t.trigger.click();
     await t.settle();
     expect(t.trigger.getAttribute('aria-expanded')).toBe('true');
     expect(t.trigger.getAttribute('aria-controls')).toBe(t.content.id);
     expect(t.content.hidden).toBe(false);
+    expect(t.content.style.display).toBe('');
     expect(t.host.open()).toBe(true);
     t.trigger.click();
     await t.settle();
@@ -251,6 +254,75 @@ describe('headless menu', () => {
     document.getElementById('outside')!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     await t.settle();
     expect(t.content.hidden).toBe(true);
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiMenuRootDirective,
+    AuiMenuTriggerDirective,
+    AuiMenuContentDirective,
+    AuiMenuItemDirective,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div auiMenuRoot #menu="auiMenuRoot" id="lazy">
+      <button auiMenuTrigger>Lazy</button>
+      @if (menu.open()) {
+        <div auiMenuContent>
+          <button auiMenuItem>One</button>
+          <button auiMenuItem>Two</button>
+        </div>
+      }
+    </div>
+    <div auiMenuRoot id="none">
+      <button auiMenuTrigger>None</button>
+      <div auiMenuContent>
+        <button auiMenuItem disabled>Off</button>
+      </div>
+    </div>
+  `,
+})
+class LazyHostComponent {}
+
+describe('headless menu focus on open', () => {
+  async function mountLazy() {
+    configureTestBed({ imports: [LazyHostComponent] });
+    const fixture = TestBed.createComponent(LazyHostComponent);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    document.body.append(el);
+    const settle = async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+    return { el, settle };
+  }
+
+  it('honours the requested focus when the content is created after opening', async () => {
+    const t = await mountLazy();
+    const trigger = t.el.querySelector<HTMLElement>('#lazy button')!;
+    trigger.focus();
+    key(trigger, 'ArrowUp');
+    await t.settle();
+    const items = t.el.querySelectorAll<HTMLElement>('#lazy [role=menuitem]');
+    expect(document.activeElement).toBe(items[1]);
+  });
+
+  it('focuses the content when no item is enabled, so Escape still closes', async () => {
+    const t = await mountLazy();
+    const trigger = t.el.querySelector<HTMLElement>('#none button')!;
+    trigger.focus();
+    key(trigger, 'ArrowDown');
+    await t.settle();
+    const content = t.el.querySelector<HTMLElement>('#none [role=menu]')!;
+    expect(document.activeElement).toBe(content);
+    key(content, 'Escape');
+    await t.settle();
+    expect(content.hidden).toBe(true);
+    expect(document.activeElement).toBe(trigger);
   });
 });
 

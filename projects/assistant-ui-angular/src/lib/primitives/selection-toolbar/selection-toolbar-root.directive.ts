@@ -16,7 +16,8 @@ export interface SelectionToolbarInfo {
  * A floating toolbar that is visible while a text selection lies inside a
  * single message. It listens for browser selection changes, validates the
  * selection against `data-message-id` (set by `[auiMessageRoot]`), and
- * exposes the result as signals. It is hidden otherwise, and a mousedown on
+ * exposes the result as signals. It is hidden otherwise (`hidden` plus an
+ * inline `display: none`, so author CSS cannot show it), and a mousedown on
  * it does not clear the selection.
  *
  * Positioning is the consumer's: bind to `rect()` (viewport coordinates of the
@@ -35,6 +36,7 @@ export interface SelectionToolbarInfo {
   exportAs: 'auiSelectionToolbarRoot',
   host: {
     '[hidden]': '!info()',
+    '[style.display]': 'info() ? null : "none"',
     '(mousedown)': '$event.preventDefault()',
   },
 })

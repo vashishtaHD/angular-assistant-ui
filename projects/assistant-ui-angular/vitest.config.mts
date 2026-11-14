@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import angular from '@analogjs/vite-plugin-angular';
 import { defineConfig } from 'vitest/config';
 
@@ -20,10 +21,20 @@ const reactAliases = [
   { find: /^react$/, replacement: '@assistant-ui/tap/standalone-shim' },
 ];
 
+// Secondary entries (`ui`) import the primary entry by its package name, as
+// ng-packagr requires. Specs resolve it to the sources, so they do not depend
+// on `npm run build:lib` (same as the demo).
+const entryAliases = [
+  {
+    find: /^angular-assistant-ui$/,
+    replacement: fileURLToPath(new URL('./src/public-api.ts', import.meta.url)),
+  },
+];
+
 function project(name: 'zone' | 'zoneless') {
   return {
     plugins: [angular({ tsconfig: 'tsconfig.spec.json' })],
-    resolve: { alias: reactAliases },
+    resolve: { alias: [...entryAliases, ...reactAliases] },
     test: {
       name,
       globals: true,
