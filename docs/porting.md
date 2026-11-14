@@ -33,7 +33,7 @@ Status is one of `ported`, `planned`, `n/a`.
 | useScrollLock                           | planned |
 | MessageByIdProvider                     | planned |
 | PartByIndexProvider                     | planned |
-| ThreadPrimitiveMessages                 | planned |
+| ThreadPrimitiveMessages                 | ported  |
 | ThreadPrimitiveViewport                 | planned |
 | ThreadPrimitiveViewportFooter           | planned |
 | ThreadPrimitiveScrollToBottom           | planned |
@@ -73,8 +73,8 @@ Status is one of `ported`, `planned`, `n/a`.
 | MessagePrimitiveAttachments             | planned |
 | ErrorPrimitiveRoot                      | planned |
 | ErrorPrimitiveMessage                   | planned |
-| ThreadPrimitiveRoot                     | planned |
-| MessagePrimitiveRoot                    | planned |
+| ThreadPrimitiveRoot                     | ported  |
+| MessagePrimitiveRoot                    | ported  |
 | ThreadListPrimitiveLoadMore             | planned |
 | ThreadListItemPrimitiveArchive          | planned |
 | ThreadListItemPrimitiveUnarchive        | planned |

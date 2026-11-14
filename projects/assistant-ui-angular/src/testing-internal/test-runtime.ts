@@ -6,6 +6,8 @@ import { AuiConfig } from '@assistant-ui/store/client';
 
 /** A minimal message accepted by the test runtime's external store adapter. */
 export interface DemoMessage {
+  /** Stable message id; omit to let the runtime generate one. */
+  id?: string;
   role: 'user' | 'assistant';
   content: ThreadMessageLike['content'];
 }
@@ -17,11 +19,13 @@ export interface TestRuntime {
   config: AuiConfig;
   append(message: DemoMessage): void;
   setRunning(value: boolean): void;
+  /** Replaces the whole message list (update in place, remove, reorder). */
+  setMessages(next: DemoMessage[]): void;
 }
 
 /**
  * Creates an `ExternalStoreRuntimeCore`-backed runtime plus helpers that push
- * new messages or toggle `isRunning` by replacing the adapter.
+ * new messages, replace the list or toggle `isRunning` by replacing the adapter.
  */
 export function createTestRuntime(): TestRuntime {
   let messages: DemoMessage[] = [];
@@ -30,6 +34,7 @@ export function createTestRuntime(): TestRuntime {
     messages,
     isRunning,
     convertMessage: (message) => ({
+      ...(message.id === undefined ? {} : { id: message.id }),
       role: message.role,
       content: message.content,
     }),
@@ -45,10 +50,15 @@ export function createTestRuntime(): TestRuntime {
     isRunning = value;
     core.setAdapter(makeAdapter());
   };
+  const setMessages = (next: DemoMessage[]) => {
+    messages = next;
+    core.setAdapter(makeAdapter());
+  };
   return {
     runtime,
     config: AuiConfig({ threads: RuntimeAdapter(runtime) }),
     append,
     setRunning,
+    setMessages,
   };
 }
