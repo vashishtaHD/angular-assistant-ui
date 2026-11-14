@@ -79,8 +79,10 @@ export {
 export {
   AuiMessageGroupedPartsComponent,
   AuiGroupChildrenComponent,
+  AuiEmptyTemplateDirective,
   AuiGroupTemplateDirective,
   AuiIndicatorTemplateDirective,
+  type AuiEmptyTemplateContext,
   type AuiGroupBy,
   type AuiGroupPart,
   type AuiGroupTemplateContext,

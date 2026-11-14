@@ -148,6 +148,34 @@ export class AuiIndicatorTemplateDirective {
   readonly templateRef = inject<TemplateRef<AuiIndicatorTemplateContext>>(TemplateRef);
 }
 
+/** The context of an `ng-template auiEmpty`: the message status. */
+export interface AuiEmptyTemplateContext {
+  /** The status of the message (`let-status`). */
+  $implicit: PartStatus;
+}
+
+/**
+ * Marks the `<ng-template>` that {@link AuiMessageGroupedPartsComponent}
+ * (as `aui-message-parts-grouped`) renders for a message with no parts
+ * (React's `components.Empty`). Without it, an empty paragraph renders, with
+ * a trailing marker while the message runs. Not used by `groupBy` mode.
+ *
+ * @example
+ * ```html
+ * <aui-message-parts-grouped>
+ *   <ng-template auiEmpty let-status>Thinking... ({{ status.type }})</ng-template>
+ * </aui-message-parts-grouped>
+ * ```
+ */
+@Directive({
+  selector: 'ng-template[auiEmpty]',
+  standalone: true,
+})
+export class AuiEmptyTemplateDirective {
+  /** The marked template. */
+  readonly templateRef = inject<TemplateRef<AuiEmptyTemplateContext>>(TemplateRef);
+}
+
 interface RenderGroup {
   readonly kind: 'group';
   readonly trackKey: string;
@@ -253,6 +281,17 @@ const shouldShowIndicator = (
     @for (node of nodes(); track node.trackKey) {
       <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: node }" />
     }
+    @if (showEmpty()) {
+      @if (emptyTemplate(); as template) {
+        <ng-container *ngTemplateOutlet="template; context: emptyContext(); injector: injector" />
+      } @else {
+        <p style="white-space: pre-line">
+          @if (messageStatus().type === 'running') {
+            <span style="font-family: revert">{{ ' ●' }}</span>
+          }
+        </p>
+      }
+    }
     @if (showIndicator()) {
       @if (indicatorTemplate(); as template) {
         <ng-container *ngTemplateOutlet="template; context: indicatorContext; injector: injector" />
@@ -265,9 +304,10 @@ export class AuiMessageGroupedPartsComponent {
   readonly groupBy = input<AuiGroupBy | undefined>(undefined);
   /**
    * Clusters parts by indices instead of adjacent paths (React's
-   * `Unstable_PartsGrouped`): the groups need not be adjacent, and a keyed
-   * group renders as `group-<key>` (its `groupKey` is on the group). Parts
-   * of an unkeyed group render flat. Without `groupBy` or this input the
+   * `Unstable_PartsGrouped`): the groups need not be adjacent. A keyed
+   * group renders as `group-<key>` (its `groupKey` is on the group); an
+   * unkeyed one as `group-` with no `groupKey`, like React's `Group` call
+   * with an undefined key (without a template it renders its children). Without `groupBy` or this input the
    * parts cluster by `parentId` (`Unstable_PartsGroupedByParentId`); use it
    * through the `aui-message-parts-grouped` selector.
    */
@@ -278,6 +318,7 @@ export class AuiMessageGroupedPartsComponent {
   private readonly partTemplateDirectives = contentChildren(AuiPartTemplateDirective);
   private readonly groupTemplateDirectives = contentChildren(AuiGroupTemplateDirective);
   private readonly indicatorDirective = contentChild(AuiIndicatorTemplateDirective);
+  private readonly emptyDirective = contentChild(AuiEmptyTemplateDirective);
 
   /** The recursive node template; read by {@link AuiGroupChildrenComponent}. */
   readonly nodeTemplate = viewChild.required<TemplateRef<unknown>>('nodeTemplate');
@@ -314,6 +355,17 @@ export class AuiMessageGroupedPartsComponent {
     return map;
   });
 
+  protected readonly emptyTemplate = computed(() => this.emptyDirective()?.templateRef);
+  protected readonly messageStatus = injectAuiState<PartStatus>(
+    (s) => (s.message.status ?? { type: 'complete' }) as PartStatus,
+  );
+  protected readonly emptyContext = computed<AuiEmptyTemplateContext>(() => ({
+    $implicit: this.messageStatus(),
+  }));
+  /** True for a message with no parts in `groupingFunction` / parent-id mode. */
+  protected readonly showEmpty = computed(
+    () => this.groupBy() === undefined && this.parts().length === 0,
+  );
   protected readonly indicatorTemplate = computed(() => this.indicatorDirective()?.templateRef);
 
   /** Memo fingerprint of `groupBy`: its identity unless it carries one. */
@@ -383,14 +435,10 @@ export class AuiMessageGroupedPartsComponent {
     grouping(parts).forEach(({ groupKey, indices }, groupIndex) => {
       if (indices.length === 0) return;
       const leaves = indices.map(leaf);
-      if (groupKey === undefined) {
-        nodes.push(...leaves);
-        return;
-      }
       const summary = getGroupSummary(parts, indices);
       const group: AuiGroupPart = {
-        type: `group-${groupKey}`,
-        groupKey,
+        type: `group-${groupKey ?? ''}`,
+        ...(groupKey !== undefined && { groupKey }),
         status: summary.status,
         counts: summary.counts,
         indices,
@@ -402,7 +450,7 @@ export class AuiMessageGroupedPartsComponent {
         kind: 'group',
         trackKey: JSON.stringify([
           'group',
-          groupKey,
+          groupKey ?? null,
           identity?.includes(':') ? `id:${identity}` : groupIndex,
         ]),
         group,

@@ -10,6 +10,7 @@ import { createTestRuntime, type DemoMessage } from '../../testing-internal/test
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
 import { groupMessagePartsByParentId, type GroupingFunction } from '../utils/group-parts';
 import {
+  AuiEmptyTemplateDirective,
   AuiGroupChildrenComponent,
   AuiGroupTemplateDirective,
   AuiMessageGroupedPartsComponent,
@@ -121,12 +122,12 @@ describe('MessagePrimitive.Unstable_PartsGrouped', () => {
       call('solo'),
       call('b2', 'B'),
     ]);
-    expect(shape(el)).toEqual(['[A', 'a1', 'a2', '[B', 'b1', 'b2', 'solo']);
+    expect(shape(el)).toEqual(['[A', 'a1', 'a2', '[B', 'b1', 'b2', '[null', 'solo']);
   });
 
-  it('keeps unparented parts in their chronological position', async () => {
+  it('wraps unparented parts in a group without a key, in their chronological position', async () => {
     const { el } = await mount([call('x'), call('a1', 'A'), call('y'), call('a2', 'A')]);
-    expect(shape(el)).toEqual(['x', '[A', 'a1', 'a2', 'y']);
+    expect(shape(el)).toEqual(['[null', 'x', '[A', 'a1', 'a2', '[null', 'y']);
   });
 
   it('adds streamed parts to their cluster without recreating it', async () => {
@@ -153,7 +154,7 @@ describe('MessagePrimitive.Unstable_PartsGrouped', () => {
       { groupKey: undefined, indices: parts.length > 3 ? [3] : [] },
     ];
     const { el } = await mount([call('p'), call('q'), call('r')], byName);
-    expect(shape(el)).toEqual(['[first', 'p', 'r', 'q']);
+    expect(shape(el)).toEqual(['[first', 'p', 'r', '[null', 'q']);
   });
 
   it('groups by parent id by default (the exported grouping function)', () => {
@@ -161,5 +162,83 @@ describe('MessagePrimitive.Unstable_PartsGrouped', () => {
       { groupKey: 'A', indices: [0, 2] },
       { groupKey: undefined, indices: [1] },
     ]);
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessageGroupedPartsComponent,
+    AuiEmptyTemplateDirective,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <aui-message-parts-grouped>
+            <ng-template auiEmpty let-status
+              ><em class="empty">{{ status.type }}</em></ng-template
+            >
+          </aui-message-parts-grouped>
+        </ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class EmptyTemplateHostComponent {
+  readonly config = hostConfig;
+}
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessageGroupedPartsComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-thread-messages>
+        <ng-template auiMessage><aui-message-parts-grouped /></ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class EmptyDefaultHostComponent {
+  readonly config = hostConfig;
+}
+
+const mountEmpty = async (host: new () => unknown, running: boolean) => {
+  TestBed.resetTestingModule();
+  const rt = createTestRuntime();
+  rt.append({ id: 'a1', role: 'assistant', content: [] });
+  if (running) rt.setRunning(true);
+  hostConfig = rt.config;
+  configureTestBed({ imports: [host as never] });
+  const fixture = TestBed.createComponent(host);
+  fixture.detectChanges();
+  await settle(fixture);
+  return fixture.nativeElement as HTMLElement;
+};
+
+describe('MessagePrimitive.Unstable_PartsGrouped empty message', () => {
+  it('renders the auiEmpty template with the message status', async () => {
+    const el = await mountEmpty(EmptyTemplateHostComponent, true);
+    expect(el.querySelector('.empty')?.textContent).toBe('running');
+    const done = await mountEmpty(EmptyTemplateHostComponent, false);
+    expect(done.querySelector('.empty')?.textContent).toBe('complete');
+  });
+
+  it('falls back to an empty text paragraph with the in-progress marker while running', async () => {
+    const running = await mountEmpty(EmptyDefaultHostComponent, true);
+    expect(running.querySelector('p')?.textContent?.trim()).toBe('●');
+    const done = await mountEmpty(EmptyDefaultHostComponent, false);
+    expect(done.querySelector('p')?.textContent).toBe('');
   });
 });
