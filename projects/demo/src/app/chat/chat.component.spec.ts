@@ -158,6 +158,81 @@ describe('ChatComponent', () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
+  it('shows an error state when the weather tool fails', async () => {
+    await mountScript([
+      {
+        chunks: [
+          { type: 'start' },
+          { type: 'start-step' },
+          {
+            type: 'tool-input-available',
+            toolCallId: 'call-1',
+            toolName: 'getWeather',
+            input: { city: 'Atlantis' },
+            providerExecuted: true,
+          },
+          {
+            type: 'tool-output-error',
+            toolCallId: 'call-1',
+            errorText: 'City not found',
+            providerExecuted: true,
+          },
+          { type: 'finish-step' },
+          { type: 'finish' },
+        ],
+      },
+    ]);
+
+    await sendText('Weather in Atlantis?');
+
+    await waitFor(() => {
+      const card = root().querySelector('[data-testid="weather-card"]');
+      expect(card?.getAttribute('data-state')).toBe('error');
+      expect(card!.textContent).toContain('Atlantis');
+      expect(card!.textContent).not.toContain('Checking the weather');
+    });
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it('stops spinning when the run is cancelled mid tool call', async () => {
+    const chunks: UIMessageChunk[] = [
+      { type: 'start' },
+      { type: 'start-step' },
+      {
+        type: 'tool-input-available',
+        toolCallId: 'call-1',
+        toolName: 'getWeather',
+        input: { city: 'Paris' },
+        providerExecuted: true,
+      },
+      {
+        type: 'tool-output-available',
+        toolCallId: 'call-1',
+        output: { city: 'Paris', temperatureC: 18, condition: 'Sunny' },
+        providerExecuted: true,
+      },
+      { type: 'finish-step' },
+      { type: 'finish' },
+    ];
+    await mountScript([{ chunks, delayMs: 300 }]);
+
+    await sendText('Weather in Paris?');
+    await waitFor(() => expect(stopButton()).not.toBeNull());
+    await waitFor(() =>
+      expect(root().querySelector('[data-testid="weather-card"]')?.getAttribute('data-state')).toBe(
+        'loading',
+      ),
+    );
+    stopButton()!.click();
+
+    await waitFor(() => expect(stopButton()).toBeNull());
+    await waitFor(() => {
+      const card = root().querySelector('[data-testid="weather-card"]');
+      expect(card?.getAttribute('data-state')).toBe('cancelled');
+      expect(card!.textContent).not.toContain('Checking the weather');
+    });
+  });
+
   it('shows stop while running and cancels', async () => {
     const { transport, signals } = recordSignals(
       createScriptedChatTransport([
