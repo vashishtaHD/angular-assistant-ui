@@ -67,3 +67,20 @@ export {
   injectActionButton,
   type ActionButtonOptions,
 } from './lib/primitives/action-button';
+
+// Task 7: suggestions.
+export {
+  AuiThreadSuggestionsComponent,
+  AuiSuggestionTemplateDirective,
+} from './lib/primitives/thread-suggestions.component';
+export { AuiSuggestionTriggerDirective } from './lib/primitives/suggestion/trigger';
+export { AuiSuggestionTitleComponent } from './lib/primitives/suggestion/title';
+export { AuiSuggestionDescriptionComponent } from './lib/primitives/suggestion/description';
+export { Suggestions, type SuggestionConfig } from '@assistant-ui/core/store';
+export {
+  createSuggestionAdapter,
+  type SuggestionAdapter,
+  type SuggestionAdapterGenerateOptions,
+  type CreateSuggestionAdapterOptions,
+  type ThreadSuggestion,
+} from '@assistant-ui/core';

@@ -46,7 +46,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | AssistantRuntimeProvider | no | n/a (replaced by `[auiProvider]` with `AuiConfig({ threads: RuntimeAdapter(runtime) })`) |  |
 | MessageByIndexProvider | yes | n/a (replaced by `aui-thread-messages` + `messageScopeConfig`) |  |
 | PartByIndexProvider | yes | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
-| SuggestionByIndexProvider | yes | planned (Task 7) (via `indexScopeConfig` kind `suggestion`) | Task 7 |
+| SuggestionByIndexProvider | yes | ported (via `indexScopeConfig` kind `suggestion`) | Task 7 |
 | MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | planned (Task 6) (via `indexScopeConfig` kind `attachment`) | Task 6 |
 | ThreadListItemByIndexProvider | yes | planned (Task 8) (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
 | ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | planned (Task 9) (parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
@@ -68,9 +68,9 @@ Angular scope or directive replaces exactly are `n/a`.
 | ThreadPrimitive.Row, createThreadRowsSelector, ThreadRow, ThreadRowsOptions | no | planned (Task 2) | Task 2 |
 | ThreadPrimitive.ScrollToBottom | yes | planned (Task 2) | Task 2 |
 | ThreadPrimitive.LoadEarlier | no | planned (Task 2) | Task 2 |
-| ThreadPrimitive.Suggestions | yes | planned (Task 7) | Task 7 |
-| ThreadPrimitive.SuggestionByIndex | provider | planned (Task 7) | Task 7 |
-| ThreadPrimitive.Suggestion | no (use `SuggestionPrimitiveTrigger`) | planned (Task 7) (covered by `button[auiSuggestionTrigger]`) | Task 7 |
+| ThreadPrimitive.Suggestions | yes | ported | Task 7 |
+| ThreadPrimitive.SuggestionByIndex | provider | ported | Task 7 |
+| ThreadPrimitive.Suggestion | no (use `SuggestionPrimitiveTrigger`) | ported (covered by `button[auiSuggestionTrigger]`) | Task 7 |
 | ThreadPrimitive.Empty, ThreadPrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
 | useScrollLock | yes | planned (Task 2) | Task 2 |
 | unstable_useThreadMessageIds | no | planned (Task 22) (Angular accessor over `s.thread.messages`) | Task 22 |
@@ -211,10 +211,10 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| SuggestionPrimitive.Trigger | yes | planned (Task 7) | Task 7 |
-| SuggestionPrimitive.Title | yes | planned (Task 7) | Task 7 |
-| SuggestionPrimitive.Description | yes | planned (Task 7) | Task 7 |
-| Suggestions, SuggestionConfig, ThreadSuggestion, createSuggestionAdapter, SuggestionAdapter, SuggestionAdapterGenerateOptions, CreateSuggestionAdapterOptions | yes (`Suggestions`) | planned (Task 7) (re-exported from core) | Task 7 |
+| SuggestionPrimitive.Trigger | yes | ported | Task 7 |
+| SuggestionPrimitive.Title | yes | ported | Task 7 |
+| SuggestionPrimitive.Description | yes | ported | Task 7 |
+| Suggestions, SuggestionConfig, ThreadSuggestion, createSuggestionAdapter, SuggestionAdapter, SuggestionAdapterGenerateOptions, CreateSuggestionAdapterOptions | yes (`Suggestions`) | ported (re-exported from core) | Task 7 |
 
 ### Thread list (`ThreadListPrimitive`, `ThreadListItemPrimitive`)
 
