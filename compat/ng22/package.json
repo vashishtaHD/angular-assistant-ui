@@ -1,0 +1,30 @@
+{
+  "name": "compat-ng22",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "build": "ng build"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/platform-browser": "^22.2.0",
+    "@assistant-ui/ai-sdk": "0.0.18",
+    "@assistant-ui/core": "~0.3.36",
+    "@assistant-ui/store": "~0.3.23",
+    "@assistant-ui/tap": "~0.9.26",
+    "ai": "^7.0.173",
+    "react": "^19.3.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.7",
+    "@angular/cli": "^22.2.7",
+    "@angular/compiler-cli": "^22.2.0",
+    "@types/react": "^19.3.0",
+    "typescript": "~6.0.2"
+  }
+}

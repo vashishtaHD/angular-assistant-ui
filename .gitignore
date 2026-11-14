@@ -1,0 +1,14 @@
+.claude/worktrees/
+.superpowers/
+
+node_modules/
+dist/
+out-tsc/
+.env
+.angular/
+coverage/
+
+# compat matrix (scripts/compat.mjs)
+compat/.packs/
+compat/test-results/
+compat/playwright-report/

@@ -1,0 +1,38 @@
+{
+  "name": "angular-assistant-ui",
+  "version": "0.0.0",
+  "description": "Angular (18.2–22) binding for assistant-ui: headless chat primitives over @assistant-ui/core",
+  "keywords": [
+    "angular",
+    "assistant-ui",
+    "chat",
+    "ai",
+    "mastra"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vashishtaHD/angular-assistant-ui.git",
+    "directory": "projects/assistant-ui-angular"
+  },
+  "bugs": "https://github.com/vashishtaHD/angular-assistant-ui/issues",
+  "homepage": "https://github.com/vashishtaHD/angular-assistant-ui#readme",
+  "peerDependencies": {
+    "@angular/common": ">=18.2.0 <23.0.0",
+    "@angular/core": ">=18.2.0 <23.0.0",
+    "@assistant-ui/core": "~0.3.36",
+    "@assistant-ui/store": "~0.3.23",
+    "@assistant-ui/tap": "~0.9.26",
+    "@types/react": "*",
+    "ai": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false,
+  "license": "MIT"
+}
