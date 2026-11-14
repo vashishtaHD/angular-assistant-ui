@@ -1,6 +1,14 @@
+// Ported from packages/ui/src/components/react/ui/base/dialog.tsx @ 7d74276
 import { Dialog, DialogRef, type DialogConfig } from '@angular/cdk/dialog';
 import type { ComponentType } from '@angular/cdk/portal';
-import { Directive, Injectable, TemplateRef, inject, input } from '@angular/core';
+import {
+  Directive,
+  HostAttributeToken,
+  Injectable,
+  TemplateRef,
+  inject,
+  input,
+} from '@angular/core';
 
 /** Options for `AuiDialogService.open`. */
 export interface AuiDialogConfig<D = unknown> {
@@ -65,11 +73,16 @@ export class AuiDialogService {
 })
 export class AuiDialogCloseDirective {
   private readonly ref = inject(DialogRef);
+  /** Non-null when used as a bare attribute (`<button auiDialogClose>`), i.e. not bound. */
+  private readonly staticValue = inject(new HostAttributeToken('auiDialogClose'), {
+    optional: true,
+  });
 
-  /** Result handed to `afterClosed`. */
+  /** Result handed to the dialog's `closed` stream, passed through unchanged. */
   readonly auiDialogClose = input<unknown>(undefined);
 
   protected close(): void {
-    this.ref.close(this.auiDialogClose() || undefined);
+    // A bare attribute carries no result; bound values (including falsy ones) pass through.
+    this.ref.close(this.staticValue === '' ? undefined : this.auiDialogClose());
   }
 }

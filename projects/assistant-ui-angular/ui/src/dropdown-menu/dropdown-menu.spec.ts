@@ -36,6 +36,35 @@ class HostComponent {
   picked: string[] = [];
 }
 
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    AuiDropdownMenuTriggerDirective,
+    AuiDropdownMenuContentDirective,
+    AuiDropdownMenuItemDirective,
+  ],
+  template: `<button class="trigger" [auiDropdownMenuTrigger]="menu">Menu</button>
+    <ng-template #menu>
+      <div auiDropdownMenuContent>
+        <button auiDropdownMenuItem disabled>One</button>
+        <button auiDropdownMenuItem disabled>Two</button>
+      </div>
+    </ng-template>`,
+})
+class DisabledHostComponent {}
+
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [AuiDropdownMenuTriggerDirective, AuiDropdownMenuContentDirective],
+  template: `<button class="trigger" [auiDropdownMenuTrigger]="menu">Menu</button>
+    <ng-template #menu>
+      <div auiDropdownMenuContent></div>
+    </ng-template>`,
+})
+class EmptyHostComponent {}
+
 describe('dropdown menu', () => {
   let restore: () => void;
   beforeEach(() => (restore = stubLayout()));
@@ -139,6 +168,45 @@ describe('dropdown menu', () => {
   it('closes on outside click', async () => {
     const { fixture } = await open();
     (overlayRoot().querySelector('.cdk-overlay-backdrop') as HTMLElement).click();
+    fixture.detectChanges();
+    await settle();
+    expect(menu()).toBeNull();
+  });
+
+  it('closes on Escape when every item is disabled, and can reopen', async () => {
+    configureTestBed({ imports: [DisabledHostComponent] });
+    const fixture = TestBed.createComponent(DisabledHostComponent);
+    fixture.detectChanges();
+    document.body.appendChild(fixture.nativeElement);
+    const trigger = fixture.nativeElement.querySelector('.trigger') as HTMLButtonElement;
+    trigger.focus();
+    trigger.click();
+    fixture.detectChanges();
+    await settle();
+    expect(menu()).not.toBeNull();
+    key(document.activeElement ?? trigger, 'Escape');
+    fixture.detectChanges();
+    await settle();
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    trigger.click();
+    fixture.detectChanges();
+    await settle();
+    expect(menu()).not.toBeNull();
+  });
+
+  it('closes on Escape for an empty menu', async () => {
+    configureTestBed({ imports: [EmptyHostComponent] });
+    const fixture = TestBed.createComponent(EmptyHostComponent);
+    fixture.detectChanges();
+    document.body.appendChild(fixture.nativeElement);
+    const trigger = fixture.nativeElement.querySelector('.trigger') as HTMLButtonElement;
+    trigger.focus();
+    trigger.click();
+    fixture.detectChanges();
+    await settle();
+    expect(menu()).not.toBeNull();
+    key(document.activeElement ?? trigger, 'Escape');
     fixture.detectChanges();
     await settle();
     expect(menu()).toBeNull();

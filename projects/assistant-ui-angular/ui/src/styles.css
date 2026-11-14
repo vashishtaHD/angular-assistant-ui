@@ -396,6 +396,13 @@
   min-height: 1px;
 }
 
+/* Applied to <html> by the CDK block-scroll strategy while a modal dialog is open. */
+.cdk-global-scrollblock {
+  position: fixed;
+  width: 100%;
+  overflow-y: scroll;
+}
+
 .cdk-visually-hidden {
   position: absolute;
   width: 1px;

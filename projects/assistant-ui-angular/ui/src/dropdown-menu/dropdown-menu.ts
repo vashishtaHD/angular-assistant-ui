@@ -1,3 +1,4 @@
+// Ported from packages/ui/src/components/react/ui/base/dropdown-menu.tsx @ 7d74276
 import { Overlay, OverlayRef, type ConnectedPosition } from '@angular/cdk/overlay';
 import { TemplatePortal } from '@angular/cdk/portal';
 import {
@@ -109,6 +110,10 @@ export class AuiDropdownMenuTriggerDirective {
       );
     });
     ref.backdropClick().subscribe(() => this.close(false));
+    // Fallback for when focus is not inside the menu (empty or all-disabled menus).
+    ref.keydownEvents().subscribe((event) => {
+      if (event.key === 'Escape') this.close(true);
+    });
     this.overlayRef = ref;
 
     const host: UiMenuHost = {

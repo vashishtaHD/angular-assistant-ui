@@ -1,3 +1,4 @@
+// Ported from packages/ui/src/components/react/ui/base/button.tsx @ 7d74276
 import { Directive, input } from '@angular/core';
 
 /** Visual variants of `button[auiButton]`. */

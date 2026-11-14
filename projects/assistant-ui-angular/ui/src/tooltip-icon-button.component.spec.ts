@@ -19,9 +19,10 @@ class HostComponent {
 }
 
 describe('AuiTooltipIconButtonComponent', () => {
-  async function setup() {
+  async function setup(side: 'top' | 'bottom' | 'left' | 'right' = 'bottom') {
     configureTestBed({ imports: [HostComponent] });
     const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.side = side;
     fixture.detectChanges();
     await fixture.whenStable();
     document.body.appendChild(fixture.nativeElement);
@@ -70,6 +71,54 @@ describe('AuiTooltipIconButtonComponent', () => {
     button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await settle();
     expect(tooltip()).toBeNull();
+  });
+
+  it('clears its state when scrolling dismisses the tooltip, and can show again', async () => {
+    const { fixture, button } = await setup();
+    button.focus();
+    await settle();
+    fixture.detectChanges();
+    expect(tooltip()).not.toBeNull();
+    document.dispatchEvent(new Event('scroll'));
+    await settle();
+    fixture.detectChanges();
+    expect(tooltip()).toBeNull();
+    expect(button.hasAttribute('aria-describedby')).toBe(false);
+    // Still focused; hovering must be able to show it again.
+    button.dispatchEvent(new MouseEvent('mouseenter'));
+    await settle();
+    fixture.detectChanges();
+    expect(tooltip()).not.toBeNull();
+    expect(button.getAttribute('aria-describedby')).toBe(tooltip()?.id);
+  });
+
+  it('reports the side it actually landed on after a flip', async () => {
+    const originalRect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const isTrigger = this.tagName === 'BUTTON';
+      const [top, width, height, left] = isTrigger ? [0, 40, 20, 200] : [300, 100, 50, 200];
+      return {
+        top,
+        left,
+        width,
+        height,
+        bottom: top + height,
+        right: left + width,
+        x: left,
+        y: top,
+        toJSON: () => ({}),
+      } as DOMRect;
+    };
+    try {
+      const { fixture, button } = await setup('top');
+      button.focus();
+      await settle();
+      fixture.detectChanges();
+      // No room above a trigger at the top of the viewport.
+      expect(tooltip()?.getAttribute('data-side')).toBe('bottom');
+    } finally {
+      Element.prototype.getBoundingClientRect = originalRect;
+    }
   });
 
   it('forwards clicks to the host', async () => {

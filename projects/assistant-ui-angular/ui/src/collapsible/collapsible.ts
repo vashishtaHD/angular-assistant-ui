@@ -1,3 +1,4 @@
+// Ported from packages/ui/src/components/react/ui/base/collapsible.tsx @ 7d74276
 import {
   ChangeDetectionStrategy,
   Component,

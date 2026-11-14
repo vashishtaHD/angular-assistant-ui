@@ -1,8 +1,9 @@
+// Ported from packages/ui/src/components/react/assistant-ui/elements/tooltip-icon-button.tsx @ 7d74276
 import {
   ConnectedPosition,
   Overlay,
   OverlayRef,
-  type PositionStrategy,
+  type FlexibleConnectedPositionStrategy,
 } from '@angular/cdk/overlay';
 import { ComponentPortal } from '@angular/cdk/portal';
 import {
@@ -144,8 +145,9 @@ export class AuiTooltipIconButtonComponent {
   protected show(): void {
     if (this.overlayRef || this.disabled()) return;
     const side = this.side();
+    const strategy = this.positionFor(side);
     const ref = this.overlay.create({
-      positionStrategy: this.positionFor(side),
+      positionStrategy: strategy,
       scrollStrategy: this.overlay.scrollStrategies.close(),
       panelClass: 'aui-tooltip-pane',
     });
@@ -153,10 +155,23 @@ export class AuiTooltipIconButtonComponent {
     panel.setInput('text', this.tooltip());
     panel.setInput('tooltipId', this.id);
     panel.setInput('side', side);
+    strategy.positionChanges.subscribe(({ connectionPair }) => {
+      const landed = (Object.keys(POSITIONS) as AuiTooltipSide[]).find(
+        (s) =>
+          POSITIONS[s].originX === connectionPair.originX &&
+          POSITIONS[s].originY === connectionPair.originY,
+      );
+      if (landed) panel.setInput('side', landed);
+    });
     ref.keydownEvents().subscribe((event) => {
       if (event.key === 'Escape') this.hide();
     });
+    // Scroll dismissal (and any other external detach) must reset our state too.
+    ref.detachments().subscribe(() => {
+      if (this.overlayRef === ref) this.dispose();
+    });
     this.overlayRef = ref;
+    ref.updatePosition();
     this.describedBy.set(this.id);
   }
 
@@ -173,12 +188,13 @@ export class AuiTooltipIconButtonComponent {
   }
 
   private dispose(): void {
-    this.overlayRef?.dispose();
+    const ref = this.overlayRef;
     this.overlayRef = null;
+    ref?.dispose();
     this.describedBy.set(null);
   }
 
-  private positionFor(side: AuiTooltipSide): PositionStrategy {
+  private positionFor(side: AuiTooltipSide): FlexibleConnectedPositionStrategy {
     const opposite = POSITIONS[OPPOSITE[side]];
     return this.overlay
       .position()

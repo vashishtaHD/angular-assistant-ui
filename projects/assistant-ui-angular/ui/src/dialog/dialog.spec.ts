@@ -23,6 +23,57 @@ class HostComponent {
   }
 }
 
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [AuiDialogCloseDirective],
+  template: `<ng-template #tpl>
+    <button class="bare" auiDialogClose>bare</button>
+    <button class="no" [auiDialogClose]="false">no</button>
+    <button class="zero" [auiDialogClose]="0">zero</button>
+    <button class="empty" [auiDialogClose]="''">empty</button>
+    <button class="nul" [auiDialogClose]="null">null</button>
+  </ng-template>`,
+})
+class ResultHostComponent {
+  @ViewChild('tpl', { static: true }) tpl!: TemplateRef<unknown>;
+  readonly dialog = inject(AuiDialogService);
+}
+
+describe('AuiDialogCloseDirective results', () => {
+  let restore: () => void;
+  beforeEach(() => (restore = stubLayout()));
+  afterEach(() => restore());
+
+  async function closeWith(selector: string): Promise<unknown> {
+    configureTestBed({ imports: [ResultHostComponent] });
+    const fixture = TestBed.createComponent(ResultHostComponent);
+    fixture.detectChanges();
+    const ref = fixture.componentInstance.dialog.open(fixture.componentInstance.tpl);
+    let result: unknown = 'unset';
+    ref.closed.subscribe((value) => (result = value));
+    fixture.detectChanges();
+    await settle();
+    (overlayRoot().querySelector(selector) as HTMLElement).click();
+    fixture.detectChanges();
+    await settle();
+    return result;
+  }
+
+  it('closes with undefined when unbound', async () => {
+    expect(await closeWith('.bare')).toBeUndefined();
+  });
+
+  it.each([
+    ['.no', false],
+    ['.zero', 0],
+    ['.empty', ''],
+    ['.nul', null],
+  ])('passes the falsy result of %s through unchanged', async (selector, expected) => {
+    expect(await closeWith(selector)).toBe(expected);
+  });
+});
+
 describe('AuiDialogService', () => {
   let restore: () => void;
   beforeEach(() => (restore = stubLayout()));

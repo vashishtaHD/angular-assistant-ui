@@ -96,10 +96,12 @@ export class UiMenuItemDirective {
   host: {
     role: 'menu',
     'aria-orientation': 'vertical',
+    tabindex: '-1',
     '(keydown)': 'onKeydown($event)',
   },
 })
 export class UiMenuContentDirective {
+  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly host = inject(UI_MENU_HOST, { optional: true });
   private readonly items = contentChildren(UiMenuItemDirective, { descendants: true });
 
@@ -176,6 +178,8 @@ export class UiMenuContentDirective {
         return;
       }
     }
+    // Nothing focusable: keep focus inside the menu so keys (Escape) still reach it.
+    this.element.focus();
   }
 
   private typeahead(char: string): void {
