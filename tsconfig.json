@@ -4,7 +4,8 @@
     "paths": {
       "angular-assistant-ui": ["./dist/assistant-ui-angular"],
       "angular-assistant-ui/testing": ["./dist/assistant-ui-angular/testing"],
-      "angular-assistant-ui/ui": ["./dist/assistant-ui-angular/ui"]
+      "angular-assistant-ui/ui": ["./dist/assistant-ui-angular/ui"],
+      "angular-assistant-ui/mastra": ["./dist/assistant-ui-angular/mastra"]
     },
     "outDir": "./dist/out-tsc",
     "strict": true,
