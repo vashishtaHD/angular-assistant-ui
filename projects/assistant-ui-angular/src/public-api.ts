@@ -165,3 +165,32 @@ export {
   type ThreadRowsOptions,
 } from './lib/primitives/thread-rows.component';
 export { injectScrollLock } from './lib/utils/scroll-lock';
+// Task 4: action bar, branch picker, feedback, export markdown and edit composer.
+export {
+  AuiActionBarRootDirective,
+  AUI_ACTION_BAR_INTERACTION,
+  type AuiActionBarAutohide,
+  type AuiActionBarAutohideFloat,
+  type AuiActionBarInteraction,
+} from './lib/primitives/action-bar/action-bar-root.directive';
+export { AuiActionBarCopyDirective } from './lib/primitives/action-bar/action-bar-copy.directive';
+export { AUI_CLIPBOARD, type AuiClipboardWriter } from './lib/primitives/action-bar/clipboard';
+export { AuiActionBarReloadDirective } from './lib/primitives/action-bar/action-bar-reload.directive';
+export { AuiActionBarEditDirective } from './lib/primitives/action-bar/action-bar-edit.directive';
+export {
+  AuiActionBarFeedbackNegativeDirective,
+  AuiActionBarFeedbackPositiveDirective,
+} from './lib/primitives/action-bar/action-bar-feedback.directive';
+export {
+  AuiActionBarExportMarkdownDirective,
+  type AuiExportMarkdownEvent,
+} from './lib/primitives/action-bar/action-bar-export-markdown.directive';
+export type { FeedbackAdapter, SubmitFeedbackOptions } from '@assistant-ui/core';
+export {
+  AuiBranchPickerCountComponent,
+  AuiBranchPickerNextDirective,
+  AuiBranchPickerNumberComponent,
+  AuiBranchPickerPreviousDirective,
+  AuiBranchPickerRootDirective,
+} from './lib/primitives/branch-picker/branch-picker';
+export { AuiEditComposerDirective } from './lib/primitives/edit-composer/edit-composer.directive';
