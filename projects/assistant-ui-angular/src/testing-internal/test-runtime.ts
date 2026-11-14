@@ -67,7 +67,7 @@ export interface TestThreadList {
 /** Optional adapter callbacks forwarded to every adapter the runtime builds. */
 export type TestRuntimeCallbacks = Pick<
   ExternalStoreAdapter<DemoMessage>,
-  'onAddToolResult' | 'onResumeToolCall' | 'onRespondToToolApproval'
+  'onAddToolResult' | 'onResumeToolCall' | 'onRespondToToolApproval' | 'onEdit' | 'onReload'
 >;
 
 let generatedIds = 0;

@@ -173,19 +173,19 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ActionBarPrimitive.Root | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.Copy | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.Reload | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.Edit | yes | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.FeedbackPositive, ActionBarPrimitive.FeedbackNegative, FeedbackAdapter, SubmitFeedbackOptions | no | planned (Task 4) | Task 4 |
-| ActionBarPrimitive.ExportMarkdown | no | planned (Task 4) | Task 4 |
+| ActionBarPrimitive.Root | yes | ported | Task 4 |
+| ActionBarPrimitive.Copy | yes | ported | Task 4 |
+| ActionBarPrimitive.Reload | yes | ported | Task 4 |
+| ActionBarPrimitive.Edit | yes | ported | Task 4 |
+| ActionBarPrimitive.FeedbackPositive, ActionBarPrimitive.FeedbackNegative, FeedbackAdapter, SubmitFeedbackOptions | no | ported | Task 4 |
+| ActionBarPrimitive.ExportMarkdown | no | ported | Task 4 |
 | ActionBarPrimitive.Speak, ActionBarPrimitive.StopSpeaking, SpeechSynthesisAdapter, WebSpeechSynthesisAdapter | no | n/a (speech out of scope) |  |
 | ActionBarPrimitive.Resume, ActionBarPrimitive.RefreshRun | no | n/a (cloud and resumable run state out of scope) |  |
 | ActionBarMorePrimitive.Root, ActionBarMorePrimitive.Trigger, ActionBarMorePrimitive.Content, ActionBarMorePrimitive.Item, ActionBarMorePrimitive.Separator | no | planned (Task 10) | Task 10 |
-| BranchPickerPrimitive.Root | no | planned (Task 4) | Task 4 |
-| BranchPickerPrimitive.Previous, BranchPickerPrimitive.Next | yes | planned (Task 4) | Task 4 |
-| BranchPickerPrimitive.Number | yes | planned (Task 4) | Task 4 |
-| BranchPickerPrimitive.Count | yes | planned (Task 4) | Task 4 |
+| BranchPickerPrimitive.Root | no | ported | Task 4 |
+| BranchPickerPrimitive.Previous, BranchPickerPrimitive.Next | yes | ported | Task 4 |
+| BranchPickerPrimitive.Number | yes | ported | Task 4 |
+| BranchPickerPrimitive.Count | yes | ported | Task 4 |
 
 ### Error (`ErrorPrimitive`)
 
