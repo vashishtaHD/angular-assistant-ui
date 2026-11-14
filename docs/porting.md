@@ -34,7 +34,7 @@ Status is one of `ported`, `planned`, `n/a`.
 | MessageByIdProvider                     | planned |
 | PartByIndexProvider                     | planned |
 | ThreadPrimitiveMessages                 | planned |
-| ThreadPrimitiveViewport                 | planned |
+| ThreadPrimitiveViewport                 | ported  |
 | ThreadPrimitiveViewportFooter           | planned |
 | ThreadPrimitiveScrollToBottom           | planned |
 | MessagePrimitiveParts                   | planned |
