@@ -84,6 +84,8 @@ export class AuiComposerRootDirective implements AuiComposerCompact {
 
   /** @internal */
   onSubmit(event: Event): void {
+    // A listener that already cancelled the submit vetoes the send.
+    if (event.defaultPrevented) return;
     event.preventDefault();
     if (this.sendDisabled()) return;
     this.aui.composer.send();

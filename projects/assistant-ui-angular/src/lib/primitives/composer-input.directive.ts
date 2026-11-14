@@ -246,7 +246,11 @@ export class AuiComposerInputDirective implements OnChanges {
     const shouldSubmit = mode === 'ctrlEnter' ? event.ctrlKey || event.metaKey : mode === 'enter';
     if (!shouldSubmit || this.sendDisabled()) return;
     event.preventDefault();
-    this.aui.composer.send();
+    // Submit through the containing form (validation and submit handlers run, the
+    // root sends); a standalone input has no form and sends directly.
+    const form = this.el.nativeElement.closest('form');
+    if (form) form.requestSubmit();
+    else this.aui.composer.send();
   }
 
   /** @internal */

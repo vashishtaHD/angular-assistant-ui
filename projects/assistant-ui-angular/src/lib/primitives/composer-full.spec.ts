@@ -134,9 +134,11 @@ class ProbeComponent {
             </div>
           </ng-template>
         </aui-composer-queue>
+        <input class="req" [required]="requireField()" />
         <textarea
           auiComposerInput
           [submitMode]="submitMode()"
+          [submitOnEnter]="submitOnEnter()"
           [cancelOnEscape]="cancelOnEscape()"
           [addAttachmentOnPaste]="addAttachmentOnPaste()"
           [autoFocus]="true"
@@ -151,6 +153,8 @@ class ProbeComponent {
 class HostComponent {
   config: AuiConfig = AuiConfig({});
   readonly submitMode = signal<'enter' | 'ctrlEnter' | 'none' | undefined>(undefined);
+  readonly submitOnEnter = signal<boolean | undefined>(undefined);
+  readonly requireField = signal(false);
   readonly cancelOnEscape = signal(true);
   readonly addAttachmentOnPaste = signal(true);
   readonly touchNewline = signal(false);
@@ -346,12 +350,67 @@ describe('composer input keyboard', () => {
     expect(key(t, {}).defaultPrevented).toBe(true);
   });
 
-  it('keeps the deprecated submitOnEnter=false alias working', async () => {
-    const t = await setup(createQueueRuntime(false).config);
-    const input = t.fixture.debugElement
-      .query(By.directive(AuiComposerInputDirective))
-      .injector.get(AuiComposerInputDirective);
-    expect(input.submitOnEnter()).toBeUndefined();
+  it('submitOnEnter=false keeps working as a deprecated alias of submitMode none', async () => {
+    const rt = createQueueRuntime(false);
+    const t = await setup(rt.config);
+    t.host.submitOnEnter.set(false);
+    await t.settle();
+    type(t, 'hello');
+    await t.settle();
+    expect(key(t, {}).defaultPrevented).toBe(false);
+    expect(rt.onNew).not.toHaveBeenCalled();
+
+    t.host.submitOnEnter.set(true);
+    await t.settle();
+    expect(key(t, {}).defaultPrevented).toBe(true);
+    await t.settle();
+    expect(rt.onNew).toHaveBeenCalledTimes(1);
+
+    // submitMode takes precedence over the alias.
+    type(t, 'again');
+    t.host.submitOnEnter.set(false);
+    t.host.submitMode.set('enter');
+    await t.settle();
+    expect(key(t, {}).defaultPrevented).toBe(true);
+    await t.settle();
+    expect(rt.onNew).toHaveBeenCalledTimes(2);
+  });
+
+  it('keyboard submission goes through the form: submit handlers run and validation applies', async () => {
+    const rt = createQueueRuntime(false);
+    const t = await setup(rt.config);
+    const submitted = vi.fn();
+    t.form.addEventListener('submit', submitted);
+    type(t, 'hello');
+    await t.settle();
+
+    // An invalid required field blocks the submit, so nothing is sent.
+    t.host.requireField.set(true);
+    await t.settle();
+    key(t, {});
+    await t.settle();
+    expect(submitted).not.toHaveBeenCalled();
+    expect(rt.onNew).not.toHaveBeenCalled();
+
+    t.host.requireField.set(false);
+    await t.settle();
+    key(t, {});
+    await t.settle();
+    expect(submitted).toHaveBeenCalledTimes(1);
+    expect(rt.onNew).toHaveBeenCalledTimes(1);
+  });
+
+  it('a submit that was already prevented does not send', async () => {
+    const rt = createQueueRuntime(false);
+    const t = await setup(rt.config);
+    type(t, 'hello');
+    await t.settle();
+    t.form.addEventListener('submit', (e) => e.preventDefault(), { capture: true });
+    const submit = new Event('submit', { cancelable: true });
+    t.form.dispatchEvent(submit);
+    await t.settle();
+    expect(rt.onNew).not.toHaveBeenCalled();
+    expect(t.aui.composer.getState().text).toBe('hello');
   });
 });
 
