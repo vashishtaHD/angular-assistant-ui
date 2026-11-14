@@ -13,9 +13,5 @@
     "tslib": "^2.3.0"
   },
   "sideEffects": false,
-  "license": "MIT",
-  "scripts": {
-    "test": "vitest run --config vitest.config.mts",
-    "test:watch": "vitest --config vitest.config.mts"
-  }
+  "license": "MIT"
 }

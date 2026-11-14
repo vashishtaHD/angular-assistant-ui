@@ -34,6 +34,7 @@ module.exports = tseslint.config(
         'error',
         { type: 'element', prefix: ['aui', 'app'], style: 'kebab-case' },
       ],
+      '@angular-eslint/prefer-on-push-component-change-detection': 'error',
     },
   },
   {
