@@ -82,7 +82,7 @@ function makeAdapter(
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div auiThreadListItemRoot class="item" (keydown)="onKey($event)">
+    <div auiThreadListItemRoot class="item" tabindex="-1" (keydown)="onKey($event)">
       <button auiThreadListItemTrigger class="trigger" [disabled]="off()">
         <aui-thread-list-item-title fallback="Untitled" />
       </button>
