@@ -1,0 +1,21 @@
+{
+  "name": "angular-assistant-ui",
+  "version": "0.0.0",
+  "peerDependencies": {
+    "@angular/common": ">=18.2.0 <23.0.0",
+    "@angular/core": ">=18.2.0 <23.0.0",
+    "@assistant-ui/core": "~0.3.36",
+    "@assistant-ui/store": "~0.3.23",
+    "@assistant-ui/tap": "~0.9.26",
+    "@types/react": "*"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run --config vitest.config.mts",
+    "test:watch": "vitest --config vitest.config.mts"
+  }
+}

@@ -1,2 +1,9 @@
 .claude/worktrees/
 .superpowers/
+
+node_modules/
+dist/
+out-tsc/
+.env
+.angular/
+coverage/
