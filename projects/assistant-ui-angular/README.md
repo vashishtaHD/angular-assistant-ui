@@ -22,6 +22,18 @@ though React renders nothing in an Angular app. To avoid shipping React, alias `
 to `@assistant-ui/tap/standalone-shim` in your bundler (and `paths` in `tsconfig.json`
 if you type-check against it).
 
+The main entry never imports core's React barrel (`@assistant-ui/core/react`). It does
+still load `@assistant-ui/tap/react-shim`, which imports `react` (the same shim
+`@assistant-ui/core/store` uses), so the requirement above applies to every runtime, not
+only the AI SDK one.
+
+The scope resources that core ships only in that barrel (`Tools`, `Interactables` and
+`unstable_Interactables`) are exported from the secondary entry
+`angular-assistant-ui/react-interop`. Use it for `AuiConfig({ unstable_interactables:
+unstable_Interactables() })`. It additionally imports `react/jsx-runtime`, so an alias
+must cover every `react/*` subpath (for example `paths: { "react/*": [...] }`), not only
+`react`.
+
 ### Angular 18
 
 Angular 18 consumers need `skipLibCheck: true` in `tsconfig.json` (the default in new
