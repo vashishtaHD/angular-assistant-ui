@@ -22,7 +22,7 @@ Library usage and API: [projects/assistant-ui-angular/README.md](projects/assist
 
 ## Setup
 
-Node `>=20.11 <23` (see `.nvmrc`).
+Node `>=22.13` (Mastra 1.x requires it; see `.nvmrc`). The Angular 22 compat app (`npm run compat -- ng22`) additionally needs Node `^22.22.3`, `^24.15.0` or `>=26`.
 
 ```bash
 npm ci

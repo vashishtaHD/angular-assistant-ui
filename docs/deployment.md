@@ -10,7 +10,7 @@ npm run build -w mastra-server   # runs `mastra build`
 ```
 
 `mastra build` writes a self-contained Node server to `mastra-server/.mastra/output`;
-run it with `node` (Node 20.11 or newer) on any host that can run a long-lived process
+run it with `node` (Node 22.13 or newer, as Mastra 1.x requires) on any host that can run a long-lived process
 (a container, a VM, or a Node PaaS). The chat route streams responses, so make sure the
 platform's request timeout and any proxy response buffering do not cut streams short.
 
