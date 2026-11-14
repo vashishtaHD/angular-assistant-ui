@@ -47,7 +47,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | MessageByIndexProvider | yes | n/a (replaced by `aui-thread-messages` + `messageScopeConfig`) |  |
 | PartByIndexProvider | yes | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
 | SuggestionByIndexProvider | yes | planned (Task 7) (via `indexScopeConfig` kind `suggestion`) | Task 7 |
-| MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | planned (Task 6) (via `indexScopeConfig` kind `attachment`) | Task 6 |
+| MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | ported (via `indexScopeConfig` kind `attachment`) | Task 6 |
 | ThreadListItemByIndexProvider | yes | planned (Task 8) (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
 | ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | planned (Task 9) (parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
 | ThreadListItemRuntimeProvider, MessageProvider, TextMessagePartProvider, ReadonlyThreadProvider | no | planned (Task 22) (scopes from a bare runtime or message objects, for read-only rendering) | Task 22 |
@@ -84,8 +84,8 @@ Angular scope or directive replaces exactly are `n/a`.
 | MessagePrimitive.Parts, MessagePrimitive.Content | yes | ported (as `aui-message-parts`) |  |
 | MessagePrimitive.PartByIndex | provider | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
 | MessagePrimitive.GroupedParts, groupPartByType, GroupByContext | no | planned (Task 3) | Task 3 |
-| MessagePrimitive.Attachments | yes | planned (Task 6) | Task 6 |
-| MessagePrimitive.AttachmentByIndex | provider | planned (Task 6) | Task 6 |
+| MessagePrimitive.Attachments | yes | ported | Task 6 |
+| MessagePrimitive.AttachmentByIndex | provider | ported | Task 6 |
 | MessagePrimitive.Error | no | planned (Task 3) | Task 3 |
 | MessagePrimitive.Quote, useMessageQuote | no | planned (Task 3) | Task 3 |
 | MessagePrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
@@ -145,10 +145,10 @@ Angular scope or directive replaces exactly are `n/a`.
 | ComposerPrimitive.Input | partial (`submitOnEnter`) | ported (as `[auiComposerInput]`); full props planned | Task 5 |
 | ComposerPrimitive.Send | yes | ported (as `button[auiComposerSend]`) |  |
 | ComposerPrimitive.Cancel | yes | ported (as `button[auiComposerCancel]`) |  |
-| ComposerPrimitive.AddAttachment | yes | planned (Task 6) | Task 6 |
-| ComposerPrimitive.Attachments | yes | planned (Task 6) | Task 6 |
-| ComposerPrimitive.AttachmentByIndex | provider | planned (Task 6) | Task 6 |
-| ComposerPrimitive.AttachmentDropzone | yes | planned (Task 6) | Task 6 |
+| ComposerPrimitive.AddAttachment | yes | ported | Task 6 |
+| ComposerPrimitive.Attachments | yes | ported | Task 6 |
+| ComposerPrimitive.AttachmentByIndex | provider | ported | Task 6 |
+| ComposerPrimitive.AttachmentDropzone | yes | ported | Task 6 |
 | ComposerPrimitive.Quote, ComposerPrimitive.QuoteText, ComposerPrimitive.QuoteDismiss | no | planned (Task 5) | Task 5 |
 | ComposerPrimitive.Queue | no | planned (Task 5) | Task 5 |
 | QueueItemPrimitive.Text, QueueItemPrimitive.Steer, QueueItemPrimitive.Remove | no | planned (Task 5) | Task 5 |
@@ -198,12 +198,12 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| AttachmentPrimitive.Root | yes | planned (Task 6) | Task 6 |
-| AttachmentPrimitive.Name | yes | planned (Task 6) | Task 6 |
-| AttachmentPrimitive.unstable_Thumb | yes (`AttachmentPrimitiveThumb`) | planned (Task 6) | Task 6 |
-| AttachmentPrimitive.Remove | yes | planned (Task 6) | Task 6 |
-| AttachmentAdapter, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter | no | planned (Task 6) (re-exported from core) | Task 6 |
-| Attachment, PendingAttachment, CompleteAttachment, AttachmentStatus, CreateAttachment, AttachmentRuntime, AttachmentState, AttachmentRuntimeState | no | planned (Task 6) (type re-exports) | Task 6 |
+| AttachmentPrimitive.Root | yes | ported | Task 6 |
+| AttachmentPrimitive.Name | yes | ported | Task 6 |
+| AttachmentPrimitive.unstable_Thumb | yes (`AttachmentPrimitiveThumb`) | ported (`img[auiAttachmentThumb]` image preview; upstream extension label not ported) | Task 6 |
+| AttachmentPrimitive.Remove | yes | ported | Task 6 |
+| AttachmentAdapter, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter | no | ported (re-exported from core) | Task 6 |
+| Attachment, PendingAttachment, CompleteAttachment, AttachmentStatus, CreateAttachment, AttachmentRuntime, AttachmentState, AttachmentRuntimeState | no | ported (type re-exports) | Task 6 |
 | CloudFileAttachmentAdapter | no | n/a (Assistant Cloud out of scope) |  |
 | useAttachmentSrc (kit hook) | no | planned (Task 17) | Task 17 |
 

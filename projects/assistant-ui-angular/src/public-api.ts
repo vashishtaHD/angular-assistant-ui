@@ -67,3 +67,33 @@ export {
   injectActionButton,
   type ActionButtonOptions,
 } from './lib/primitives/action-button';
+
+// Task 6: attachments (attachment scope primitives, composer add/dropzone/list, message list).
+export { AuiAttachmentRootDirective } from './lib/primitives/attachment/attachment-root.directive';
+export { AuiAttachmentNameComponent } from './lib/primitives/attachment/attachment-name.component';
+export { AuiAttachmentThumbDirective } from './lib/primitives/attachment/attachment-thumb.directive';
+export { AuiAttachmentRemoveDirective } from './lib/primitives/attachment/attachment-remove.directive';
+export {
+  AuiAttachmentTemplateDirective,
+  getAttachmentKeys,
+  type AuiAttachmentTemplateContext,
+} from './lib/primitives/attachment/attachment-list';
+export type { AuiAttachmentError } from './lib/primitives/attachment/inject-add-attachments';
+export { AuiComposerAddAttachmentDirective } from './lib/primitives/composer-add-attachment.directive';
+export { AuiComposerAttachmentDropzoneDirective } from './lib/primitives/composer-attachment-dropzone.directive';
+export { AuiComposerAttachmentsComponent } from './lib/primitives/composer-attachments.component';
+export { AuiMessageAttachmentsComponent } from './lib/primitives/message-attachments.component';
+export {
+  CompositeAttachmentAdapter,
+  SimpleImageAttachmentAdapter,
+  SimpleTextAttachmentAdapter,
+  type Attachment,
+  type AttachmentAdapter,
+  type AttachmentRuntime,
+  type AttachmentRuntimeState,
+  type AttachmentState,
+  type AttachmentStatus,
+  type CompleteAttachment,
+  type CreateAttachment,
+  type PendingAttachment,
+} from '@assistant-ui/core';
