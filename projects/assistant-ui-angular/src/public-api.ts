@@ -25,3 +25,11 @@ export {
   type AssistantEventSelector,
   type Unsubscribe,
 } from '@assistant-ui/store/client';
+
+// Thread viewport.
+export { AuiThreadViewportDirective } from './lib/primitives/thread-viewport.directive';
+export {
+  AUI_VIEWPORT,
+  injectAuiViewport,
+  type AuiViewport,
+} from './lib/primitives/viewport-context';
