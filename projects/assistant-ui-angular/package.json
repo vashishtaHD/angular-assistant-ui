@@ -17,6 +17,7 @@
   "bugs": "https://github.com/vashishtaHD/angular-assistant-ui/issues",
   "homepage": "https://github.com/vashishtaHD/angular-assistant-ui#readme",
   "peerDependencies": {
+    "@angular/cdk": ">=18.2.0 <23.0.0",
     "@angular/common": ">=18.2.0 <23.0.0",
     "@angular/core": ">=18.2.0 <23.0.0",
     "@assistant-ui/core": "~0.3.36",
@@ -26,12 +27,18 @@
     "ai": "^7.0.0"
   },
   "peerDependenciesMeta": {
+    "@angular/cdk": {
+      "optional": true
+    },
     "ai": {
       "optional": true
     }
   },
   "dependencies": {
     "tslib": "^2.3.0"
+  },
+  "exports": {
+    "./ui/styles.css": "./ui/styles.css"
   },
   "sideEffects": false,
   "license": "MIT"
