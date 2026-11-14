@@ -199,3 +199,70 @@ export { AuiChainOfThoughtAccordionTriggerDirective } from './lib/primitives/cha
 export { AuiChainOfThoughtPartsComponent } from './lib/primitives/chain-of-thought/parts';
 export { AuiChainOfThoughtRootDirective } from './lib/primitives/chain-of-thought/root';
 export { AuiChainOfThoughtTemplateDirective } from './lib/primitives/message-parts.component';
+// Task 3: message error, grouped parts, quote, and part primitives with smooth streaming.
+export { AuiErrorRootDirective, AuiErrorMessageComponent } from './lib/primitives/error.directive';
+export { AuiMessageErrorDirective } from './lib/primitives/message-error.directive';
+export {
+  AuiMessageQuoteDirective,
+  injectMessageQuote,
+  type AuiMessageQuoteContext,
+} from './lib/primitives/message-quote.directive';
+export {
+  AuiMessageGroupedPartsComponent,
+  AuiGroupChildrenComponent,
+  AuiEmptyTemplateDirective,
+  AuiGroupTemplateDirective,
+  AuiIndicatorTemplateDirective,
+  type AuiEmptyTemplateContext,
+  type AuiGroupBy,
+  type AuiGroupPart,
+  type AuiGroupTemplateContext,
+  type AuiIndicatorMode,
+  type AuiIndicatorPart,
+  type AuiIndicatorTemplateContext,
+} from './lib/primitives/message-grouped-parts.component';
+export {
+  GROUPBY_MEMO_KEY,
+  buildGroupTree,
+  getGroupSummary,
+  groupMessagePartsByParentId,
+  groupPartByType,
+  type GroupByContext,
+  type GroupCounts,
+  type GroupNode,
+  type GroupNodeGroup,
+  type GroupNodePart,
+  type GroupingFunction,
+  type PartIndexGroup,
+  type GroupPartType,
+  type PartState,
+  type PartStatus,
+} from './lib/utils/group-parts';
+export { AuiPartTextComponent } from './lib/primitives/part-text.component';
+export { AuiPartImageDirective } from './lib/primitives/part-image.directive';
+export { AuiPartInProgressDirective } from './lib/primitives/part-in-progress.directive';
+export {
+  AuiPartMessagesComponent,
+  AuiPartMessagesRowComponent,
+} from './lib/primitives/part-messages.component';
+export {
+  injectMessagePartData,
+  injectMessagePartFile,
+  injectMessagePartImage,
+  injectMessagePartReasoning,
+  injectMessagePartSource,
+  injectMessagePartText,
+  type PartOfType,
+} from './lib/primitives/part-state';
+export {
+  injectMessageStallDetection,
+  type MessageStallDetection,
+  type MessageStallDetectionOptions,
+} from './lib/primitives/message-stall-detection';
+export {
+  injectSmooth,
+  injectSmoothState,
+  type SmoothInput,
+  type SmoothOptions,
+  type SmoothState,
+} from './lib/utils/smooth';

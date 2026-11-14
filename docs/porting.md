@@ -83,33 +83,33 @@ Angular scope or directive replaces exactly are `n/a`.
 | MessagePrimitive.Root | yes | ported (as `[auiMessageRoot]`) |  |
 | MessagePrimitive.Parts, MessagePrimitive.Content | yes | ported (as `aui-message-parts`) |  |
 | MessagePrimitive.PartByIndex | provider | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
-| MessagePrimitive.GroupedParts, groupPartByType, GroupByContext | no | planned (Task 3) | Task 3 |
+| MessagePrimitive.GroupedParts, groupPartByType, GroupByContext | no | ported (as `aui-message-grouped-parts` with `ng-template auiGroup` / `auiPart` / `auiIndicator` slots and `aui-group-children`; `groupPartByType`, `GroupByContext`) |  |
 | MessagePrimitive.Attachments | yes | planned (Task 6) | Task 6 |
 | MessagePrimitive.AttachmentByIndex | provider | planned (Task 6) | Task 6 |
-| MessagePrimitive.Error | no | planned (Task 3) | Task 3 |
-| MessagePrimitive.Quote, useMessageQuote | no | planned (Task 3) | Task 3 |
+| MessagePrimitive.Error | no | ported (as `*auiMessageError`) |  |
+| MessagePrimitive.Quote, useMessageQuote | no | ported (as `*auiMessageQuote` and `injectMessageQuote`) |  |
 | MessagePrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
 | MessagePrimitive.GenerativeUI, GenerativeUIRender, GenerativeUIRenderError, GenerativeUIRenderProps, GenerativeUIComponentRegistry, GenerativeUIMessagePartComponent, GenerativeUIMessagePartProps, GenerativeUIMessagePart, GenerativeUINode, GenerativeUISpec | no | n/a (generative UI out of scope) |  |
-| MessagePrimitive.Unstable_PartsGrouped, MessagePrimitive.Unstable_PartsGroupedByParentId | no | planned (Task 3) (subsumed by `aui-message-grouped-parts`) | Task 3 |
+| MessagePrimitive.Unstable_PartsGrouped, MessagePrimitive.Unstable_PartsGroupedByParentId | no | ported (as `aui-message-parts-grouped` with `groupingFunction` and `groupMessagePartsByParentId`; `ng-template auiEmpty` is the `components.Empty` slot (without it the `auiPart="text"` template or the default paragraph renders in a static empty text part scope), unkeyed groups render through the `default` group template) |  |
 | useMessageTiming | no | planned (Task 18) | Task 18 |
 | useToolCallElapsed | no | planned (Task 17) | Task 17 |
-| unstable_useMessageStallDetection, Unstable_MessageStallDetection, Unstable_MessageStallDetectionOptions | no | planned (Task 3) | Task 3 |
+| unstable_useMessageStallDetection, Unstable_MessageStallDetection, Unstable_MessageStallDetectionOptions | no | ported (as `injectMessageStallDetection`, `MessageStallDetection`, `MessageStallDetectionOptions`) |  |
 
 ### Message part (`MessagePartPrimitive`) and tool UI
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| MessagePartPrimitive.Text, useSmooth, SmoothOptions | no | planned (Task 3) | Task 3 |
-| MessagePartPrimitive.Image | no | planned (Task 3) | Task 3 |
-| MessagePartPrimitive.InProgress | no | planned (Task 3) | Task 3 |
-| MessagePartPrimitive.Messages | no | planned (Task 3) (nested sub-thread messages) | Task 3 |
-| useMessagePartText, useMessagePartReasoning, useMessagePartSource, useMessagePartFile, useMessagePartImage, useMessagePartData | no | planned (Task 3) (Angular `inject*` readers over `s.part`) | Task 3 |
+| MessagePartPrimitive.Text, useSmooth, SmoothOptions | no | ported (as `aui-part-text`, `injectSmooth` / `injectSmoothState`, `SmoothOptions`) |  |
+| MessagePartPrimitive.Image | no | ported (as `img[auiPartImage]`) |  |
+| MessagePartPrimitive.InProgress | no | ported (as `*auiPartInProgress`) |  |
+| MessagePartPrimitive.Messages | no | ported (as `aui-part-messages`) |  |
+| useMessagePartText, useMessagePartReasoning, useMessagePartSource, useMessagePartFile, useMessagePartImage, useMessagePartData | no | ported (as `injectMessagePartText`, `injectMessagePartReasoning`, `injectMessagePartSource`, `injectMessagePartFile`, `injectMessagePartImage`, `injectMessagePartData`) |  |
 | makeAssistantToolUI, useAssistantToolUI, AssistantToolUI, AssistantToolUIProps | yes | ported (as `registerToolUI` and `ToolUIProps`) |  |
 | makeAssistantDataUI, useAssistantDataUI, AssistantDataUI, AssistantDataUIProps, DataRenderers | yes | ported (as `registerToolUI` and `DataUIProps`) |  |
 | ToolCallMessagePartComponent, ToolCallMessagePartProps | yes | ported (as `ToolUIComponent` and `ToolUIProps`) |  |
 | EmptyMessagePartComponent, EmptyMessagePartProps, TextMessagePartComponent, TextMessagePartProps, ReasoningMessagePartComponent, ReasoningMessagePartProps, SourceMessagePartComponent, SourceMessagePartProps, ImageMessagePartComponent, ImageMessagePartProps, FileMessagePartComponent, FileMessagePartProps, DataMessagePartComponent, DataMessagePartProps, QuoteMessagePartComponent, QuoteMessagePartProps | yes | ported (as `AuiPartTemplateDirective` and `AuiPartTemplateContext`) |  |
-| Unstable_AudioMessagePartComponent, Unstable_AudioMessagePartProps | no | planned (Task 3) (audio part template slot) | Task 3 |
-| ReasoningGroupComponent, ReasoningGroupProps | no | planned (Task 3) (group template slot of `aui-message-grouped-parts`) | Task 3 |
+| Unstable_AudioMessagePartComponent, Unstable_AudioMessagePartProps | no | ported (as `ng-template auiPart="audio"`) |  |
+| ReasoningGroupComponent, ReasoningGroupProps | no | ported (as `ng-template auiGroup` and `AuiGroupTemplateContext`) |  |
 | useToolArgsStatus, ToolArgsStatus | no | planned (Task 17) | Task 17 |
 | EnrichedPartState, PartState | no | planned (Task 22) (type re-exports) | Task 22 |
 | ToolExecutionStatus | no | planned (Task 22) (type re-export) | Task 22 |
@@ -191,8 +191,8 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ErrorPrimitive.Root | yes | planned (Task 3) | Task 3 |
-| ErrorPrimitive.Message | yes | planned (Task 3) | Task 3 |
+| ErrorPrimitive.Root | yes | ported (as `[auiErrorRoot]`) |  |
+| ErrorPrimitive.Message | yes | ported (as `[auiErrorMessage]`) |  |
 
 ### Attachments (`AttachmentPrimitive`)
 
