@@ -20,17 +20,25 @@
     "@angular/cdk": ">=18.2.0 <23.0.0",
     "@angular/common": ">=18.2.0 <23.0.0",
     "@angular/core": ">=18.2.0 <23.0.0",
+    "@angular/platform-browser": ">=18.2.0 <23.0.0",
     "@assistant-ui/core": "~0.3.36",
     "@assistant-ui/store": "~0.3.23",
     "@assistant-ui/tap": "~0.9.26",
     "@types/react": "*",
-    "ai": "^7.0.0"
+    "ai": "^7.0.0",
+    "markdown-it": "^15.0.3"
   },
   "peerDependenciesMeta": {
     "@angular/cdk": {
       "optional": true
     },
+    "@angular/platform-browser": {
+      "optional": true
+    },
     "ai": {
+      "optional": true
+    },
+    "markdown-it": {
       "optional": true
     }
   },

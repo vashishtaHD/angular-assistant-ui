@@ -13,6 +13,9 @@ module.exports = tseslint.config(
       'coverage/**',
       '.claude/**',
       '.superpowers/**',
+      // Vendored upstream sources, kept verbatim so they can be re-synced by SHA.
+      'projects/assistant-ui-angular/markdown/src/vendor/markdown/**',
+      'projects/assistant-ui-angular/markdown/src/vendor/react-markdown/preprocess*.ts',
     ],
   },
   {
