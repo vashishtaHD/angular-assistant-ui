@@ -49,7 +49,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | SuggestionByIndexProvider | yes | planned (Task 7) (via `indexScopeConfig` kind `suggestion`) | Task 7 |
 | MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | planned (Task 6) (via `indexScopeConfig` kind `attachment`) | Task 6 |
 | ThreadListItemByIndexProvider | yes | planned (Task 8) (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
-| ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | planned (Task 9) (parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
+| ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | ported (the `auiChainOfThought` template of `aui-message-parts` builds the group scope; parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
 | ThreadListItemRuntimeProvider, MessageProvider, TextMessagePartProvider, ReadonlyThreadProvider | no | planned (Task 22) (scopes from a bare runtime or message objects, for read-only rendering) | Task 22 |
 | useThreadViewport, useThreadViewportStore, ThreadViewportState | no | n/a (replaced by `AUI_VIEWPORT`, `injectAuiViewport` and `AuiViewport`) |  |
 | INTERNAL | no | n/a (upstream-internal namespace, not public API) |  |
@@ -242,9 +242,15 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ChainOfThoughtPrimitive.Root, ChainOfThoughtPrimitive.RootPrimitive | yes (via scope) | planned (Task 9) | Task 9 |
-| ChainOfThoughtPrimitive.AccordionTrigger, ChainOfThoughtPrimitive.AccordionTriggerPrimitive | yes | planned (Task 9) | Task 9 |
-| ChainOfThoughtPrimitive.Parts, ChainOfThoughtPrimitive.PartsPrimitive | yes | planned (Task 9) | Task 9 |
+| ChainOfThoughtPrimitive.Root, ChainOfThoughtPrimitive.RootPrimitive | yes (via scope) | ported (`[auiChainOfThoughtRoot]`, sets `data-collapsed`) | Task 9 |
+| ChainOfThoughtPrimitive.AccordionTrigger, ChainOfThoughtPrimitive.AccordionTriggerPrimitive | yes | ported (`button[auiChainOfThoughtAccordionTrigger]`, `aria-expanded`) | Task 9 |
+| ChainOfThoughtPrimitive.Parts, ChainOfThoughtPrimitive.PartsPrimitive | yes | ported (`aui-chain-of-thought-parts` with `ng-template auiPart` children) | Task 9 |
+
+Reasoning has no upstream primitive: a `reasoning` part renders through `auiPartTemplate`
+(`<ng-template auiPart="reasoning" let-part>`) like any other part type, in `aui-message-parts`
+and in `aui-chain-of-thought-parts`. React's `components.ChainOfThought` is the
+`<ng-template auiChainOfThought>` child of `aui-message-parts`: when present, each run of
+consecutive `reasoning` and `tool-call` parts renders as one chain of thought.
 
 ### Selection toolbar and assistant modal
 

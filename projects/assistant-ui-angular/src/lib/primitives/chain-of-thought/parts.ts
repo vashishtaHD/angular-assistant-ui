@@ -1,0 +1,123 @@
+// Ported from packages/vue/src/primitives/ChainOfThoughtPrimitiveParts.ts @ 7d74276
+// and packages/core/src/react/primitives/chainOfThought/ChainOfThoughtParts.tsx @ 7d74276
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  TemplateRef,
+  computed,
+  contentChildren,
+  inject,
+} from '@angular/core';
+import { getMessagePartKeys } from '@assistant-ui/core/internal';
+import type { AuiConfig } from '@assistant-ui/store/client';
+import { indexScopeConfig, indexScopeCount } from '../../scope/index-scope';
+import { AuiScopeOutletComponent } from '../../scope/scope-outlet.component';
+import { stableKeys } from '../../scope/stable-keys';
+import { injectAui } from '../../state/inject-aui';
+import { injectAuiState } from '../../state/inject-aui-state';
+import { AuiPartTemplateDirective } from '../message-parts.component';
+import {
+  AuiPartViewComponent,
+  type AuiPartTemplateContext,
+  type AuiPartTemplates,
+} from '../part-view.component';
+
+interface Entry {
+  index: number;
+  config: AuiConfig;
+}
+
+/**
+ * Renders the parts of the enclosing chain of thought (`reasoning` and
+ * `tool-call` parts), each in its own part scope, one per entry of
+ * `s.chainOfThought.parts`. Part templates are `ng-template auiPart` children
+ * (`reasoning`, `tool-call`, `default`); tool UIs registered in the `tools`
+ * scope still win for tool calls.
+ *
+ * Rendering is not gated on `s.chainOfThought.collapsed`, matching upstream:
+ * gate visibility in the caller (for example with `@if`).
+ *
+ * @example
+ * ```html
+ * <aui-chain-of-thought-parts>
+ *   <ng-template auiPart="reasoning" let-part>{{ part.type === 'reasoning' ? part.text : '' }}</ng-template>
+ * </aui-chain-of-thought-parts>
+ * ```
+ */
+@Component({
+  selector: 'aui-chain-of-thought-parts',
+  standalone: true,
+  imports: [AuiScopeOutletComponent, AuiPartViewComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
+  template: `
+    <ng-template #partView><aui-part-view [templates]="templateMap()" /></ng-template>
+    @for (key of keys(); track key) {
+      <aui-scope-outlet [config]="configFor(key, $index)" [template]="partView" />
+    }
+  `,
+})
+export class AuiChainOfThoughtPartsComponent {
+  private readonly templates = contentChildren(AuiPartTemplateDirective);
+
+  /** Projected templates by part type; the first one for a type wins. */
+  protected readonly templateMap = computed<AuiPartTemplates>(() => {
+    const map = new Map<string, TemplateRef<AuiPartTemplateContext>>();
+    for (const directive of this.templates()) {
+      const type = directive.auiPart();
+      if (!map.has(type)) map.set(type, directive.templateRef);
+    }
+    return map;
+  });
+
+  private readonly aui = injectAui();
+  private readonly parts = injectAuiState((s) => s.chainOfThought.parts);
+  /** The part keys, stable while they keep the same order. */
+  protected readonly keys = stableKeys(() => getMessagePartKeys(this.parts()));
+
+  private readonly entries = new Map<string, Entry>();
+  private prunedFor: readonly string[] | undefined;
+  private destroyed = false;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
+      this.entries.clear();
+    });
+  }
+
+  /** Returns the memoised scope config for the part `key` at `index`. */
+  protected configFor(key: string, index: number): AuiConfig {
+    const keys = this.keys();
+    if (keys !== this.prunedFor) {
+      this.prunedFor = keys;
+      const live = new Set(keys);
+      for (const known of this.entries.keys()) {
+        if (!live.has(known)) this.entries.delete(known);
+      }
+    }
+    const existing = this.entries.get(key);
+    if (existing && existing.index === index) return existing.config;
+    const aui = this.aui;
+    const entry: Entry = {
+      index,
+      config: indexScopeConfig(
+        'chainOfThoughtPart',
+        aui,
+        index,
+        () => !this.destroyed && this.entries.get(key) === entry && this.isValid(index),
+      ),
+    };
+    this.entries.set(key, entry);
+    return entry.config;
+  }
+
+  private isValid(index: number): boolean {
+    try {
+      return index < indexScopeCount('chainOfThoughtPart', this.aui);
+    } catch {
+      return false;
+    }
+  }
+}

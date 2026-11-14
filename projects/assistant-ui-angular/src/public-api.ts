@@ -67,3 +67,9 @@ export {
   injectActionButton,
   type ActionButtonOptions,
 } from './lib/primitives/action-button';
+
+// Task 9: chain of thought primitives and reasoning grouping.
+export { AuiChainOfThoughtAccordionTriggerDirective } from './lib/primitives/chain-of-thought/accordion-trigger';
+export { AuiChainOfThoughtPartsComponent } from './lib/primitives/chain-of-thought/parts';
+export { AuiChainOfThoughtRootDirective } from './lib/primitives/chain-of-thought/root';
+export { AuiChainOfThoughtTemplateDirective } from './lib/primitives/message-parts.component';

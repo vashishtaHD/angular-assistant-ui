@@ -1,17 +1,22 @@
 // Ported from packages/vue/src/primitives/MessagePrimitiveParts.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
   Directive,
+  Injector,
   TemplateRef,
   computed,
+  contentChild,
   contentChildren,
   inject,
   input,
 } from '@angular/core';
+import { ChainOfThoughtClient } from '@assistant-ui/core/store';
+import type { ChainOfThoughtPart } from '@assistant-ui/core/store';
 import { getMessagePartKeys } from '@assistant-ui/core/internal';
-import type { AssistantClient, AuiConfig } from '@assistant-ui/store/client';
+import { AuiConfig, type AssistantClient } from '@assistant-ui/store/client';
 import { partScopeConfig } from '../scope/part-scope';
 import { AuiScopeOutletComponent } from '../scope/scope-outlet.component';
 import { stableKeys } from '../scope/stable-keys';
@@ -60,6 +65,94 @@ export class AuiPartTemplateDirective {
   }
 }
 
+/**
+ * Marks the `<ng-template>` that {@link AuiMessagePartsComponent} renders for
+ * each chain of thought. Its presence turns grouping on, like React's
+ * `components.ChainOfThought`: every run of consecutive `reasoning` and
+ * `tool-call` parts becomes one chain of thought, rendered by this template
+ * inside a chain of thought scope (`s.chainOfThought`). The template
+ * normally holds an `auiChainOfThoughtRoot`, an
+ * `auiChainOfThoughtAccordionTrigger` and an `<aui-chain-of-thought-parts>`.
+ *
+ * @example
+ * ```html
+ * <aui-message-parts>
+ *   <ng-template auiChainOfThought>
+ *     <div auiChainOfThoughtRoot>
+ *       <button auiChainOfThoughtAccordionTrigger>Reasoning</button>
+ *       <aui-chain-of-thought-parts>...</aui-chain-of-thought-parts>
+ *     </div>
+ *   </ng-template>
+ * </aui-message-parts>
+ * ```
+ */
+@Directive({
+  selector: 'ng-template[auiChainOfThought]',
+  standalone: true,
+})
+export class AuiChainOfThoughtTemplateDirective {
+  /** The marked template. */
+  readonly templateRef = inject<TemplateRef<unknown>>(TemplateRef);
+}
+
+/** Internal: renders the chain of thought template inside its scope. */
+@Component({
+  selector: 'aui-chain-of-thought-host',
+  standalone: true,
+  imports: [NgTemplateOutlet],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
+  template: `<ng-container *ngTemplateOutlet="template(); injector: injector" />`,
+})
+export class AuiChainOfThoughtHostComponent {
+  /** The template to render. */
+  readonly template = input.required<TemplateRef<unknown>>();
+  /** Renders the template in the chain of thought scope. */
+  protected readonly injector = inject(Injector);
+}
+
+/** One rendered range of parts: a single part or a chain of thought. */
+type PartRange =
+  | { kind: 'single'; key: string; index: number }
+  | { kind: 'chain'; key: string; start: number; end: number };
+
+/**
+ * Groups consecutive `reasoning` and `tool-call` parts into chain of thought
+ * ranges; every other part is a single range. A group keyed by an id-bearing
+ * first part (`id:<partId>`) keeps its identity when it grows.
+ */
+const chainRanges = (types: readonly string[], partIds: readonly string[]): PartRange[] => {
+  const ranges: PartRange[] = [];
+  const claimed = new Set<string>();
+  let start = -1;
+  const endGroup = (end: number) => {
+    if (start === -1) return;
+    const id = partIds[start];
+    let identity: string | number = start;
+    if (id?.includes(':') && !claimed.has(id)) {
+      claimed.add(id);
+      identity = `id:${id}`;
+    }
+    ranges.push({
+      kind: 'chain',
+      key: JSON.stringify(['chainOfThoughtGroup', identity]),
+      start,
+      end,
+    });
+    start = -1;
+  };
+  types.forEach((type, i) => {
+    if (type === 'tool-call' || type === 'reasoning') {
+      if (start === -1) start = i;
+    } else {
+      endGroup(i - 1);
+      ranges.push({ kind: 'single', key: partIds[i] ?? String(i), index: i });
+    }
+  });
+  endGroup(types.length - 1);
+  return ranges;
+};
+
 /** True when the current message of `aui` has a part at `index`. */
 const hasPart = (aui: AssistantClient, index: number): boolean => {
   try {
@@ -105,13 +198,26 @@ interface PartEntry {
 @Component({
   selector: 'aui-message-parts',
   standalone: true,
-  imports: [AuiScopeOutletComponent, AuiPartViewComponent],
+  imports: [AuiScopeOutletComponent, AuiPartViewComponent, AuiChainOfThoughtHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
     <ng-template #partView><aui-part-view [templates]="templateMap()" /></ng-template>
-    @for (key of keys(); track key) {
-      <aui-scope-outlet [config]="configFor(key, $index)" [template]="partView" />
+    <ng-template #chainView
+      ><aui-chain-of-thought-host [template]="chainTemplate()!"
+    /></ng-template>
+    @if (chainTemplate()) {
+      @for (range of ranges(); track range.key) {
+        @if (range.kind === 'single') {
+          <aui-scope-outlet [config]="configFor(range.key, range.index)" [template]="partView" />
+        } @else {
+          <aui-scope-outlet [config]="chainConfigFor(range)" [template]="chainView" />
+        }
+      }
+    } @else {
+      @for (key of keys(); track key) {
+        <aui-scope-outlet [config]="configFor(key, $index)" [template]="partView" />
+      }
     }
   `,
 })
@@ -133,6 +239,17 @@ export class AuiMessagePartsComponent {
   /** The part keys, stable while they keep the same order. */
   protected readonly keys = stableKeys(() => getMessagePartKeys(this.parts()));
 
+  private readonly chainTemplateDirective = contentChild(AuiChainOfThoughtTemplateDirective);
+  /** The projected chain of thought template; grouping is on while it exists. */
+  protected readonly chainTemplate = computed(() => this.chainTemplateDirective()?.templateRef);
+  private readonly types = injectAuiState((s) => s.message.parts.map((part) => part.type));
+  /** The ranges to render while a chain of thought template is projected. */
+  protected readonly ranges = computed(() => chainRanges(this.types(), this.keys()));
+  private readonly chains = new Map<
+    string,
+    { parts: readonly unknown[]; start: number; end: number; config: AuiConfig }
+  >();
+
   private readonly entries = new Map<string, PartEntry>();
   private prunedFor: readonly string[] | undefined;
   private destroyed = false;
@@ -142,6 +259,42 @@ export class AuiMessagePartsComponent {
       this.destroyed = true;
       this.entries.clear();
     });
+  }
+
+  /** Returns the memoised chain of thought scope config for `range`. */
+  protected chainConfigFor(range: PartRange & { kind: 'chain' }): AuiConfig {
+    const parts = this.parts();
+    const known = this.chains.get(range.key);
+    if (known && known.parts === parts && known.start === range.start && known.end === range.end) {
+      return known.config;
+    }
+    const aui = this.aui;
+    const { start, end } = range;
+    const slice = parts.slice(start, end + 1) as ChainOfThoughtPart[];
+    const config = AuiConfig({
+      chainOfThought: ChainOfThoughtClient({
+        parts: slice,
+        getMessagePart: ({ index }) => {
+          if (index < 0 || slice.length === 0) {
+            throw new Error(
+              `ChainOfThought part index ${index} is out of bounds (0..${slice.length - 1})`,
+            );
+          }
+          // A row of a part that just left the chain can still look itself up
+          // for a moment (its scope item is served from the last-valid
+          // cache). Upstream throws there; clamping keeps that window quiet
+          // and the scope serves the chain's last part instead.
+          index = Math.min(index, slice.length - 1);
+          return aui.message.part({ index: start + index });
+        },
+      }),
+    });
+    this.chains.set(range.key, { parts, start, end, config });
+    if (this.chains.size > this.ranges().length) {
+      const live = new Set(this.ranges().map((r) => r.key));
+      for (const k of this.chains.keys()) if (!live.has(k)) this.chains.delete(k);
+    }
+    return config;
   }
 
   /** Returns the memoised scope config for the part `key` at `index`. */
