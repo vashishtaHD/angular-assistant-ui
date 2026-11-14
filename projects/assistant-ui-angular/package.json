@@ -17,28 +17,48 @@
   "bugs": "https://github.com/vashishtaHD/angular-assistant-ui/issues",
   "homepage": "https://github.com/vashishtaHD/angular-assistant-ui#readme",
   "peerDependencies": {
+    "@ai-sdk/react": "^4.0.157",
     "@angular/cdk": ">=18.2.0 <23.0.0",
     "@angular/common": ">=18.2.0 <23.0.0",
     "@angular/core": ">=18.2.0 <23.0.0",
     "@angular/platform-browser": ">=18.2.0 <23.0.0",
+    "@assistant-ui/ai-sdk": "0.0.18",
     "@assistant-ui/core": "~0.3.36",
     "@assistant-ui/store": "~0.3.23",
     "@assistant-ui/tap": "~0.9.26",
     "@types/react": "*",
-    "ai": "^7.0.0",
-    "markdown-it": "^15.0.3"
+    "ai": "^7.0.101",
+    "assistant-stream": "^0.3.57",
+    "markdown-it": "^15.0.3",
+    "react": "^18 || ^19",
+    "shiki": "^4.6.0"
   },
   "peerDependenciesMeta": {
+    "@ai-sdk/react": {
+      "optional": true
+    },
     "@angular/cdk": {
       "optional": true
     },
     "@angular/platform-browser": {
       "optional": true
     },
+    "@assistant-ui/ai-sdk": {
+      "optional": true
+    },
     "ai": {
       "optional": true
     },
+    "assistant-stream": {
+      "optional": true
+    },
     "markdown-it": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "shiki": {
       "optional": true
     }
   },

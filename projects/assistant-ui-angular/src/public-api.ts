@@ -266,3 +266,232 @@ export {
   type SmoothOptions,
   type SmoothState,
 } from './lib/utils/smooth';
+// Task 10: headless menus, composer trigger popover, selection toolbar and assistant modal.
+export { AuiMenuRootDirective } from './lib/primitives/menu/menu-root.directive';
+export type {
+  AuiMenuInitialFocus,
+  AuiMenuSetOpenOptions,
+} from './lib/primitives/menu/menu-root.directive';
+export { AuiMenuTriggerDirective } from './lib/primitives/menu/menu-trigger.directive';
+export { AuiMenuContentDirective } from './lib/primitives/menu/menu-content.directive';
+export { AuiMenuItemDirective } from './lib/primitives/menu/menu-item.directive';
+export { AuiMenuSeparatorDirective } from './lib/primitives/menu/menu-separator.directive';
+export {
+  AuiActionBarMoreRootDirective,
+  AuiActionBarMoreTriggerDirective,
+  AuiActionBarMoreContentDirective,
+  AuiActionBarMoreItemDirective,
+  AuiActionBarMoreSeparatorDirective,
+} from './lib/primitives/action-bar-more';
+export {
+  AuiThreadListItemMoreRootDirective,
+  AuiThreadListItemMoreTriggerDirective,
+  AuiThreadListItemMoreContentDirective,
+  AuiThreadListItemMoreItemDirective,
+  AuiThreadListItemMoreSeparatorDirective,
+} from './lib/primitives/thread-list-item-more';
+export { AuiAssistantModalRootDirective } from './lib/primitives/assistant-modal/assistant-modal-root.directive';
+export { AuiAssistantModalTriggerDirective } from './lib/primitives/assistant-modal/assistant-modal-trigger.directive';
+export { AuiAssistantModalAnchorDirective } from './lib/primitives/assistant-modal/assistant-modal-anchor.directive';
+export { AuiAssistantModalContentDirective } from './lib/primitives/assistant-modal/assistant-modal-content.directive';
+export { AuiSelectionToolbarRootDirective } from './lib/primitives/selection-toolbar/selection-toolbar-root.directive';
+export type { SelectionToolbarInfo } from './lib/primitives/selection-toolbar/selection-toolbar-root.directive';
+export { AuiSelectionToolbarQuoteDirective } from './lib/primitives/selection-toolbar/selection-toolbar-quote.directive';
+export { getSelectionMessageId } from './lib/primitives/selection-toolbar/get-selection-message-id';
+export {
+  defaultDirectiveFormatter,
+  unstable_defaultDirectiveFormatter,
+  detectTrigger,
+  matchesTriggerItemQuery,
+  resolveTriggerMatch,
+  type DirectiveFormatter,
+  type DirectiveSegment,
+  type TriggerAdapter,
+  type TriggerBehavior,
+  type TriggerCategory,
+  type TriggerItem,
+  type TriggerMatch,
+  type TriggerMatcher,
+  type Unstable_DirectiveFormatter,
+  type Unstable_DirectiveSegment,
+  type Unstable_TriggerAdapter,
+  type Unstable_TriggerBehavior,
+  type Unstable_TriggerCategory,
+  type Unstable_TriggerItem,
+  type Unstable_TriggerMatch,
+  type Unstable_TriggerMatcher,
+} from './lib/primitives/composer-trigger-popover/trigger-contracts';
+export {
+  AuiComposerTriggerPopoverRootDirective,
+  AuiUnstableComposerTriggerPopoverRootDirective,
+  injectTriggerPopoverRootContext,
+  injectTriggerPopoverRootContextOptional,
+  injectTriggerPopoverTriggers,
+  injectTriggerPopoverTriggersOptional,
+  injectTriggerPopoverAriaProps,
+  type ComposerInputPlugin,
+  type RegisteredTrigger,
+  type TriggerPopoverActiveAria,
+  type TriggerPopoverAriaProps,
+  type TriggerPopoverLifecycleListener,
+  type Unstable_RegisteredTrigger,
+  type Unstable_TriggerPopoverAriaProps,
+} from './lib/primitives/composer-trigger-popover/trigger-popover-root.directive';
+export {
+  AuiComposerTriggerPopoverDirective,
+  AuiUnstableComposerTriggerPopoverDirective,
+  injectTriggerPopoverScopeContext,
+  injectTriggerPopoverScopeContextOptional,
+  type TriggerActionConfig,
+  type TriggerDirectiveConfig,
+  type TriggerNavigableEntry,
+} from './lib/primitives/composer-trigger-popover/trigger-popover.directive';
+export {
+  AuiComposerTriggerPopoverCategoriesDirective,
+  AuiComposerTriggerPopoverCategoryItemDirective,
+  AuiComposerTriggerPopoverItemsDirective,
+  AuiComposerTriggerPopoverItemDirective,
+  AuiComposerTriggerPopoverBackDirective,
+  AuiUnstableComposerTriggerPopoverCategoriesDirective,
+  AuiUnstableComposerTriggerPopoverCategoryItemDirective,
+  AuiUnstableComposerTriggerPopoverItemsDirective,
+  AuiUnstableComposerTriggerPopoverItemDirective,
+  AuiUnstableComposerTriggerPopoverBackDirective,
+} from './lib/primitives/composer-trigger-popover/trigger-popover-parts.directive';
+export { AuiComposerTriggerPopoverInputDirective } from './lib/primitives/composer-trigger-popover/trigger-popover-input.directive';
+export {
+  injectMentionAdapter,
+  type MentionAdapterBundle,
+  type Unstable_IconComponent,
+  type Unstable_Mention,
+  type Unstable_MentionCategory,
+  type Unstable_MentionDirective,
+  type Unstable_ModelContextToolsOptions,
+  type Unstable_UseMentionAdapterOptions,
+} from './lib/primitives/composer-trigger-popover/inject-mention-adapter';
+export {
+  injectSlashCommandAdapter,
+  type SlashCommandAdapterBundle,
+  type Unstable_SlashCommand,
+  type Unstable_SlashCommandAction,
+  type Unstable_UseSlashCommandAdapterOptions,
+} from './lib/primitives/composer-trigger-popover/inject-slash-command-adapter';
+export {
+  injectLiveCompletionAdapter,
+  type LiveCompletionAdapterBundle,
+  type Unstable_UseLiveCompletionAdapterOptions,
+} from './lib/primitives/composer-trigger-popover/inject-live-completion-adapter';
+// Task 6: attachments (attachment scope primitives, composer add/dropzone/list, message list).
+export { AuiAttachmentRootDirective } from './lib/primitives/attachment/attachment-root.directive';
+export { AuiAttachmentNameComponent } from './lib/primitives/attachment/attachment-name.component';
+export { AuiAttachmentThumbDirective } from './lib/primitives/attachment/attachment-thumb.directive';
+export {
+  AuiAttachmentThumbLabelComponent,
+  getAttachmentThumbLabel,
+} from './lib/primitives/attachment/attachment-thumb-label.component';
+export { AuiAttachmentRemoveDirective } from './lib/primitives/attachment/attachment-remove.directive';
+export {
+  AuiAttachmentTemplateDirective,
+  getAttachmentKeys,
+  type AuiAttachmentTemplateContext,
+} from './lib/primitives/attachment/attachment-list';
+export type { AuiAttachmentError } from './lib/primitives/attachment/inject-add-attachments';
+export { AuiComposerAddAttachmentDirective } from './lib/primitives/composer-add-attachment.directive';
+export { AuiComposerAttachmentDropzoneDirective } from './lib/primitives/composer-attachment-dropzone.directive';
+export { AuiComposerAttachmentsComponent } from './lib/primitives/composer-attachments.component';
+export { AuiMessageAttachmentsComponent } from './lib/primitives/message-attachments.component';
+export {
+  CompositeAttachmentAdapter,
+  SimpleImageAttachmentAdapter,
+  SimpleTextAttachmentAdapter,
+  type Attachment,
+  type AttachmentAdapter,
+  type AttachmentRuntime,
+  type AttachmentRuntimeState,
+  type AttachmentState,
+  type AttachmentStatus,
+  type CompleteAttachment,
+  type CreateAttachment,
+  type PendingAttachment,
+} from '@assistant-ui/core';
+// Task 22: model context, frontend tools, interactables and runtime helpers.
+export {
+  injectAssistantInstructions,
+  type AssistantInstructionsOptions,
+  type MaybeSignal,
+} from './lib/model-context/instructions';
+export {
+  injectAssistantContext,
+  type AssistantContextConfig,
+  type AssistantContextOptions,
+} from './lib/model-context/context';
+export { AuiAssistantVisibleDirective } from './lib/model-context/visible';
+export {
+  makeAssistantTool,
+  registerTool,
+  type AssistantTool,
+  type AssistantToolProps,
+  type AuiToolDefinition,
+  type AuiToolDisplay,
+} from './lib/tools/register-tool';
+export {
+  injectAuiToolOverrides,
+  registerToolkit,
+  type AuiToolOverrides,
+  type AuiToolkit,
+} from './lib/tools/toolkit';
+export {
+  unstable_injectInteractable,
+  unstable_injectInteractableState,
+  unstable_injectInteractableVersions,
+  type InteractableConfig,
+  type InteractableHandle,
+  type InteractableStateHandle,
+  type InteractableStateUpdater,
+} from './lib/interactables/inject-interactable';
+export {
+  injectAssistantInteractable,
+  injectInteractableState,
+  type AssistantInteractableProps,
+  type LegacyInteractableStateHandle,
+} from './lib/interactables/legacy';
+export {
+  registerInteractableToolConfig,
+  unstable_interactableTool,
+  type InteractableToolRenderComponent,
+  type Unstable_InteractableToolConfig,
+  type Unstable_InteractableToolRenderProps,
+} from './lib/interactables/interactable-tool';
+export { unstable_injectThreadMessageIds } from './lib/state/inject-thread-message-ids';
+export {
+  createExternalStoreRuntime,
+  createLocalRuntime,
+  injectExternalStoreRuntime,
+  injectLocalRuntime,
+  remoteThreadListConfig,
+  type LocalRuntimeFactoryOptions,
+  type ManagedRuntime,
+  type RemoteThreadListConfigOptions,
+} from './lib/runtime/factories';
+export {
+  createExternalMessageConverter,
+  type ExternalMessageConverter,
+  type ExternalMessageConverterOptions,
+  type ExternalMessageConverterCallback,
+  type ExternalMessageConverterMetadata,
+} from './lib/runtime/external-message-converter';
+export {
+  messageObjectScope,
+  readonlyThreadScope,
+  textMessagePartScope,
+  threadListItemRuntimeScope,
+  type ReadonlyThreadScope,
+} from './lib/runtime/scopes';
+export * from './lib/runtime/re-exports';
+export {
+  createAssistantTransportRuntime,
+  injectAssistantTransportSendCommand,
+  injectAssistantTransportState,
+  type AssistantTransportRuntime,
+  type AssistantTransportRuntimeOptions,
+} from './lib/runtime/assistant-transport';

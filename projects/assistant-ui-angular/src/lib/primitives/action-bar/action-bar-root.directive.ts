@@ -34,7 +34,9 @@ type Status = 'hidden' | 'floating' | 'normal';
 
 /**
  * The root of an action bar inside a message scope. Hides itself with the
- * `hidden` attribute (it stays in the DOM, so its content keeps state)
+ * `hidden` attribute plus a host `display: none` style binding, so class-based
+ * author CSS such as `.flex` cannot show it (it stays in the DOM, so its
+ * content keeps state)
  * according to `hideWhenRunning` and `autohide`, and sets `data-floating`
  * while auto-hidden-but-visible and `autohideFloat` allows floating.
  *
@@ -58,6 +60,7 @@ type Status = 'hidden' | 'floating' | 'normal';
   ],
   host: {
     '[attr.hidden]': 'status() === "hidden" ? "" : null',
+    '[style.display]': 'status() === "hidden" ? "none" : null',
     '[attr.data-floating]': 'status() === "floating" ? "true" : null',
     '(focusin)': 'focusWithin.set(true)',
     '(focusout)': 'onFocusOut($event)',

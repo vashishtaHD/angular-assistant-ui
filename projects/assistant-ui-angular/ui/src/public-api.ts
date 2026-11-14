@@ -34,11 +34,6 @@ export {
   AuiDropdownMenuTriggerDirective,
 } from './dropdown-menu/dropdown-menu';
 export type { AuiDropdownMenuAlign } from './dropdown-menu/dropdown-menu';
-// Host directives of the dropdown menu. The Angular compiler requires them to be
-// exported; do not use them directly. They are replaced when the menu moves to the
-// main entry's headless menu (Ruling R10).
-export { UiMenuContentDirective, UiMenuItemDirective } from './dropdown-menu/headless-menu';
-
 // Task 16: styled thread, messages, composer, action bars, branch picker and markdown text.
 export { AuiThreadComponent } from './thread/thread.component';
 export type {
