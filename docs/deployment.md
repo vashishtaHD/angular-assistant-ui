@@ -43,40 +43,43 @@ host root as well, or change the loader (`load(url)` in
 `projects/demo/src/app/runtime-config.ts`) to resolve against the base href. If the file
 is missing, the app logs a warning and falls back to the localhost default.
 
-## Gating the chat route
+## Identity and auth modes
 
-The chat route is open by default. Before exposing it, add auth middleware to the
-Mastra server (`server.middleware` in `mastra-server/src/mastra/index.ts`) that rejects
-requests without valid credentials, for example by checking a bearer token or session
-cookie.
+The server derives the user from the request and uses it as the memory resource id.
+A `resourceId` in a body or query string is ignored. `MASTRA_AUTH_MODE` is required;
+the server refuses to start without it.
 
-Then forward credentials from Angular by providing your own `CHAT_TRANSPORT`, which the
-demo's chat component uses instead of its default transport:
+| Mode  | Settings                                              | Behaviour                                                                                  |
+| ----- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `dev` | `MASTRA_AUTH_MODE=dev` and `MASTRA_DEV_AUTH=1`        | Every request is the fixed user `dev-user`. No token needed. Never use outside local development. |
+| `jwt` | `MASTRA_AUTH_MODE=jwt` and `MASTRA_JWT_SECRET=<long random value>` | Requests need `Authorization: Bearer <HS256 JWT>`. The `sub` claim is the user id; `exp` and `nbf` are honoured. Missing or invalid tokens get 401. |
 
-```ts
-import { type ApplicationConfig, inject } from '@angular/core';
-import { AssistantChatTransport } from '@assistant-ui/ai-sdk';
-import { CHAT_TRANSPORT } from './chat/chat-transport.token';
-import { MASTRA_CHAT_URL } from './runtime-config';
+`jwt` mode is the example verifier. To plug in your own identity provider, pass a
+`verifyToken(token)` hook to `createMastra({ verifyToken })` in
+`mastra-server/src/mastra/index.ts`. It returns `{ id }` for a valid token and `null`
+otherwise. The `id` becomes the resource id for every thread and message.
 
-export const appConfig: ApplicationConfig = {
-  providers: [
-    // ...
-    {
-      provide: CHAT_TRANSPORT,
-      useFactory: () => {
-        const auth = inject(AuthService); // your own service
-        return new AssistantChatTransport({
-          api: inject(MASTRA_CHAT_URL),
-          headers: () => ({ Authorization: `Bearer ${auth.token()}` }),
-          credentials: 'include',
-        });
-      },
-    },
-  ],
-};
-```
+Forward the token from Angular with a `headers` function returning an `Authorization: Bearer <token>`
+header on the chat transport and on the memory and history requests. The server allows the
+`Authorization` and `Content-Type` headers from `FRONTEND_ORIGIN`.
 
-`credentials: 'include'` sends cookies cross-origin, which works because the server
-already sets `credentials: true` for `FRONTEND_ORIGIN`. Use `headers`, `credentials`, or
-both depending on how your server authenticates.
+## Storage
+
+Threads and messages are stored in LibSQL. Set `MASTRA_DB_URL` to a `file:` path (default
+`file:./mastra.db`, so mount a volume to keep it) or to a remote libSQL/Turso URL. Tests
+use `:memory:`.
+
+## Request size
+
+The chat route accepts bodies up to `MASTRA_MAX_BODY_BYTES` (default 10 MiB) and answers
+413 above that. Image attachments travel as base64 data URLs in the JSON body, about 33%
+larger than the file, so a 2 MB image needs about 2.7 MB. Put any reverse proxy limit
+(for example nginx `client_max_body_size`) at or above this value. The image model must be
+multimodal for the model to see attachments.
+
+## Branches and the stored log
+
+Mastra memory is a linear log. The server stores only the branch that was last sent: on
+each send the frontend lists the active branch's message ids, and the server deletes the
+stored messages that are not on it. Other branches live in the browser for the session only.
+Reopening a thread restores the last branch that was sent, not the last one viewed.
