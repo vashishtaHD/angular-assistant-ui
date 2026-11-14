@@ -70,7 +70,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | ThreadPrimitive.LoadEarlier | no | planned (Task 2) | Task 2 |
 | ThreadPrimitive.Suggestions | yes | ported | Task 7 |
 | ThreadPrimitive.SuggestionByIndex | provider | ported | Task 7 |
-| ThreadPrimitive.Suggestion | no (use `SuggestionPrimitiveTrigger`) | ported (covered by `button[auiSuggestionTrigger]`) | Task 7 |
+| ThreadPrimitive.Suggestion | no (use `SuggestionPrimitiveTrigger`) | ported (covered by `button[auiSuggestionTrigger]`; pass `prompt` for an explicit-prompt button outside the list) | Task 7 |
 | ThreadPrimitive.Empty, ThreadPrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
 | useScrollLock | yes | planned (Task 2) | Task 2 |
 | unstable_useThreadMessageIds | no | planned (Task 22) (Angular accessor over `s.thread.messages`) | Task 22 |

@@ -7,8 +7,8 @@ import { injectAui } from '../../state/inject-aui';
 import { injectAuiState } from '../../state/inject-aui-state';
 
 /**
- * A button that triggers the current suggestion (use inside the template of
- * `aui-thread-suggestions`). With `send`, the prompt is appended as a message
+ * A button that triggers a suggestion: the scoped one (inside the template of
+ * `aui-thread-suggestions`) or, with `prompt`, an explicit prompt anywhere. With `send`, the prompt is appended as a message
  * and starts a run (a queued send never clears a draft the user is still
  * composing). Without it, the prompt replaces the composer text, or is
  * appended to it when `clearComposer` is false. Disabled per core's
@@ -25,11 +25,17 @@ export class AuiSuggestionTriggerDirective {
   readonly send = input(false, { transform: booleanAttribute });
   /** Clear (or replace) the composer text; when false the prompt is appended to it. */
   readonly clearComposer = input(true, { transform: booleanAttribute });
+  /**
+   * An explicit prompt, for app-authored buttons outside `aui-thread-suggestions`
+   * (React's `ThreadPrimitive.Suggestion`). When set, the suggestion scope is
+   * not read at all; when omitted the button reads the scoped suggestion's prompt.
+   */
+  readonly prompt = input<string | undefined>(undefined);
   /** Consumer-controlled disabled flag, combined with the store predicate. */
   readonly disabled = input(false, { transform: booleanAttribute });
 
   private readonly aui = injectAui();
-  private readonly prompt = injectAuiState((s) => s.suggestion.prompt);
+  private readonly resolvedPrompt = injectAuiState((s) => this.prompt() ?? s.suggestion.prompt);
   private readonly blocked = injectAuiState((s) => suggestionTriggerDisabled(s, this.send()));
 
   constructor() {
@@ -41,7 +47,7 @@ export class AuiSuggestionTriggerDirective {
 
   private trigger(): void {
     const aui = this.aui;
-    const prompt = this.prompt();
+    const prompt = this.resolvedPrompt();
     flushTapSync(() => {
       if (this.send()) {
         const mode = suggestionSendMode(aui.thread.getState());

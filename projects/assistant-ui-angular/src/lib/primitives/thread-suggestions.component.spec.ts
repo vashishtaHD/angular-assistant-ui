@@ -24,8 +24,13 @@ const suggestion = (n: number): ThreadSuggestion => ({
   prompt: `P${n}`,
 });
 
-function createSpyRuntime(initial: readonly ThreadSuggestion[]) {
+function createSpyRuntime(initial: readonly ThreadSuggestion[], withQueue = false) {
   const onNew = vi.fn(async () => undefined);
+  const enqueue = vi.fn();
+  const steer = vi.fn();
+  const queue = withQueue
+    ? { items: [], steerItems: [], enqueue, steer, move: vi.fn(), edit: vi.fn(), remove: vi.fn() }
+    : undefined;
   let isRunning = false;
   let suggestions = initial;
   const make = (): ExternalStoreAdapter<{ role: 'user'; content: string }> => ({
@@ -34,11 +39,14 @@ function createSpyRuntime(initial: readonly ThreadSuggestion[]) {
     suggestions,
     convertMessage: (m) => m,
     onNew,
+    queue,
   });
   const core = new ExternalStoreRuntimeCore(make());
   const runtime = new AssistantRuntimeImpl(core);
   return {
     onNew,
+    enqueue,
+    steer,
     config: AuiConfig({ threads: RuntimeAdapter(runtime) }),
     setRunning(value: boolean) {
       isRunning = value;
@@ -87,6 +95,8 @@ let current: ReturnType<typeof createSpyRuntime>;
           <button auiSuggestionTrigger [clearComposer]="false" class="append">add</button>
         </ng-template>
       </aui-thread-suggestions>
+      <button auiSuggestionTrigger prompt="Explicit" class="explicit-fill">e</button>
+      <button auiSuggestionTrigger prompt="Explicit" send class="explicit-send">s</button>
     </div>
   `,
 })
@@ -102,8 +112,8 @@ const settle = async (fixture: ComponentFixture<unknown>) => {
   }
 };
 
-const mount = async (initial: readonly ThreadSuggestion[]) => {
-  current = createSpyRuntime(initial);
+const mount = async (initial: readonly ThreadSuggestion[], withQueue = false) => {
+  current = createSpyRuntime(initial, withQueue);
   configureTestBed({ imports: [HostComponent] });
   const fixture = TestBed.createComponent(HostComponent);
   fixture.detectChanges();
@@ -184,6 +194,52 @@ describe('aui-thread-suggestions', () => {
     flushTapSync(() => rt.setRunning(false));
     await settle(fixture);
     expect(q('send')[0]!.disabled).toBe(false);
+    fixture.destroy();
+  });
+
+  it('an explicit-prompt trigger outside the list fills the composer', async () => {
+    const { fixture, rt, aui, q } = await mount([]);
+    expect(q('fill')).toHaveLength(0);
+    q('explicit-fill')[0]!.click();
+    await settle(fixture);
+    expect(aui.composer().getState().text).toBe('Explicit');
+    expect(rt.onNew).not.toHaveBeenCalled();
+    fixture.destroy();
+  });
+
+  it('an explicit-prompt trigger with send appends the prompt and starts a run', async () => {
+    const { fixture, rt, aui, q } = await mount([]);
+    flushTapSync(() => aui.composer().setText('draft'));
+    q('explicit-send')[0]!.click();
+    await settle(fixture);
+    expect(rt.onNew).toHaveBeenCalledTimes(1);
+    const message = (rt.onNew.mock.calls[0] as unknown[])[0] as { content: unknown };
+    expect(message.content).toEqual([{ type: 'text', text: 'Explicit' }]);
+    expect(aui.composer().getState().text).toBe('');
+    fixture.destroy();
+  });
+
+  it('forwards the composer runConfig when sending', async () => {
+    const { fixture, rt, aui, q } = await mount([suggestion(1)]);
+    flushTapSync(() => aui.composer().setRunConfig({ custom: { tag: 'x' } }));
+    q('send')[0]!.click();
+    await settle(fixture);
+    const message = (rt.onNew.mock.calls[0] as unknown[])[0] as { runConfig: unknown };
+    expect(message.runConfig).toEqual({ custom: { tag: 'x' } });
+    fixture.destroy();
+  });
+
+  it('on a queue-capable runtime a send during a run stays enabled, queues and keeps the draft', async () => {
+    const { fixture, rt, aui, q } = await mount([suggestion(1)], true);
+    flushTapSync(() => rt.setRunning(true));
+    await settle(fixture);
+    expect(q('send')[0]!.disabled).toBe(false);
+    flushTapSync(() => aui.composer().setText('draft'));
+    q('send')[0]!.click();
+    await settle(fixture);
+    expect(rt.onNew).not.toHaveBeenCalled();
+    expect(rt.enqueue.mock.calls.length + rt.steer.mock.calls.length).toBe(1);
+    expect(aui.composer().getState().text).toBe('draft');
     fixture.destroy();
   });
 });
