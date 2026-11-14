@@ -27,6 +27,12 @@ import {
 import { AuiThreadListLoadMoreDirective } from './thread-list-load-more.directive';
 import { AuiThreadListNewDirective } from './thread-list-new.directive';
 import { AuiThreadListRootDirective } from './thread-list-root.directive';
+import {
+  AuiThreadListItemMoreContentDirective,
+  AuiThreadListItemMoreItemDirective,
+  AuiThreadListItemMoreRootDirective,
+  AuiThreadListItemMoreTriggerDirective,
+} from '../thread-list-item-more';
 
 type Meta = RemoteThreadMetadata;
 
@@ -79,6 +85,10 @@ function makeAdapter(
     AuiThreadListItemArchiveDirective,
     AuiThreadListItemUnarchiveDirective,
     AuiThreadListItemDeleteDirective,
+    AuiThreadListItemMoreRootDirective,
+    AuiThreadListItemMoreTriggerDirective,
+    AuiThreadListItemMoreContentDirective,
+    AuiThreadListItemMoreItemDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -86,6 +96,14 @@ function makeAdapter(
       <button auiThreadListItemTrigger class="trigger" [disabled]="off()">
         <aui-thread-list-item-title fallback="Untitled" />
       </button>
+      @if (showMore()) {
+        <div auiThreadListItemMoreRoot sharedFocusGroup>
+          <button auiThreadListItemMoreTrigger class="item-more">…</button>
+          <div auiThreadListItemMoreContent class="item-menu">
+            <button auiThreadListItemMoreItem>Rename</button>
+          </div>
+        </div>
+      }
       <button auiThreadListItemArchive class="archive">a</button>
       <button auiThreadListItemUnarchive class="unarchive">u</button>
       <button auiThreadListItemDelete class="delete">d</button>
@@ -95,6 +113,7 @@ function makeAdapter(
 class RowComponent {
   private readonly id = injectAuiState((s) => s.threadListItem.id);
   protected readonly off = () => disabledIds().has(this.id());
+  protected readonly showMore = showMore;
   protected onKey(event: KeyboardEvent): void {
     if (vetoKeys()) event.preventDefault();
   }
@@ -102,6 +121,7 @@ class RowComponent {
 
 const disabledIds = signal<ReadonlySet<string>>(new Set());
 const vetoKeys = signal(false);
+const showMore = signal(true);
 
 let current: {
   config: ReturnType<ReturnType<typeof createTestRuntime>['withThreadList']>['config'];
@@ -179,6 +199,7 @@ const keydown = (el: HTMLElement, key: string, init: KeyboardEventInit = {}) =>
 afterEach(() => {
   disabledIds.set(new Set());
   vetoKeys.set(false);
+  showMore.set(true);
   TestBed.resetTestingModule();
   vi.restoreAllMocks();
 });
@@ -373,5 +394,44 @@ describe('thread list keyboard navigation', () => {
     first!.focus();
     keydown(first!, 'ArrowDown');
     expect(document.activeElement).toBe(third);
+  });
+
+  it('moves between an item trigger and its More button with ArrowRight/ArrowLeft', async () => {
+    const t = await mount(three());
+    const [first] = t.regularTriggers();
+    const more = t.all('.list .item-more')[0]!;
+    first!.focus();
+    expect(keydown(first!, 'ArrowRight')).toBe(false);
+    expect(document.activeElement).toBe(more);
+    expect(keydown(more, 'ArrowLeft')).toBe(false);
+    expect(document.activeElement).toBe(first);
+  });
+
+  it('opens the More menu with ArrowRight on the More button, and ArrowLeft returns to it', async () => {
+    const t = await mount(three());
+    const [first] = t.regularTriggers();
+    const more = t.all('.list .item-more')[0]!;
+    const menu = t.all('.list .item-menu')[0]!;
+    first!.focus();
+    keydown(first!, 'ArrowRight');
+    keydown(more, 'ArrowRight');
+    await settle(t.fixture);
+    expect(menu.hidden).toBe(false);
+    const item = menu.querySelector<HTMLElement>('[role=menuitem]')!;
+    expect(document.activeElement).toBe(item);
+    keydown(item, 'ArrowLeft');
+    await settle(t.fixture);
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement).toBe(more);
+  });
+
+  it('leaves ArrowRight on the trigger alone once the More button is removed', async () => {
+    const t = await mount(three());
+    showMore.set(false);
+    await settle(t.fixture);
+    const [first] = t.regularTriggers();
+    first!.focus();
+    expect(keydown(first!, 'ArrowRight')).toBe(true);
+    expect(document.activeElement).toBe(first);
   });
 });
