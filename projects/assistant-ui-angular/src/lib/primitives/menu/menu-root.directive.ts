@@ -1,0 +1,134 @@
+// Ported from packages/react/src/primitives/actionBarMore/ActionBarMoreRoot.tsx @ 7d74276
+import {
+  Directive,
+  Injector,
+  afterNextRender,
+  booleanAttribute,
+  inject,
+  input,
+  model,
+  type OnChanges,
+  type SimpleChanges,
+} from '@angular/core';
+import type { AuiMenuContentDirective } from './menu-content.directive';
+
+let nextMenuId = 0;
+
+/** Which element receives focus when the menu opens. */
+export type AuiMenuInitialFocus = 'content' | 'first' | 'last';
+
+/** Options of {@link AuiMenuRootDirective.setOpen}. */
+export interface AuiMenuSetOpenOptions {
+  /** Where focus goes after opening. Defaults to `'content'`. */
+  readonly focus?: AuiMenuInitialFocus;
+  /** Move focus back to the trigger after closing. Defaults to `false`. */
+  readonly restoreFocus?: boolean;
+}
+
+/**
+ * Root of a headless WAI-ARIA menu (no CDK, no positioning). It owns the
+ * `open` state shared by `button[auiMenuTrigger]`, `[auiMenuContent]`,
+ * `[auiMenuItem]` and `[auiMenuSeparator]`, which find it through
+ * dependency injection.
+ *
+ * The content stays in the DOM and is hidden with the `hidden` attribute while
+ * closed; wrap it in `@if (menu.open())` (or render it in an overlay) when the
+ * markup should not exist. Pointer-down outside the trigger and the content
+ * closes the menu. Supports `[(open)]` two-way binding.
+ *
+ * @example
+ * ```html
+ * <div auiMenuRoot #menu="auiMenuRoot">
+ *   <button auiMenuTrigger>More</button>
+ *   <div auiMenuContent>
+ *     <button auiMenuItem (select)="rename()">Rename</button>
+ *     <hr auiMenuSeparator />
+ *     <button auiMenuItem (select)="remove()">Delete</button>
+ *   </div>
+ * </div>
+ * ```
+ */
+@Directive({
+  selector: '[auiMenuRoot]',
+  standalone: true,
+  exportAs: 'auiMenuRoot',
+  host: {
+    '[attr.data-state]': 'open() ? "open" : "closed"',
+    '(document:pointerdown)': 'onDocumentPointerdown($event)',
+  },
+})
+export class AuiMenuRootDirective implements OnChanges {
+  private readonly injector = inject(Injector);
+
+  /** Whether the menu is open. Two-way bindable. */
+  readonly open = model(false);
+  /**
+   * Enables side-arrow navigation for menus that live in a horizontal focus
+   * group: the trigger opens on ArrowRight (ArrowLeft in RTL) and the content
+   * closes and refocuses the trigger on the opposite arrow.
+   */
+  readonly sideKeys = input(false, { transform: booleanAttribute });
+
+  /** Stable id of the content element. */
+  readonly contentId = `aui-menu-${++nextMenuId}`;
+
+  /** @internal Registered by `button[auiMenuTrigger]`. */
+  trigger: HTMLElement | null = null;
+  /** @internal Registered by `[auiMenuContent]`. */
+  content: AuiMenuContentDirective | null = null;
+
+  private lastOpen = false;
+  private pendingFocus: AuiMenuInitialFocus = 'content';
+
+  /** @internal */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['open']) this.handleOpenState(this.open());
+  }
+
+  /**
+   * Opens or closes the menu.
+   *
+   * @param open - The next state.
+   * @param options - Focus behaviour; see {@link AuiMenuSetOpenOptions}.
+   */
+  setOpen(open: boolean, options: AuiMenuSetOpenOptions = {}): void {
+    if (open) this.pendingFocus = options.focus ?? 'content';
+    this.open.set(open);
+    this.handleOpenState(open);
+    if (!open && options.restoreFocus) this.trigger?.focus();
+  }
+
+  /**
+   * Toggles the menu.
+   *
+   * @param options - Focus behaviour; see {@link AuiMenuSetOpenOptions}.
+   */
+  toggle(options: AuiMenuSetOpenOptions = {}): void {
+    this.setOpen(!this.open(), options);
+  }
+
+  /** @internal Called by the content when it is created while already open. */
+  focusOnCreate(): void {
+    if (this.open()) this.scheduleFocus();
+  }
+
+  private handleOpenState(open: boolean): void {
+    if (open === this.lastOpen) return;
+    this.lastOpen = open;
+    if (open) this.scheduleFocus();
+  }
+
+  private scheduleFocus(): void {
+    const target = this.pendingFocus;
+    this.pendingFocus = 'content';
+    afterNextRender(() => this.content?.focusInitial(target), { injector: this.injector });
+  }
+
+  /** @internal */
+  onDocumentPointerdown(event: PointerEvent): void {
+    if (!this.open()) return;
+    const target = event.target as Node | null;
+    if (target && (this.trigger?.contains(target) || this.content?.contains(target))) return;
+    this.setOpen(false);
+  }
+}
