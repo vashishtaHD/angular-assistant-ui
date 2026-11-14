@@ -9,9 +9,10 @@ compose with your own markup and CSS.
 
 ```bash
 npm install angular-assistant-ui @assistant-ui/core @assistant-ui/store @assistant-ui/tap @assistant-ui/ai-sdk ai react
+npm install --save-dev @types/react
 ```
 
-`@assistant-ui/ai-sdk` is only needed for the AI SDK runtime (`AISDKChat`). `ai` is an
+`@types/react` is a required peer (types only), hence the dev install. `@assistant-ui/ai-sdk` is only needed for the AI SDK runtime (`AISDKChat`). `ai` is an
 optional peer dependency (also needed by the `angular-assistant-ui/testing` entry point).
 
 ### The `react` requirement
@@ -183,8 +184,8 @@ See [docs/porting.md](../../docs/porting.md) for what is ported and what is plan
 | Angular | Change detection | Status                                                                                                         |
 | ------- | ---------------- | -------------------------------------------------------------------------------------------------------------- |
 | 18.2    | Zone.js          | Verified by the demo app and a live end-to-end smoke test (Mastra, OpenRouter model, tool call, streamed text) |
-| 20      | Zone.js          | Verified by CI compat matrix (Task 9); the matrix job `compat` gates this version                              |
-| 22      | Zoneless         | Verified by CI compat matrix (Task 9); the matrix job `compat` gates this version                              |
+| 20      | Zone.js          | Pending: covered by the CI compatibility matrix (not yet run)                              |
+| 22      | Zoneless         | Pending: covered by the CI compatibility matrix (not yet run)                              |
 
 <!-- compat-table -->
 
