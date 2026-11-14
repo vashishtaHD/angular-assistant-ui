@@ -59,22 +59,22 @@ Angular scope or directive replaces exactly are `n/a`.
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
 | ThreadPrimitive.Root | yes | ported (as `[auiThreadRoot]`) |  |
-| ThreadPrimitive.Viewport | partial (no turnAnchor or clamp) | ported; `turnAnchor` and `topAnchorMessageClamp` planned | Task 2 |
+| ThreadPrimitive.Viewport | partial (no turnAnchor or clamp) | ported (`turnAnchor` and `topAnchorMessageClamp` inputs) | Task 2 |
 | useThreadViewportAutoScroll | yes (via `createThreadViewportAutoScroll`) | ported (built into the viewport directive) |  |
 | ThreadPrimitive.ViewportProvider | no | n/a (replaced by `AUI_VIEWPORT`) |  |
-| ThreadPrimitive.ViewportFooter | yes | planned (Task 2) | Task 2 |
+| ThreadPrimitive.ViewportFooter | yes | ported (as `[auiThreadViewportFooter]`) | Task 2 |
 | ThreadPrimitive.Messages | yes | ported (as `aui-thread-messages`) |  |
 | ThreadPrimitive.MessageByIndex, ThreadPrimitive.Unstable_MessageById | provider only | n/a (replaced by `aui-thread-messages` + `messageScopeConfig`) |  |
-| ThreadPrimitive.Row, createThreadRowsSelector, ThreadRow, ThreadRowsOptions | no | planned (Task 2) | Task 2 |
-| ThreadPrimitive.ScrollToBottom | yes | planned (Task 2) | Task 2 |
-| ThreadPrimitive.LoadEarlier | no | planned (Task 2) | Task 2 |
+| ThreadPrimitive.Row, createThreadRowsSelector, ThreadRow, ThreadRowsOptions | no | ported (as `aui-thread-row` and `aui-thread-rows`; selector and types re-exported) | Task 2 |
+| ThreadPrimitive.ScrollToBottom | yes | ported (as `button[auiThreadScrollToBottom]`) | Task 2 |
+| ThreadPrimitive.LoadEarlier | no | ported (as `button[auiThreadLoadEarlier]`) | Task 2 |
 | ThreadPrimitive.Suggestions | yes | ported | Task 7 |
 | ThreadPrimitive.SuggestionByIndex | provider | ported | Task 7 |
 | ThreadPrimitive.Suggestion | no (use `SuggestionPrimitiveTrigger`) | ported (covered by `button[auiSuggestionTrigger]`; pass `prompt` for an explicit-prompt button outside the list) | Task 7 |
 | ThreadPrimitive.Empty, ThreadPrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
-| useScrollLock | yes | planned (Task 2) | Task 2 |
+| useScrollLock | yes | ported (as `injectScrollLock`) | Task 2 |
 | unstable_useThreadMessageIds | no | planned (Task 22) (Angular accessor over `s.thread.messages`) | Task 22 |
-| useThreadRootElementRef | no | planned (Task 2) (exposed by the thread root directive) | Task 2 |
+| useThreadRootElementRef | no | ported (as `injectThreadRootElementRef`, provided by the thread root directive) | Task 2 |
 
 ### Message (`MessagePrimitive`)
 

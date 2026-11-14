@@ -16,7 +16,10 @@ export {
   AuiThreadMessagesComponent,
 } from './lib/primitives/thread-messages.component';
 export { AuiMessageRootDirective } from './lib/primitives/message-root.directive';
-export { AuiThreadRootDirective } from './lib/primitives/thread-root.directive';
+export {
+  AuiThreadRootDirective,
+  injectThreadRootElementRef,
+} from './lib/primitives/thread-root.directive';
 
 // Store primitives, re-exported as upstream's Vue binding does.
 export {
@@ -35,7 +38,10 @@ export {
 } from '@assistant-ui/store/client';
 
 // Thread viewport.
-export { AuiThreadViewportDirective } from './lib/primitives/thread-viewport.directive';
+export {
+  AuiThreadViewportDirective,
+  type AuiTopAnchorMessageClamp,
+} from './lib/primitives/thread-viewport.directive';
 export {
   AUI_VIEWPORT,
   injectAuiViewport,
@@ -142,3 +148,20 @@ export {
   type CreateSuggestionAdapterOptions,
   type ThreadSuggestion,
 } from '@assistant-ui/core';
+// Task 2: thread extras and scroll lock.
+export { AuiThreadViewportFooterDirective } from './lib/primitives/thread-viewport-footer.directive';
+export { AuiThreadScrollToBottomDirective } from './lib/primitives/thread-scroll-to-bottom.directive';
+export { AuiThreadLoadEarlierDirective } from './lib/primitives/thread-load-earlier.directive';
+export {
+  AuiThreadRowComponent,
+  AuiThreadRowsComponent,
+  AuiThreadRowTemplateDirective,
+  createThreadRowsSelector,
+  type AuiThreadRowGroupPart,
+  type AuiThreadRowInfo,
+  type AuiThreadRowLeafPart,
+  type AuiThreadRowTemplateContext,
+  type ThreadRow,
+  type ThreadRowsOptions,
+} from './lib/primitives/thread-rows.component';
+export { injectScrollLock } from './lib/utils/scroll-lock';

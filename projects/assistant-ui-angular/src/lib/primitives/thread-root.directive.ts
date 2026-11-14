@@ -4,6 +4,14 @@ import { injectAui } from '../state/inject-aui';
 import { AUI_THREAD_ROOT_ELEMENT } from './composer-input-support';
 
 /**
+ * Returns the nearest `[auiThreadRoot]`'s element, or `undefined` outside one.
+ * Must be called in an injection context.
+ */
+export function injectThreadRootElementRef(): ElementRef<HTMLElement> | undefined {
+  return inject(AUI_THREAD_ROOT_ELEMENT, { optional: true }) ?? undefined;
+}
+
+/**
  * Marks the wrapper element of the thread. While it exists, Escape stops an
  * active speech synthesis run (unless another handler already called
  * `preventDefault()`).
