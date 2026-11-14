@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../out-tsc/demo-spec",
+    "types": ["vitest/globals"],
+    "paths": {
+      "angular-assistant-ui": ["../assistant-ui-angular/src/public-api.ts"],
+      "angular-assistant-ui/testing": ["../assistant-ui-angular/testing/src/public-api.ts"]
+    }
+  },
+  "include": ["src/**/*.spec.ts", "src/**/*.d.ts", "src/test-setup*.ts"]
+}
