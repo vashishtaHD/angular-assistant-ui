@@ -122,6 +122,29 @@ if (!tarball) {
   process.exit(1);
 }
 
+// The tarball must carry the upstream MIT notice (LICENSE) and NOTICE, identical to the root copies.
+{
+  const listing = spawnSync('tar', ['-tzf', join(packDir, tarball)], { encoding: 'utf8' });
+  if (listing.status !== 0) {
+    console.error(`\n[compat:${app}] FAIL: could not list ${tarball}: ${listing.stderr}`);
+    process.exit(1);
+  }
+  const entries = listing.stdout.split(/\r?\n/);
+  for (const name of ['LICENSE', 'NOTICE']) {
+    if (!entries.includes(`package/${name}`)) {
+      console.error(`\n[compat:${app}] FAIL: ${tarball} does not contain ${name}`);
+      process.exit(1);
+    }
+    if (!readFileSync(join(libDist, name)).equals(readFileSync(join(root, name)))) {
+      console.error(
+        `\n[compat:${app}] FAIL: packed ${name} differs from the repository root ${name}`,
+      );
+      process.exit(1);
+    }
+  }
+  console.log('  verified: tarball contains LICENSE and NOTICE (same as the repository root)');
+}
+
 // 3. Install the app's locked dependencies, then the tarball (without
 //    touching its package.json or lockfile).
 log('installing dependencies and the packed library');
