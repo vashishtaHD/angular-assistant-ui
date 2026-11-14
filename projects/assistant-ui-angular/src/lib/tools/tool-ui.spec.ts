@@ -2,6 +2,7 @@
 // and packages/vue/src/primitives/MessagePrimitiveParts.tool-interaction.test.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
 import { ChangeDetectionStrategy, Component, input, signal, type Type } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { DefaultAssistantClient, type AssistantClient } from '@assistant-ui/store/client';
 import { flushTapSync } from '@assistant-ui/tap';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../testing-internal/test-bed';
@@ -20,6 +21,7 @@ import {
   AuiThreadMessagesComponent,
 } from '../primitives/thread-messages.component';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
+import { injectAuiContext } from '../context/aui-context';
 import { registerToolUI, type ToolUIComponent, type ToolUIProps } from './tool-ui';
 
 const settle = async (fixture: ComponentFixture<unknown>) => {
@@ -93,6 +95,8 @@ class SecondComponent implements ToolUIComponent {
 
 /** What the registering component registers (set per test). */
 let registrations: [string, Type<ToolUIComponent>][] = [];
+/** The client the provider exposed when the registrar's constructor ran. */
+let clientAtRegistration: AssistantClient | undefined;
 
 @Component({
   selector: 'aui-test-registrar',
@@ -102,6 +106,8 @@ let registrations: [string, Type<ToolUIComponent>][] = [];
 })
 class RegistrarComponent {
   constructor() {
+    // Constructors run before the provider's first ngOnChanges creates its client.
+    clientAtRegistration = injectAuiContext().source.getClient();
     for (const [name, component] of registrations) registerToolUI(name, component);
   }
 }
@@ -141,6 +147,37 @@ class HostComponent {
   readonly registered = signal(true);
 }
 
+/** Like HostComponent, but the registrar is a direct child (constructed before the provider's first ngOnChanges). */
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessagePartsComponent,
+    AuiPartTemplateDirective,
+    RegistrarComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-test-registrar />
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <li>
+            <aui-message-parts>
+              <ng-template auiPart="tool-call"><span class="slot">[slot]</span></ng-template>
+            </aui-message-parts>
+          </li>
+        </ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class EarlyHostComponent {
+  readonly config = current.config;
+}
+
 const mount = async (callbacks: TestRuntimeCallbacks = {}) => {
   current = createTestRuntime(callbacks);
   configureTestBed({ imports: [HostComponent] });
@@ -163,6 +200,7 @@ describe('registerToolUI', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     registrations = [];
+    clientAtRegistration = undefined;
   });
 
   it('renders a registered tool UI with the tool input', async () => {
@@ -256,6 +294,85 @@ describe('registerToolUI', () => {
       expect(el(fixture).querySelector('span.ui')).not.toBeNull();
       expect(el(fixture).querySelector('span.slot')).toBeNull();
     });
+    fixture.destroy();
+  });
+
+  it('registers from a constructor before the provider has created its client', async () => {
+    registrations = [['weather', WeatherCardComponent]];
+    current = createTestRuntime();
+    configureTestBed({ imports: [EarlyHostComponent] });
+    const fixture = TestBed.createComponent(EarlyHostComponent);
+    fixture.detectChanges();
+    await settle(fixture);
+    expect(clientAtRegistration).toBe(DefaultAssistantClient);
+
+    flushTapSync(() => current.append(toolCall('weather')));
+    await waitFor(fixture, () =>
+      expect((fixture.nativeElement as HTMLElement).querySelector('span.ui')).not.toBeNull(),
+    );
+    fixture.destroy();
+  });
+
+  it('keeps one tool UI instance while the arguments stream in', async () => {
+    let constructed = 0;
+    @Component({
+      selector: 'aui-test-counting-card',
+      standalone: true,
+      changeDetection: ChangeDetectionStrategy.OnPush,
+      template: `<span class="ui">{{ city() }}</span>`,
+    })
+    class CountingCardComponent implements ToolUIComponent {
+      readonly tool = input.required<ToolUIProps>();
+      constructor() {
+        constructed++;
+      }
+      protected city() {
+        return (this.tool().part.args as { city?: string }).city ?? '';
+      }
+    }
+    registrations = [['weather', CountingCardComponent]];
+    const { fixture, rt } = await mount();
+    const message = (city: string): DemoMessage => ({
+      id: 'm1',
+      ...toolCall('weather', { args: { city } }),
+    });
+
+    flushTapSync(() => rt.setMessages([message('Pa')]));
+    await waitFor(fixture, () =>
+      expect(el(fixture).querySelector('span.ui')?.textContent).toBe('Pa'),
+    );
+    const card = el(fixture).querySelector('span.ui');
+
+    for (const city of ['Par', 'Pari', 'Paris']) {
+      flushTapSync(() => rt.setMessages([message(city)]));
+      await waitFor(fixture, () =>
+        expect(el(fixture).querySelector('span.ui')?.textContent).toBe(city),
+      );
+    }
+
+    expect(el(fixture).querySelector('span.ui')).toBe(card);
+    expect(constructed).toBe(1);
+    fixture.destroy();
+  });
+
+  it('warns in dev when registering outside any provider', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    registrations = [['weather', WeatherCardComponent]];
+    configureTestBed({ imports: [RegistrarComponent] });
+    const fixture = TestBed.createComponent(RegistrarComponent);
+    fixture.detectChanges();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toMatch(/registerToolUI\('weather'\).*AuiProvider/);
+    fixture.destroy();
+  });
+
+  it('does not warn when registering under a provider', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    registrations = [['weather', WeatherCardComponent]];
+    const { fixture } = await mount();
+
+    expect(warn).not.toHaveBeenCalled();
     fixture.destroy();
   });
 
