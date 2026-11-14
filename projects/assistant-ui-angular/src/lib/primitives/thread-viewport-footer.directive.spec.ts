@@ -40,6 +40,7 @@ const makeViewport = () => {
     isAtBottom: signal(true),
     scrollToBottom: vi.fn(),
     registerContentInset: () => ({ setHeight, unregister }),
+    onScrollToBottom: () => () => undefined,
   };
   return { viewport, setHeight, unregister };
 };

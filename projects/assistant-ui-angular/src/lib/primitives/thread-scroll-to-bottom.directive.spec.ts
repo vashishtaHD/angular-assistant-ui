@@ -92,6 +92,7 @@ describe('AuiThreadScrollToBottomDirective', () => {
       isAtBottom: signal(false),
       scrollToBottom,
       registerContentInset: () => ({ setHeight: vi.fn(), unregister: vi.fn() }),
+      onScrollToBottom: () => () => undefined,
     };
     configureTestBed({
       imports: [BareHostComponent],
