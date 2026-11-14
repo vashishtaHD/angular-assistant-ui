@@ -179,11 +179,16 @@ export async function requestJson<T>(
 // only the messages the server lacks. The history load seeds the record, creating a thread
 // records it as empty, and each completed run updates it.
 //
-// No record means the stored state is UNKNOWN (the history load failed or has not finished, or a
-// send ran without reconciling). That is never treated as "empty": an empty `messageIds` prefix
-// would make the server delete the whole stored thread. Instead the send omits `messageIds`, which
-// the server takes as "do not reconcile", and carries the whole active branch (the server
-// de-duplicates messages it already stores by id).
+// No record means the stored state is UNKNOWN (the history load failed or has not finished, or
+// the thread was deleted). That is never treated as "empty": an empty `messageIds` prefix would
+// make the server delete the whole stored thread. Instead the send omits `messageIds`, which the
+// server takes as "do not reconcile", and carries the whole active branch (the server
+// de-duplicates messages it already stores by id). Such a send leaves the record as it is, so a
+// history load that finishes during it still counts. After a failed load the state stays unknown
+// until the page reloads (see `createMastraTransport`).
+//
+// The record is per page: another tab or device changing the same thread makes it stale (see
+// `createMastraTransport`, "Two tabs").
 
 const storedIds = new Map<string, readonly string[]>();
 const storedKey = (e: MastraEndpoint, threadId: string) =>
@@ -201,14 +206,16 @@ export const setStoredIds = (e: MastraEndpoint, threadId: string, ids: readonly 
   storedIds.set(storedKey(e, threadId), [...ids]);
 };
 
-/** Marks a thread's stored state unknown (after it is deleted, or a send that did not reconcile). */
+/** Marks a thread's stored state unknown (after it is deleted). */
 export const clearStoredIds = (e: MastraEndpoint, threadId: string) => {
   storedIds.delete(storedKey(e, threadId));
 };
 
 /**
- * Forgets every thread's stored ids, for example on sign-out. Later sends of a thread whose
- * history is not reloaded carry the whole branch without reconciling, which is always safe.
+ * Forgets every thread's stored ids, for example on sign-out, or when another tab may have changed
+ * a thread (a stale record would make the next send drop that tab's newer messages). Later sends
+ * of a thread whose history is not reloaded carry the whole branch without reconciling, which
+ * deletes nothing (but edits and regenerates then do not reconcile either).
  *
  * The record is keyed by the server URL as written (`api` for the transport, `baseUrl` for the
  * adapters; a trailing slash is ignored), the agent id and the thread id. Pass the same URL to
@@ -277,8 +284,8 @@ export function buildChatBody(args: {
 /**
  * The ids the server stores after a completed run of `body`: the active branch, plus the
  * streamed assistant message for a normal send. A resubmit extends the stored assistant unit in
- * place, so its ids do not change. A send without `messageIds` did not reconcile, so the stored
- * state stays unknown (`undefined`) until the history loads again.
+ * place, so its ids do not change. A send without `messageIds` did not reconcile, so the run
+ * tells nothing about the stored ids (`undefined`): the record is left as it is.
  */
 export function storedIdsAfterRun(
   body: MastraChatBody,

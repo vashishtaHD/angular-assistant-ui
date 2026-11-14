@@ -126,6 +126,15 @@ describe('createMastraTransport', () => {
     expect(server.messages('t3')[0]?.id).toBe('old');
   });
 
+  it('keeps ids a history load recorded while an unreconciled send was streaming', async () => {
+    const { server, send, endpoint } = setup();
+    server.seedThread({ id: 't4' }, [user('old')]);
+    const stream = await send('t4', [user('u1')]);
+    setStoredIds(endpoint, 't4', ['old']); // the load finishing mid-run
+    await readAll(stream);
+    expect(getStoredIds(endpoint, 't4')).toEqual(['old']);
+  });
+
   it('forwards model-context tools, filtered by the tools option', async () => {
     const tools = {
       pickDate: { description: 'Pick a date', parameters: { type: 'object' } },

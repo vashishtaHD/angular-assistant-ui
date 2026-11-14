@@ -475,6 +475,39 @@ describe('MastraThreads over the Mastra contract', () => {
     expect(chatRequests()).toHaveLength(2);
   });
 
+  it('reconciles again after a send made while the history was still loading', async () => {
+    const { aui, server, mounted, chatRequests, historyRequests, send, idle } = await setup({
+      // A slow stream: the history load (delayed below) resolves before the run ends.
+      respond: () => textReply('slow reply to you', 80),
+      seed: (s) => {
+        s.seedThread({ id: 't1' }, [user('u1', 'first'), assistant('a1', 'reply one')]);
+        s.delayNext({ method: 'GET', path: `/chat/${AGENT}/threads/t1/messages` }, 150);
+      },
+    });
+    aui.threads().switchToThread('t1');
+    await mounted.waitFor(() => expect(historyRequests('t1')).toHaveLength(1));
+    expect(aui.thread().getState().isLoading).toBe(true);
+
+    send('during the load');
+    await mounted.waitFor(() => expect(chatRequests()).toHaveLength(1));
+    // The stored state was unknown when this send started.
+    expect(chatRequests()[0]!.body).not.toHaveProperty('messageIds');
+    await mounted.waitFor(() => expect(messageIds(aui).slice(0, 2)).toEqual(['u1', 'a1']));
+    await idle();
+    await mounted.waitFor(() => expect(server.messages('t1')).toHaveLength(4));
+
+    send('next');
+    await mounted.waitFor(() => expect(chatRequests()).toHaveLength(2));
+    const body = chatRequests()[1]!.body as { messageIds?: string[]; messages: UIMessage[] };
+    // The history load recorded what the server stores, so this send reconciles again.
+    expect(body.messageIds).toEqual(messageIds(aui).slice(0, 5));
+    expect(body.messageIds?.slice(0, 2)).toEqual(['u1', 'a1']);
+    await idle();
+    const ids = server.messages('t1').map((m) => m.id);
+    expect(ids.slice(0, 2)).toEqual(['u1', 'a1']);
+    expect(ids).toHaveLength(6);
+  });
+
   describe('after a failed history load', () => {
     const stored = [
       user('u1', 'first'),
@@ -514,7 +547,7 @@ describe('MastraThreads over the Mastra contract', () => {
           // Unknown stored state: no messageIds, so the server does not reconcile.
           expect(chatRequests().at(-1)!.body).not.toHaveProperty('messageIds');
 
-          // It stays unknown until the history loads again: the next send does not reconcile.
+          // It stays unknown (until a page reload): the next send does not reconcile either.
           send('and again');
           await mounted.waitFor(() => expect(messageTexts(aui).at(-1)).toBe('Echo: and again'));
           await idle();

@@ -5,7 +5,6 @@ import {
   authHeaders,
   buildChatBody,
   chatUrl,
-  clearStoredIds,
   getStoredIds,
   setStoredIds,
   storedIdsAfterRun,
@@ -141,9 +140,12 @@ export class MastraChatTransport extends AssistantChatTransport<UIMessage> {
           flush() {
             if (failed) return;
             const ids = storedIdsAfterRun(pending.body, assistantId);
-            // A send without `messageIds` did not reconcile: the stored state stays unknown.
+            // A send without `messageIds` started from an unknown state and did not reconcile.
+            // Leave the record as it is: either still unknown, or set meanwhile by a history load
+            // that finished during the run. That snapshot is what the server stored when it was
+            // read (it may lack this run's messages, which the next send re-sends with the full
+            // `messageIds`; the server keeps the matching prefix and de-duplicates by id).
             if (ids) setStoredIds(state.endpoint, pending.threadId, ids);
-            else clearStoredIds(state.endpoint, pending.threadId);
           },
         }),
       );
@@ -163,9 +165,25 @@ export class MastraChatTransport extends AssistantChatTransport<UIMessage> {
  * server uses to drop stored messages of other branches. The transport tracks the stored ids per
  * thread, seeded by the history load and updated after each completed run.
  *
- * While a thread's stored state is unknown (its history load failed or the thread was never
- * loaded), `messageIds` is omitted and `messages` is the whole active branch, so the server does
- * not reconcile (delete) anything; the stored state stays unknown until the history reloads.
+ * While a thread's stored state is unknown (its history load failed, is still in flight, or the
+ * thread was never loaded), `messageIds` is omitted and `messages` is the whole active branch, so
+ * the server does not reconcile (delete) anything. A load that finishes during such a send still
+ * records the server's ids, and later sends reconcile again.
+ *
+ * After a failed history load the thread shows empty and the state stays unknown until the page
+ * reloads: each thread's history is loaded once and the thread stays mounted. Until then every
+ * send re-sends the turns made since the failure, and edits and regenerates do not reconcile (a
+ * regenerated reply is stored next to the old one and the two show as one message on the next
+ * load; an edited-away branch stays stored and in the model's context). It is not healed
+ * automatically: the page does not hold the server's history, so reconciling would delete it,
+ * and the runtime's reload hook may skip importing the history while a run is active.
+ *
+ * Two tabs (or devices) on the same thread: each page keeps its own record of the stored ids. A
+ * send from a tab whose record predates messages another tab added reconciles against its own
+ * branch, so the server drops the other tab's newer messages (they lie after the matching
+ * prefix) and the model never sees them. Reload a thread before continuing it in another tab;
+ * `clearMastraStoredIds()` makes later sends unreconciled (nothing deleted) but does not show
+ * the other tab's messages.
  *
  * A failed request rejects with the AI SDK's error, not a `MastraHttpError` (see that class).
  *

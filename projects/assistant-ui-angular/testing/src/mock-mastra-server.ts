@@ -107,6 +107,11 @@ export interface MockMastraServer {
     match: { method?: string; path: string | RegExp },
     failure: { status: number; body?: unknown } | 'network',
   ): void;
+  /**
+   * Delays the answer to the next request matching `match` by `ms` (for a slow link, e.g. a
+   * history load still in flight while the user sends). Each call arms one delay.
+   */
+  delayNext(match: { method?: string; path: string | RegExp }, ms: number): void;
 }
 
 const DEFAULT_TOOLS = ['getWeather', 'bookMeeting', 'askUser'];
@@ -523,6 +528,7 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
     match: { method?: string; path: string | RegExp };
     failure: { status: number; body?: unknown } | 'network';
   }[] = [];
+  const delays: { match: { method?: string; path: string | RegExp }; ms: number }[] = [];
 
   const mockFetch: typeof fetch = async (input, init) => {
     const isRequest = typeof Request !== 'undefined' && input instanceof Request;
@@ -551,11 +557,15 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
     }
     requests.push({ method, path, query: url.searchParams, headers, body: parsed });
 
-    const armed = failures.findIndex(
-      ({ match }) =>
-        (match.method === undefined || match.method.toUpperCase() === method) &&
-        (typeof match.path === 'string' ? match.path === path : match.path.test(path)),
-    );
+    const matches = (match: { method?: string; path: string | RegExp }) =>
+      (match.method === undefined || match.method.toUpperCase() === method) &&
+      (typeof match.path === 'string' ? match.path === path : match.path.test(path));
+    const delayed = delays.findIndex(({ match }) => matches(match));
+    if (delayed >= 0) {
+      const [{ ms }] = delays.splice(delayed, 1) as [(typeof delays)[number]];
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    const armed = failures.findIndex(({ match }) => matches(match));
     if (armed >= 0) {
       const [{ failure }] = failures.splice(armed, 1) as [(typeof failures)[number]];
       if (failure === 'network') throw new TypeError('Failed to fetch');
@@ -604,6 +614,9 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
     },
     failNext(match, failure) {
       failures.push({ match, failure });
+    },
+    delayNext(match, ms) {
+      delays.push({ match, ms });
     },
     setTitle(threadId, title) {
       const thread = threads.get(threadId);
