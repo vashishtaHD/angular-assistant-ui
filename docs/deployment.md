@@ -83,3 +83,15 @@ Mastra memory is a linear log. The server stores only the branch that was last s
 each send the frontend lists the active branch's message ids, and the server deletes the
 stored messages that are not on it. Other branches live in the browser for the session only.
 Reopening a thread restores the last branch that was sent, not the last one viewed.
+
+## Exposed routes
+
+Authenticated callers can reach only the routes the app uses; every other path, including
+Mastra's stock `/api/agents/*` execution endpoints, tool execution, workflows and raw
+message writes, answers 403. The allowed set is `POST /chat/:agentId`,
+`GET /chat/:agentId/threads/:threadId/messages`, `GET|POST /api/memory/threads` and
+`GET|PATCH|DELETE /api/memory/threads/:threadId`. To expose more, extend `isAllowedRoute`
+in `mastra-server/src/mastra/auth.ts` and add a test.
+
+Message ids sent by the client are stored under an id scoped to the user and thread, so one
+user cannot overwrite another user's messages by reusing an id. The client still sees its own ids.

@@ -4,6 +4,7 @@ import { toAISdkMessages } from '@mastra/ai-sdk/ui';
 import { createUIMessageStreamResponse, jsonSchema } from 'ai';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
+import { scopeMessageId, unscopeMessageId } from '../message-ids';
 import { groupAssistantRuns, reconcileThread } from '../reconcile';
 
 const RESOURCE_ID_KEY = 'mastra__resourceId';
@@ -137,6 +138,19 @@ export function createChatRoutes(options: ChatRouteOptions = {}) {
 
       const memory = (await agent.getMemory()) as unknown as MemoryLike | undefined;
       const threadId = body.memory.thread;
+
+      // Assistant ids come back from the client on resubmits; they must not address another
+      // user's (or another thread's) stored message.
+      const assistantIds = body.messages.filter((m) => m.role === 'assistant').map((m) => m.id);
+      if (assistantIds.length > 0) {
+        const store = await mastra.getStorage()?.getStore('memory');
+        const existing = store
+          ? (await store.listMessagesById({ messageIds: assistantIds })).messages
+          : [];
+        if (existing.some((m) => m.threadId !== threadId || m.resourceId !== resourceId)) {
+          return c.json({ error: 'Message id already in use' }, 409);
+        }
+      }
       if (memory) {
         const thread = await memory.getThreadById({ threadId });
         if (thread?.resourceId && thread.resourceId !== resourceId) {
@@ -151,6 +165,7 @@ export function createChatRoutes(options: ChatRouteOptions = {}) {
             threadId,
             resourceId,
             activeIds: body.messageIds,
+            toClientId: (id) => unscopeMessageId(resourceId, threadId, id),
           });
         }
       }
@@ -163,7 +178,9 @@ export function createChatRoutes(options: ChatRouteOptions = {}) {
         agentId,
         version: 'v7',
         params: {
-          messages: body.messages as never,
+          messages: body.messages.map((m) =>
+            m.role === 'user' ? { ...m, id: scopeMessageId(resourceId, threadId, m.id) } : m,
+          ) as never,
           memory: { thread: threadId, resource: resourceId },
           requestContext,
           abortSignal: c.req.raw.signal,
@@ -206,7 +223,15 @@ export function createChatRoutes(options: ChatRouteOptions = {}) {
         perPage: false,
         orderBy: { field: 'createdAt', direction: 'ASC' },
       });
-      const ui = mergeAssistantRuns(toAISdkMessages(messages, { version: 'v7' }) as never[]);
+      const ui = mergeAssistantRuns(
+        (
+          toAISdkMessages(messages, { version: 'v7' }) as Array<{
+            id: string;
+            role: string;
+            parts: unknown[];
+          }>
+        ).map((m) => ({ ...m, id: unscopeMessageId(resourceId, threadId, m.id) })),
+      );
       return c.json({ messages: ui, total: ui.length });
     },
   });

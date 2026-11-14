@@ -62,8 +62,11 @@ export async function reconcileThread(args: {
   threadId: string;
   resourceId: string;
   activeIds: string[];
+  /** Maps a stored id to the id the client uses (see `unscopeMessageId`). */
+  toClientId?: (storedId: string) => string;
 }): Promise<{ deleted: string[] }> {
   const { memory, threadId, resourceId, activeIds } = args;
+  const toClientId = args.toClientId ?? ((id: string) => id);
   const { messages } = await memory.recall({
     threadId,
     resourceId,
@@ -72,7 +75,7 @@ export async function reconcileThread(args: {
   });
   const groups = groupAssistantRuns(messages);
   const plan = planReconcile(
-    groups.map((group) => group[0].id),
+    groups.map((group) => toClientId(group[0].id)),
     activeIds,
   );
   const deleted = groups.slice(plan.keep).flatMap((group) => group.map((m) => m.id));

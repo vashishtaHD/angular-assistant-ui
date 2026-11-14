@@ -70,6 +70,27 @@ export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode 
   throw new Error("MASTRA_AUTH_MODE must be 'dev' or 'jwt'.");
 }
 
+const ALLOWED_ROUTES: Array<[RegExp, readonly string[]]> = [
+  // Custom, whitelisting chat routes.
+  [/^\/chat\/[^/]+$/, ['POST']],
+  [/^\/chat\/[^/]+\/threads\/[^/]+\/messages$/, ['GET']],
+  // Thread list and thread CRUD. Messages are read through the chat history route.
+  [/^\/api\/memory\/threads$/, ['GET', 'POST']],
+  [/^\/api\/memory\/threads\/[^/]+$/, ['GET', 'PATCH', 'DELETE']],
+];
+
+/**
+ * Default deny. Mastra mounts stock endpoints (`/api/agents/:id/stream`, `/generate`, tool
+ * execution, workflows, raw message writes) that accept arbitrary agent options, so only the
+ * routes this app uses are reachable by an authenticated caller.
+ */
+export function isAllowedRoute(path: string, method: string): boolean {
+  const normalized = path.length > 1 ? path.replace(/\/+$/, '') : path;
+  return ALLOWED_ROUTES.some(
+    ([pattern, methods]) => pattern.test(normalized) && methods.includes(method.toUpperCase()),
+  );
+}
+
 /**
  * Builds `server.auth`. The resource id of every memory call is derived here from the verified
  * user (`mapUserToResourceId`); Mastra ignores a `resourceId` in a body or query once it is set.
@@ -88,5 +109,6 @@ export function createAuthConfig(options: AuthOptions = {}): MastraAuthConfig<Au
   return {
     authenticateToken: async (token) => (await verify(token)) ?? (null as never),
     mapUserToResourceId: (user) => user.id,
+    authorize: async (path, method) => isAllowedRoute(path, method),
   };
 }
