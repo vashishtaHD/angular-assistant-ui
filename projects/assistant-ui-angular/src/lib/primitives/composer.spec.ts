@@ -1,5 +1,5 @@
 // Ported from packages/svelte/src/__tests__/primitives-composer.test.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ErrorHandler, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import type { AssistantClient } from '@assistant-ui/store/client';
@@ -9,7 +9,7 @@ import { AssistantRuntimeImpl, ExternalStoreRuntimeCore } from '@assistant-ui/co
 import { RuntimeAdapter } from '@assistant-ui/core/store';
 import { AuiConfig } from '@assistant-ui/store/client';
 import { describe, expect, it, vi } from 'vitest';
-import { configureTestBed } from '../../testing-internal/test-bed';
+import { configureTestBed, isZonelessTestRun } from '../../testing-internal/test-bed';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
 import { injectAui } from '../state/inject-aui';
 import { AuiComposerCancelDirective } from './composer-cancel.directive';
@@ -307,4 +307,68 @@ describe('composer primitives', () => {
       delete (proto as { scrollHeight?: number }).scrollHeight;
     }
   });
+});
+
+describe('composer input resize errors', () => {
+  @Component({
+    standalone: true,
+    imports: [AuiProviderDirective, AuiComposerInputDirective],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    template: `<div [auiProvider]="config"><textarea auiComposerInput></textarea></div>`,
+  })
+  class MeasureHostComponent {
+    readonly config = createSpyRuntime().config;
+  }
+
+  const mount = (reported: unknown[]) => {
+    configureTestBed({
+      imports: [MeasureHostComponent],
+      providers: [
+        { provide: ErrorHandler, useValue: { handleError: (e: unknown) => reported.push(e) } },
+      ],
+    });
+    return TestBed.createComponent(MeasureHostComponent);
+  };
+
+  const flush = async (fixture: ComponentFixture<unknown>) => {
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    await fixture.whenStable();
+  };
+
+  it('reports no error while mounting before the provider has created its client', async () => {
+    const reported: unknown[] = [];
+    const fixture = mount(reported);
+    fixture.autoDetectChanges();
+    await flush(fixture);
+
+    expect(reported).toEqual([]);
+    fixture.destroy();
+  });
+
+  // The zone project renders (and runs the hook) during createComponent, before a
+  // failing read can be injected; the zoneless project renders on the first detection.
+  it.skipIf(!isZonelessTestRun())(
+    'reports an error thrown while measuring instead of swallowing it',
+    async () => {
+      const reported: unknown[] = [];
+      const fixture = mount(reported);
+      const input = fixture.debugElement
+        .query(By.directive(AuiComposerInputDirective))
+        .injector.get(AuiComposerInputDirective);
+      // Only the read made from the afterNextRender callback fails.
+      (input as { text: () => string }).text = () => {
+        if (/afterNextRender|after_render/.test(new Error().stack ?? '')) {
+          throw new Error('selector bug');
+        }
+        return '';
+      };
+      fixture.autoDetectChanges();
+      await flush(fixture);
+
+      expect(reported.map((e) => (e as Error).message)).toContain('selector bug');
+      fixture.destroy();
+    },
+  );
 });

@@ -49,7 +49,11 @@ export class AuiComposerInputDirective {
   readonly maxRows = input(8);
 
   /** @internal */
-  readonly text = injectAuiState((s) => (s.composer.isEditing ? s.composer.text : ''));
+  readonly text = injectAuiState((s) => {
+    // `optional`: the composer scope is absent until the provider has created its client.
+    const composer = s.optional.composer;
+    return composer?.isEditing ? composer.text : '';
+  });
   private readonly threadDisabled = injectAuiState(composerInputDisabled);
   private readonly sendDisabled = injectAuiState(composerSendDisabled);
   private lastText: string | undefined;
@@ -100,14 +104,7 @@ export class AuiComposerInputDirective {
     afterNextRender(
       () => {
         this.resizePending = false;
-        let text: string;
-        try {
-          text = this.text();
-        } catch {
-          // The provider's client does not exist yet; its first store
-          // notification re-schedules because the text is still unmeasured.
-          return;
-        }
+        const text = this.text();
         this.lastText = text;
         this.resize();
       },
