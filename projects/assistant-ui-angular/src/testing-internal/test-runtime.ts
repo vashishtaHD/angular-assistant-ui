@@ -23,11 +23,17 @@ export interface TestRuntime {
   setMessages(next: DemoMessage[]): void;
 }
 
+/** Optional adapter callbacks forwarded to every adapter the runtime builds. */
+export type TestRuntimeCallbacks = Pick<
+  ExternalStoreAdapter<DemoMessage>,
+  'onAddToolResult' | 'onResumeToolCall' | 'onRespondToToolApproval'
+>;
+
 /**
  * Creates an `ExternalStoreRuntimeCore`-backed runtime plus helpers that push
  * new messages, replace the list or toggle `isRunning` by replacing the adapter.
  */
-export function createTestRuntime(): TestRuntime {
+export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRuntime {
   let messages: DemoMessage[] = [];
   let isRunning = false;
   const makeAdapter = (): ExternalStoreAdapter<DemoMessage> => ({
@@ -39,6 +45,7 @@ export function createTestRuntime(): TestRuntime {
       content: message.content,
     }),
     onNew: async () => undefined,
+    ...callbacks,
   });
   const core = new ExternalStoreRuntimeCore(makeAdapter());
   const runtime = new AssistantRuntimeImpl(core);

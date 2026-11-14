@@ -47,3 +47,16 @@ export { AuiComposerRootDirective } from './lib/primitives/composer-root.directi
 export { AuiComposerInputDirective } from './lib/primitives/composer-input.directive';
 export { AuiComposerSendDirective } from './lib/primitives/composer-send.directive';
 export { AuiComposerCancelDirective } from './lib/primitives/composer-cancel.directive';
+
+// Message parts and tool UI registry.
+export {
+  AuiMessagePartsComponent,
+  AuiPartTemplateDirective,
+  type AuiPartTemplateContext,
+} from './lib/primitives/message-parts.component';
+export {
+  registerToolUI,
+  type DataUIProps,
+  type ToolUIComponent,
+  type ToolUIProps,
+} from './lib/tools/tool-ui';

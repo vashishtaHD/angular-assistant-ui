@@ -37,7 +37,7 @@ Status is one of `ported`, `planned`, `n/a`.
 | ThreadPrimitiveViewport                 | ported  |
 | ThreadPrimitiveViewportFooter           | planned |
 | ThreadPrimitiveScrollToBottom           | planned |
-| MessagePrimitiveParts                   | planned |
+| MessagePrimitiveParts                   | ported  |
 | ChainOfThoughtPrimitiveParts            | planned |
 | ChainOfThoughtPrimitiveAccordionTrigger | planned |
 | ComposerPrimitiveInput                  | ported  |
@@ -91,5 +91,5 @@ Status is one of `ported`, `planned`, `n/a`.
 | AssistantEventName (type)               | planned |
 | AssistantEventSelector (type)           | planned |
 | Unsubscribe (type)                      | planned |
-| DataUIProps (type)                      | planned |
-| ToolUIProps (type)                      | planned |
+| DataUIProps (type)                      | ported  |
+| ToolUIProps (type)                      | ported  |
