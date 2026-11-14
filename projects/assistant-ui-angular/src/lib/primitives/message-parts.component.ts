@@ -275,16 +275,11 @@ export class AuiMessagePartsComponent {
       chainOfThought: ChainOfThoughtClient({
         parts: slice,
         getMessagePart: ({ index }) => {
-          if (index < 0 || slice.length === 0) {
+          if (index < 0 || index >= slice.length) {
             throw new Error(
               `ChainOfThought part index ${index} is out of bounds (0..${slice.length - 1})`,
             );
           }
-          // A row of a part that just left the chain can still look itself up
-          // for a moment (its scope item is served from the last-valid
-          // cache). Upstream throws there; clamping keeps that window quiet
-          // and the scope serves the chain's last part instead.
-          index = Math.min(index, slice.length - 1);
           return aui.message.part({ index: start + index });
         },
       }),

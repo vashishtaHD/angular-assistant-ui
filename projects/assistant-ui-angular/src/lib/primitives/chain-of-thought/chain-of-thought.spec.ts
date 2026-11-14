@@ -1,6 +1,6 @@
 // Ported from packages/vue/src/primitives/ChainOfThoughtPrimitiveParts.test.ts @ 7d74276
 // and packages/vue/src/primitives/ChainOfThoughtPrimitiveAccordionTrigger.test.ts @ 7d74276
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, type OnInit } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { AuiConfig, type AssistantClient } from '@assistant-ui/store/client';
 import { flushTapSync } from '@assistant-ui/tap';
@@ -53,6 +53,28 @@ class CaptureComponent {
   }
 }
 
+let probeMounts = 0;
+
+/** Remembers the tool name it first saw, to prove state follows the part. */
+@Component({
+  selector: 'aui-test-cot-probe',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `{{ initialName }}`,
+})
+class ProbeComponent implements OnInit {
+  private readonly name = injectAuiState((s) =>
+    s.part.type === 'tool-call' ? s.part.toolName : '',
+  );
+  protected initialName = '';
+  constructor() {
+    probeMounts++;
+  }
+  ngOnInit(): void {
+    this.initialName = this.name();
+  }
+}
+
 @Component({
   selector: 'aui-test-cot-body',
   standalone: true,
@@ -62,20 +84,23 @@ class CaptureComponent {
     AuiChainOfThoughtPartsComponent,
     AuiPartTemplateDirective,
     CaptureComponent,
+    ProbeComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div auiChainOfThoughtRoot class="cot">
       <aui-test-cot-capture />
       <button auiChainOfThoughtAccordionTrigger class="trigger">toggle</button>
+      <button auiChainOfThoughtAccordionTrigger class="veto">veto</button>
+      <button auiChainOfThoughtAccordionTrigger class="off" [disabled]="true">off</button>
       <span class="status">{{ status() }}</span>
-      @if (!collapsed()) {
+      @if (!gate() || !collapsed()) {
         <aui-chain-of-thought-parts>
           <ng-template auiPart="reasoning" let-part>
             <i class="reasoning">{{ part.type === 'reasoning' ? part.text : '' }}</i>
           </ng-template>
           <ng-template auiPart="tool-call" let-part>
-            <code class="tool">{{ part.type === 'tool-call' ? part.toolName : '' }}</code>
+            <code class="tool"><aui-test-cot-probe /></code>
           </ng-template>
         </aui-chain-of-thought-parts>
       }
@@ -83,6 +108,7 @@ class CaptureComponent {
   `,
 })
 class CotBodyComponent {
+  readonly gate = input(true);
   readonly collapsed = injectAuiState((s) => s.chainOfThought.collapsed);
   readonly status = injectAuiState((s) => s.chainOfThought.status.type);
 }
@@ -114,6 +140,35 @@ class CotBodyComponent {
   `,
 })
 class GroupedHostComponent {
+  readonly config = hostConfig;
+}
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessagePartsComponent,
+    AuiChainOfThoughtTemplateDirective,
+    CotBodyComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <li>
+            <aui-message-parts>
+              <ng-template auiChainOfThought><aui-test-cot-body [gate]="false" /></ng-template>
+            </aui-message-parts>
+          </li>
+        </ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class UngatedHostComponent {
   readonly config = hostConfig;
 }
 
@@ -159,11 +214,12 @@ const mount = async <T>(host: new () => T, config: AuiConfig) => {
 const root = (fixture: ComponentFixture<unknown>) => fixture.nativeElement as HTMLElement;
 
 const reasoning = (text: string) => ({ type: 'reasoning' as const, text });
-const tool = (toolName: string, id = toolName) => ({
+const tool = (toolName: string, id = toolName, result: unknown = 'ok') => ({
   type: 'tool-call' as const,
   toolCallId: id,
   toolName,
   args: {},
+  result,
 });
 const message = (content: DemoMessage['content'], id = 'a1'): DemoMessage => ({
   id,
@@ -237,25 +293,115 @@ describe('chain of thought', () => {
     fixture.destroy();
   });
 
-  it('stays collapsed on completion unless the user expanded it, and keeps state while streaming', async () => {
+  it('keeps state while streaming and never auto-collapses on completion', async () => {
     const rt = createTestRuntime();
     const fixture = await mount(GroupedHostComponent, rt.config);
+    const status = () => root(fixture).querySelector('.status')?.textContent;
+
+    // Initially collapsed: a run starting and finishing does not expand it.
     flushTapSync(() => rt.setMessages([message([reasoning('a')])]));
     await waitFor(fixture, () => expect(root(fixture).querySelector('.trigger')).not.toBeNull());
     const button = root(fixture).querySelector<HTMLButtonElement>('.trigger')!;
+    flushTapSync(() => rt.setRunning(true));
+    await waitFor(fixture, () => expect(status()).toBe('running'));
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    flushTapSync(() => rt.setRunning(false));
+    await waitFor(fixture, () => expect(status()).toBe('complete'));
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    // Expanded by the user: it grows while a run streams and stays expanded.
     button.click();
     await waitFor(fixture, () => expect(button.getAttribute('aria-expanded')).toBe('true'));
-
-    // The chain grows while streaming; the same group (and its state) stays.
+    flushTapSync(() => rt.setRunning(true));
+    await waitFor(fixture, () => expect(status()).toBe('running'));
     flushTapSync(() => rt.setMessages([message([reasoning('a'), tool('search')])]));
     await waitFor(fixture, () => expect(root(fixture).querySelectorAll('.tool')).toHaveLength(1));
     expect(root(fixture).querySelector<HTMLButtonElement>('.trigger')).toBe(button);
     expect(button.getAttribute('aria-expanded')).toBe('true');
-
-    // Upstream has no auto-collapse: completion does not change `collapsed`.
     flushTapSync(() => rt.setRunning(false));
-    await waitFor(fixture, () => expect(root(fixture).querySelector('.status')).not.toBeNull());
+    await waitFor(fixture, () => expect(status()).toBe('complete'));
     expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(root(fixture).querySelectorAll('.reasoning, .tool')).toHaveLength(2);
+    fixture.destroy();
+  });
+
+  it('respects caller vetoes', async () => {
+    const rt = createTestRuntime();
+    const fixture = await mount(GroupedHostComponent, rt.config);
+    flushTapSync(() => rt.setMessages([message([reasoning('a')])]));
+    await waitFor(fixture, () => expect(root(fixture).querySelector('.veto')).not.toBeNull());
+    const veto = root(fixture).querySelector<HTMLButtonElement>('.veto')!;
+    // Caller listeners run before the primitive's (capture phase, as in the action-button spec).
+    veto.addEventListener('click', (event) => event.preventDefault(), { capture: true });
+    veto.click();
+    await settle(fixture);
+    expect(root(fixture).querySelector('.veto')!.getAttribute('aria-expanded')).toBe('false');
+    expect(capturedAui!.chainOfThought.getState().collapsed).toBe(true);
+    fixture.destroy();
+  });
+
+  it('stays disabled when the disabled input is set', async () => {
+    const rt = createTestRuntime();
+    const fixture = await mount(GroupedHostComponent, rt.config);
+    flushTapSync(() => rt.setMessages([message([reasoning('a')])]));
+    await waitFor(fixture, () => expect(root(fixture).querySelector('.off')).not.toBeNull());
+    const off = root(fixture).querySelector<HTMLButtonElement>('.off')!;
+    expect(off.disabled).toBe(true);
+    flushTapSync(() => off.click());
+    await settle(fixture);
+    expect(capturedAui!.chainOfThought.getState().collapsed).toBe(true);
+
+    off.disabled = false;
+    flushTapSync(() => off.click());
+    await settle(fixture);
+    expect(capturedAui!.chainOfThought.getState().collapsed).toBe(true);
+    fixture.destroy();
+  });
+
+  it('renders parts regardless of the collapsed state when the caller does not gate', async () => {
+    const rt = createTestRuntime();
+    const fixture = await mount(UngatedHostComponent, rt.config);
+    flushTapSync(() => rt.setMessages([message([reasoning('alpha'), reasoning('beta')])]));
+    const texts = () =>
+      Array.from(root(fixture).querySelectorAll('.reasoning')).map((e) => e.textContent?.trim());
+    await waitFor(fixture, () => expect(texts()).toEqual(['alpha', 'beta']));
+    expect(root(fixture).querySelector('.cot')!.hasAttribute('data-collapsed')).toBe(true);
+
+    root(fixture).querySelector<HTMLButtonElement>('.trigger')!.click();
+    await waitFor(fixture, () => {
+      expect(root(fixture).querySelector('.cot')!.hasAttribute('data-collapsed')).toBe(false);
+      expect(texts()).toEqual(['alpha', 'beta']);
+    });
+    fixture.destroy();
+  });
+
+  it('keeps tool-call state with its part when chain parts swap', async () => {
+    probeMounts = 0;
+    const rt = createTestRuntime();
+    const fixture = await mount(UngatedHostComponent, rt.config);
+    const first = tool('alpha', 'call-a');
+    const second = tool('beta', 'call-b');
+    const texts = () =>
+      Array.from(root(fixture).querySelectorAll('.tool')).map((e) => e.textContent?.trim());
+
+    flushTapSync(() => rt.setMessages([message([reasoning('lead'), first, second])]));
+    await waitFor(fixture, () => expect(texts()).toEqual(['alpha', 'beta']));
+    expect(probeMounts).toBe(2);
+
+    flushTapSync(() => rt.setMessages([message([reasoning('lead'), second, first])]));
+    await waitFor(fixture, () => expect(texts()).toEqual(['beta', 'alpha']));
+    expect(probeMounts).toBe(2);
+    fixture.destroy();
+  });
+
+  it('rejects an out-of-bounds part selector after settling', async () => {
+    const rt = createTestRuntime();
+    const fixture = await mount(GroupedHostComponent, rt.config);
+    flushTapSync(() => rt.setMessages([message([tool('search')])]));
+    await waitFor(fixture, () => expect(capturedAui).toBeDefined());
+    expect(() => capturedAui!.chainOfThought.part({ index: 999 })).toThrow(/out of bounds/);
+    expect(() => capturedAui!.chainOfThought.part({ index: -1 })).toThrow(/out of bounds/);
+    expect(capturedAui!.chainOfThought.part({ index: 0 }).getState().type).toBe('tool-call');
     fixture.destroy();
   });
 
