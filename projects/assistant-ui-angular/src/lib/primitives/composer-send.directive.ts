@@ -3,6 +3,7 @@ import { Directive, booleanAttribute, input } from '@angular/core';
 import { composerSendDisabled } from '@assistant-ui/core/store/internal';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
+import { AuiActionButtonHostDirective, injectActionButton } from './action-button';
 
 /**
  * A button that sends the composer. Disabled while the composer cannot send,
@@ -12,11 +13,7 @@ import { injectAuiState } from '../state/inject-aui-state';
 @Directive({
   selector: 'button[auiComposerSend]',
   standalone: true,
-  host: {
-    type: 'button',
-    '[disabled]': 'isDisabled()',
-    '(click)': 'onClick($event)',
-  },
+  hostDirectives: [AuiActionButtonHostDirective],
 })
 export class AuiComposerSendDirective {
   private readonly aui = injectAui();
@@ -25,14 +22,10 @@ export class AuiComposerSendDirective {
   /** Consumer-controlled disabled flag, combined with the store predicate. */
   readonly disabled = input(false, { transform: booleanAttribute });
 
-  /** @internal */
-  isDisabled(): boolean {
-    return this.disabled() || this.sendDisabled();
-  }
-
-  /** @internal */
-  onClick(event: MouseEvent): void {
-    if (event.defaultPrevented || this.isDisabled()) return;
-    this.aui.composer.send();
+  constructor() {
+    injectActionButton({
+      disabled: () => this.disabled() || this.sendDisabled(),
+      onClick: () => this.aui.composer.send(),
+    });
   }
 }

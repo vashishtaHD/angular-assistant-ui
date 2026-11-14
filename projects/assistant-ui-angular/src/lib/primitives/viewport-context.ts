@@ -11,6 +11,11 @@ export interface AuiViewport {
   isAtBottom: Signal<boolean>;
   /** Scrolls the viewport to the bottom. */
   scrollToBottom(behavior?: ScrollBehavior): void;
+  /**
+   * Subscribes to explicit `scrollToBottom()` calls (not to the viewport's own
+   * run-start or thread-switch scrolling). Returns an unsubscribe function.
+   */
+  onScrollToBottom(callback: (config: { behavior: ScrollBehavior }) => void): () => void;
   /** Reserves extra space at the end of the content (e.g. a footer). */
   registerContentInset: ThreadViewportAutoScroll['registerContentInset'];
 }
