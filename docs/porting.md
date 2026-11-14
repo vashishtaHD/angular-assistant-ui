@@ -200,7 +200,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | --- | --- | --- | --- |
 | AttachmentPrimitive.Root | yes | ported | Task 6 |
 | AttachmentPrimitive.Name | yes | ported | Task 6 |
-| AttachmentPrimitive.unstable_Thumb | yes (`AttachmentPrimitiveThumb`) | ported (`img[auiAttachmentThumb]` image preview; upstream extension label not ported) | Task 6 |
+| AttachmentPrimitive.unstable_Thumb | yes (`AttachmentPrimitiveThumb`) | ported (`aui-attachment-thumb-label` is upstream's extension/type label; `img[auiAttachmentThumb]` adds the image preview) | Task 6 |
 | AttachmentPrimitive.Remove | yes | ported | Task 6 |
 | AttachmentAdapter, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter | no | ported (re-exported from core) | Task 6 |
 | Attachment, PendingAttachment, CompleteAttachment, AttachmentStatus, CreateAttachment, AttachmentRuntime, AttachmentState, AttachmentRuntimeState | no | ported (type re-exports) | Task 6 |

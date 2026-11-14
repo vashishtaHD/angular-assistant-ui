@@ -72,6 +72,10 @@ export {
 export { AuiAttachmentRootDirective } from './lib/primitives/attachment/attachment-root.directive';
 export { AuiAttachmentNameComponent } from './lib/primitives/attachment/attachment-name.component';
 export { AuiAttachmentThumbDirective } from './lib/primitives/attachment/attachment-thumb.directive';
+export {
+  AuiAttachmentThumbLabelComponent,
+  getAttachmentThumbLabel,
+} from './lib/primitives/attachment/attachment-thumb-label.component';
 export { AuiAttachmentRemoveDirective } from './lib/primitives/attachment/attachment-remove.directive';
 export {
   AuiAttachmentTemplateDirective,

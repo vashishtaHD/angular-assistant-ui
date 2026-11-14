@@ -3,12 +3,14 @@ import {
   DestroyRef,
   Directive,
   ElementRef,
+  type OnChanges,
   booleanAttribute,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { injectAuiContext } from '../context/aui-context';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
 import {
@@ -37,7 +39,7 @@ const isFileDrag = (event: DragEvent): boolean =>
   standalone: true,
   host: { '[attr.data-dragging]': 'showDragging() ? "true" : null' },
 })
-export class AuiComposerAttachmentDropzoneDirective {
+export class AuiComposerAttachmentDropzoneDirective implements OnChanges {
   private readonly aui = injectAui();
   private readonly threadDisabled = injectAuiState((s) => s.thread.isDisabled);
 
@@ -67,7 +69,20 @@ export class AuiComposerAttachmentDropzoneDirective {
       on('dragleave', (e) => this.onDragLeave(e, el)),
       on('drop', (e) => this.onDrop(e)),
     ];
-    inject(DestroyRef).onDestroy(() => offs.forEach((off) => off()));
+    // The latch must not outlive an enabled period: a disabled handler cannot
+    // clear it, so reset it as soon as the thread becomes disabled.
+    const unsubscribe = injectAuiContext().source.subscribe(() => {
+      if (this.threadDisabled()) this.dragging.set(false);
+    });
+    inject(DestroyRef).onDestroy(() => {
+      offs.forEach((off) => off());
+      unsubscribe();
+    });
+  }
+
+  /** Resets the drag latch when the consumer disables the dropzone. */
+  ngOnChanges(): void {
+    if (this.disabled()) this.dragging.set(false);
   }
 
   private isDisabled(): boolean {
