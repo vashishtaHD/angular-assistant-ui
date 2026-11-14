@@ -17,6 +17,7 @@ import { injectTriggerPopoverScopeContext } from './trigger-popover.directive';
     role: 'group',
     '[attr.aria-label]': 'ariaLabel()',
     '[hidden]': '!visible()',
+    '[style.display]': 'visible() ? null : "none"',
   },
 })
 export class AuiComposerTriggerPopoverCategoriesDirective {
@@ -83,6 +84,7 @@ export class AuiComposerTriggerPopoverCategoryItemDirective {
     role: 'group',
     '[attr.aria-label]': 'ariaLabel()',
     '[hidden]': '!visible()',
+    '[style.display]': 'visible() ? null : "none"',
   },
 })
 export class AuiComposerTriggerPopoverItemsDirective {
@@ -147,6 +149,7 @@ export class AuiComposerTriggerPopoverItemDirective {
   host: {
     type: 'button',
     '[hidden]': '!visible()',
+    '[style.display]': 'visible() ? null : "none"',
     '(click)': 'popover.goBack()',
   },
 })

@@ -11,6 +11,7 @@ import {
   inject,
   input,
   signal,
+  type Signal,
 } from '@angular/core';
 import {
   AuiMenuContentDirective,
@@ -52,7 +53,9 @@ function positions(align: AuiDropdownMenuAlign): ConnectedPosition[] {
  * the menu is open; it is unmounted on close, never just hidden.
  *
  * Keyboard: ArrowDown/ArrowUp on the trigger open the menu on the first/last
- * item, and a keyboard click opens it on the first item. Closes on Escape, item
+ * item, and a keyboard click (Enter/Space) opens it on the first item. A pointer
+ * click opens it with focus on the menu surface (no item highlighted), as Radix
+ * does; ArrowDown then enters the list. Closes on Escape, item
  * selection, Tab and outside click.
  */
 @Directive({
@@ -74,8 +77,8 @@ export class AuiDropdownMenuTriggerDirective {
   /** Which edge of the trigger the menu lines up with. */
   readonly align = input<AuiDropdownMenuAlign>('start');
 
-  /** Whether the menu is open. */
-  readonly isOpen = signal(false);
+  /** Whether the menu is open. A read-only view of the underlying menu root's `open`. */
+  readonly isOpen: Signal<boolean> = this.menu.open.asReadonly();
 
   private overlayRef: OverlayRef | null = null;
 
@@ -140,13 +143,11 @@ export class AuiDropdownMenuTriggerDirective {
     );
     view.detectChanges();
     ref.updatePosition();
-    this.isOpen.set(true);
   }
 
   private teardown(): void {
     this.overlayRef?.dispose();
     this.overlayRef = null;
-    this.isOpen.set(false);
   }
 }
 

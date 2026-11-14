@@ -74,7 +74,10 @@ function flatAdapter(items: readonly TriggerItem[]): TriggerAdapter {
 /**
  * Declares one trigger (`@`, `/`, ...) and renders its popover container. The
  * container is `role="listbox"` and is hidden unless the trigger character is
- * active at the caret in the composer text. It exposes (as signals) the query,
+ * active at the caret in the composer text (`hidden` plus a host
+ * `display: none` style binding, so class-based author CSS such as `.flex`
+ * cannot show it while closed; a template `style`/`[style.display]` on the
+ * element or an `!important` rule still takes precedence). It exposes (as signals) the query,
  * the categories and items, the highlighted index and `select(item)`.
  *
  * Items come from `adapter` (a {@link TriggerAdapter}) or from the flat `items`
@@ -103,6 +106,7 @@ function flatAdapter(items: readonly TriggerItem[]): TriggerAdapter {
     role: 'listbox',
     '[id]': 'popoverId',
     '[hidden]': '!open()',
+    '[style.display]': 'open() ? null : "none"',
     '[attr.aria-label]': 'ariaLabel()',
     '[attr.aria-activedescendant]': 'highlightedItemId() ?? null',
     '[attr.data-state]': 'open() ? "open" : "closed"',

@@ -7,7 +7,9 @@ const TABBABLE =
 
 /**
  * The modal window: `role="dialog"`, hidden while the modal is closed (`hidden`
- * plus an inline `display: none`, so author CSS cannot show it). When it
+ * plus a host `display: none` style binding, so class-based author CSS such as
+ * `.flex` cannot show it; a template `style`/`[style.display]` on the element
+ * or an `!important` rule still takes precedence). When it
  * opens, focus moves to the first tabbable element inside (or the dialog
  * itself). Escape (handled on the document, so it works wherever focus is) closes
  * it and returns focus to the trigger; a pointer-down

@@ -32,7 +32,8 @@ export interface AuiMenuSetOpenOptions {
  * dependency injection.
  *
  * The content stays in the DOM and is hidden with the `hidden` attribute (plus
- * an inline `display: none`) while closed; wrap it in `@if (menu.open())` (or
+ * a host `display: none` style binding that class-based CSS cannot override)
+ * while closed; wrap it in `@if (menu.open())` (or
  * render it in an overlay, as the `ui` entry's dropdown menu does) when the
  * markup should not exist. Pointer-down outside the trigger and the content
  * closes the menu. Supports `[(open)]` two-way binding.

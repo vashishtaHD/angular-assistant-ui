@@ -10,8 +10,10 @@ const TYPEAHEAD_RESET_MS = 500;
  * `[auiMenuItem]` children. ArrowDown/ArrowUp move (and wrap), Home/End jump to
  * the ends, printable characters run a typeahead search, Escape closes the menu
  * and returns focus to the trigger, and Tab closes it too. It is hidden while
- * the menu is closed (`hidden`, plus an inline `display: none` so a utility
- * class such as `.flex` cannot show it).
+ * the menu is closed (`hidden`, plus a host `display: none` style binding so
+ * class-based author CSS such as `.flex` cannot show it; a template
+ * `style`/`[style.display]` on the element or an `!important` rule still takes
+ * precedence).
  *
  * Must be inside an `[auiMenuRoot]` (declared there, it can still be rendered
  * elsewhere, for example in an overlay).

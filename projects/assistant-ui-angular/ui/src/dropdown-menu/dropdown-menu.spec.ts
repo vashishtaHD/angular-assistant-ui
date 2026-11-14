@@ -89,6 +89,29 @@ class KeepOpenHostComponent {
   picked: string[] = [];
 }
 
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    AuiMenuRootDirective,
+    AuiDropdownMenuTriggerDirective,
+    AuiDropdownMenuContentDirective,
+    AuiDropdownMenuItemDirective,
+  ],
+  template: `<div auiMenuRoot #outer="auiMenuRoot" class="outer">
+    <button class="trigger" [auiDropdownMenuTrigger]="menu">Menu</button>
+    <!-- Declared inside another menu root: its view must still get the dropdown's root. -->
+    <ng-template #menu>
+      <div auiDropdownMenuContent>
+        <button auiDropdownMenuItem (itemSelect)="picked.push('one')">One</button>
+      </div>
+    </ng-template>
+  </div>`,
+})
+class NestedHostComponent {
+  picked: string[] = [];
+}
+
 describe('dropdown menu', () => {
   let restore: () => void;
   beforeEach(() => (restore = stubLayout()));
@@ -282,6 +305,59 @@ describe('dropdown menu', () => {
     await settle();
     expect(fixture.componentInstance.picked).toEqual(['keep']);
     expect(menu()).not.toBeNull();
+  });
+
+  it('a pointer click opens with focus on the menu surface; ArrowDown enters the list', async () => {
+    const { fixture, trigger } = await setup();
+    // HTMLElement.click() has detail 0 (a keyboard click); a real pointer click has detail >= 1.
+    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+    fixture.detectChanges();
+    await settle();
+    expect(menu()).not.toBeNull();
+    expect(document.activeElement).toBe(menu());
+    expect(items().some((item) => item.hasAttribute('data-highlighted'))).toBe(false);
+    key(menu()!, 'ArrowDown');
+    fixture.detectChanges();
+    expect(document.activeElement).toBe(items()[0]);
+    expect(items()[0].hasAttribute('data-highlighted')).toBe(true);
+  });
+
+  it('a template declared inside another menu root still binds to the dropdown', async () => {
+    configureTestBed({ imports: [NestedHostComponent] });
+    const fixture = TestBed.createComponent(NestedHostComponent);
+    fixture.detectChanges();
+    document.body.appendChild(fixture.nativeElement);
+    const outer = fixture.debugElement.query(By.css('.outer')).injector.get(AuiMenuRootDirective);
+    const inner = fixture.debugElement.query(By.css('.trigger')).injector.get(AuiMenuRootDirective);
+    expect(inner).not.toBe(outer);
+    const trigger = fixture.nativeElement.querySelector('.trigger') as HTMLButtonElement;
+    trigger.focus();
+    key(trigger, 'ArrowDown');
+    fixture.detectChanges();
+    await settle();
+    expect(menu()!.id).toBe(inner.contentId);
+    expect(document.activeElement).toBe(items()[0]);
+    items()[0].click();
+    fixture.detectChanges();
+    await settle();
+    expect(fixture.componentInstance.picked).toEqual(['one']);
+    expect(menu()).toBeNull();
+    expect(inner.open()).toBe(false);
+    expect(outer.open()).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('isOpen is a read-only view of the menu state', async () => {
+    const { fixture } = await open();
+    const dropdown = fixture.debugElement
+      .query(By.css('.trigger'))
+      .injector.get(AuiDropdownMenuTriggerDirective);
+    expect(dropdown.isOpen()).toBe(true);
+    expect('set' in dropdown.isOpen).toBe(false);
+    key(menu()!, 'Escape');
+    fixture.detectChanges();
+    await settle();
+    expect(dropdown.isOpen()).toBe(false);
   });
 
   it('no longer exports the internal headless menu from the ui entry', () => {

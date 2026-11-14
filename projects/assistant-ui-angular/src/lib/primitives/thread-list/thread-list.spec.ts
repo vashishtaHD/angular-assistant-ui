@@ -98,7 +98,7 @@ function makeAdapter(
       </button>
       @if (showMore()) {
         <div auiThreadListItemMoreRoot sharedFocusGroup>
-          <button auiThreadListItemMoreTrigger class="item-more">…</button>
+          <button auiThreadListItemMoreTrigger class="item-more">...</button>
           <div auiThreadListItemMoreContent class="item-menu">
             <button auiThreadListItemMoreItem>Rename</button>
           </div>

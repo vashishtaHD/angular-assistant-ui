@@ -16,8 +16,10 @@ export interface SelectionToolbarInfo {
  * A floating toolbar that is visible while a text selection lies inside a
  * single message. It listens for browser selection changes, validates the
  * selection against `data-message-id` (set by `[auiMessageRoot]`), and
- * exposes the result as signals. It is hidden otherwise (`hidden` plus an
- * inline `display: none`, so author CSS cannot show it), and a mousedown on
+ * exposes the result as signals. It is hidden otherwise (`hidden` plus a host
+ * `display: none` style binding, so class-based author CSS such as `.flex`
+ * cannot show it; a template `style`/`[style.display]` on the element or an
+ * `!important` rule still takes precedence), and a mousedown on
  * it does not clear the selection.
  *
  * Positioning is the consumer's: bind to `rect()` (viewport coordinates of the
