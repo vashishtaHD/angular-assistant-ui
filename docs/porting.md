@@ -48,7 +48,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | PartByIndexProvider | yes | n/a (replaced by `aui-message-parts` + `partScopeConfig`) |  |
 | SuggestionByIndexProvider | yes | planned (Task 7) (via `indexScopeConfig` kind `suggestion`) | Task 7 |
 | MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | planned (Task 6) (via `indexScopeConfig` kind `attachment`) | Task 6 |
-| ThreadListItemByIndexProvider | yes | planned (Task 8) (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
+| ThreadListItemByIndexProvider | yes | ported (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
 | ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | planned (Task 9) (parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
 | ThreadListItemRuntimeProvider, MessageProvider, TextMessagePartProvider, ReadonlyThreadProvider | no | planned (Task 22) (scopes from a bare runtime or message objects, for read-only rendering) | Task 22 |
 | useThreadViewport, useThreadViewportStore, ThreadViewportState | no | n/a (replaced by `AUI_VIEWPORT`, `injectAuiViewport` and `AuiViewport`) |  |
@@ -220,16 +220,16 @@ Angular scope or directive replaces exactly are `n/a`.
 
 | React export | Vue has it | Angular status | Task |
 | --- | --- | --- | --- |
-| ThreadListPrimitive.Root | yes | planned (Task 8) | Task 8 |
-| ThreadListPrimitive.New | yes | planned (Task 8) | Task 8 |
-| ThreadListPrimitive.Items | yes | planned (Task 8) | Task 8 |
-| ThreadListPrimitive.ItemByIndex | provider | planned (Task 8) | Task 8 |
-| ThreadListPrimitive.LoadMore | yes | planned (Task 8) | Task 8 |
-| ThreadListItemPrimitive.Root | yes | planned (Task 8) | Task 8 |
-| ThreadListItemPrimitive.Trigger | yes | planned (Task 8) | Task 8 |
-| ThreadListCollection, useThreadListCollection, ThreadListItemFocusProvider, useThreadListItemFocus | yes (`threadListFocusGroup`) | planned (Task 8) (thread list focus group) | Task 8 |
-| ThreadListItemPrimitive.Title | yes | planned (Task 8) | Task 8 |
-| ThreadListItemPrimitive.Archive, ThreadListItemPrimitive.Unarchive, ThreadListItemPrimitive.Delete | yes | planned (Task 8) | Task 8 |
+| ThreadListPrimitive.Root | yes | ported | Task 8 |
+| ThreadListPrimitive.New | yes | ported | Task 8 |
+| ThreadListPrimitive.Items | yes | ported | Task 8 |
+| ThreadListPrimitive.ItemByIndex | provider | ported | Task 8 |
+| ThreadListPrimitive.LoadMore | yes | ported | Task 8 |
+| ThreadListItemPrimitive.Root | yes | ported | Task 8 |
+| ThreadListItemPrimitive.Trigger | yes | ported | Task 8 |
+| ThreadListCollection, useThreadListCollection, ThreadListItemFocusProvider, useThreadListItemFocus | yes (`threadListFocusGroup`) | ported (thread list focus group) | Task 8 |
+| ThreadListItemPrimitive.Title | yes | ported | Task 8 |
+| ThreadListItemPrimitive.Archive, ThreadListItemPrimitive.Unarchive, ThreadListItemPrimitive.Delete | yes | ported | Task 8 |
 | ThreadListItemMorePrimitive.Root, ThreadListItemMorePrimitive.Trigger, ThreadListItemMorePrimitive.Content, ThreadListItemMorePrimitive.Item, ThreadListItemMorePrimitive.Separator | no | planned (Task 10) | Task 10 |
 | InMemoryThreadListAdapter, RemoteThreadListAdapter, RemoteThreadListProviderComponent, RemoteThreadListOptions, ThreadHistoryAdapter, GenericThreadHistoryAdapter, MessageFormatAdapter, MessageFormatItem, MessageFormatRepository, MessageStorageEntry, RuntimeAdapters, RuntimeAdapterProvider, useRuntimeAdapters | no | planned (Task 14) (Mastra entry builds on core `RemoteThreadList`) | Task 14 |
 | ExternalThread, ExternalThreadProps, ExternalThreadMessage, InMemoryThreadList, InMemoryThreadListProps, RemoteThreadList, RemoteThreadListProps, SingleThreadList, ChainOfThoughtClient | no | planned (Task 22) (core store clients re-exported) | Task 22 |
