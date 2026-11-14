@@ -266,3 +266,41 @@ export function getGroupSummary(
     ...(timing && { timing }),
   };
 }
+
+/** A custom cluster of parts: an optional key and the indices of its parts. */
+export interface PartIndexGroup {
+  /** The cluster key; `undefined` leaves the parts ungrouped. */
+  readonly groupKey: string | undefined;
+  /** Indices of the cluster's parts in the message. */
+  readonly indices: number[];
+}
+
+/**
+ * Clusters message parts by any criterion: returns the groups, each with a
+ * key and the part indices it holds (not necessarily adjacent). Used by
+ * `aui-message-parts-grouped` (React's `Unstable_PartsGrouped`).
+ */
+export type GroupingFunction = (parts: readonly any[]) => PartIndexGroup[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+/**
+ * Groups parts by their `parentId`. Parts without one stay in their
+ * chronological position as individual groups; parts sharing a parent are
+ * gathered at the position of the parent's first occurrence, even when other
+ * parts sit between them (React's `Unstable_PartsGroupedByParentId`).
+ */
+export const groupMessagePartsByParentId: GroupingFunction = (parts) => {
+  // A Map keeps insertion order, so groups appear in order of first occurrence.
+  const groupMap = new Map<string | number, number[]>();
+  for (let i = 0; i < parts.length; i++) {
+    const parentId = parts[i]?.parentId as string | undefined;
+    // Parts without a parent get a unique group id to keep their position.
+    const groupId = parentId ?? i;
+    const indices = groupMap.get(groupId) ?? [];
+    indices.push(i);
+    groupMap.set(groupId, indices);
+  }
+  return Array.from(groupMap, ([groupId, indices]) => ({
+    groupKey: typeof groupId === 'string' ? groupId : undefined,
+    indices,
+  }));
+};

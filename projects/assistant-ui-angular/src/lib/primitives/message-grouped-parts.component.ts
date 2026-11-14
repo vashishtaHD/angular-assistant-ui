@@ -26,7 +26,9 @@ import {
   GROUPBY_MEMO_KEY,
   buildGroupTree,
   getGroupSummary,
+  groupMessagePartsByParentId,
   type GroupByContext,
+  type GroupingFunction,
   type GroupCounts,
   type GroupNode,
   type PartState,
@@ -47,6 +49,8 @@ import { AuiPartTemplateDirective } from './message-parts.component';
  */
 export interface AuiGroupPart<TKey extends `group-${string}` = `group-${string}`> {
   readonly type: TKey;
+  /** The cluster key, for groups made by a `groupingFunction`. */
+  readonly groupKey?: string;
   readonly status: PartStatus;
   /** Per-status tallies over `indices`; they sum to `indices.length`. */
   readonly counts: GroupCounts;
@@ -221,7 +225,7 @@ const shouldShowIndicator = (
  * ```
  */
 @Component({
-  selector: 'aui-message-grouped-parts',
+  selector: 'aui-message-grouped-parts, aui-message-parts-grouped',
   standalone: true,
   imports: [
     NgTemplateOutlet,
@@ -232,7 +236,9 @@ const shouldShowIndicator = (
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
-    <ng-template #partView><aui-part-view [templates]="partTemplates()" /></ng-template>
+    <ng-template #partView
+      ><aui-part-view [templates]="partTemplates()" [templatesFirst]="true"
+    /></ng-template>
     <ng-template #nodeTemplate let-node>
       @if (node.kind === 'group') {
         @if (groupTemplate(node.group.type); as template) {
@@ -256,7 +262,16 @@ const shouldShowIndicator = (
 })
 export class AuiMessageGroupedPartsComponent {
   /** Maps each part to a group-key path; see the class docs. */
-  readonly groupBy = input.required<AuiGroupBy>();
+  readonly groupBy = input<AuiGroupBy | undefined>(undefined);
+  /**
+   * Clusters parts by indices instead of adjacent paths (React's
+   * `Unstable_PartsGrouped`): the groups need not be adjacent, and a keyed
+   * group renders as `group-<key>` (its `groupKey` is on the group). Parts
+   * of an unkeyed group render flat. Without `groupBy` or this input the
+   * parts cluster by `parentId` (`Unstable_PartsGroupedByParentId`); use it
+   * through the `aui-message-parts-grouped` selector.
+   */
+  readonly groupingFunction = input<GroupingFunction | undefined>(undefined);
   /** When to emit the trailing indicator. @default 'no-text' */
   readonly indicator = input<AuiIndicatorMode>('no-text');
 
@@ -304,8 +319,8 @@ export class AuiMessageGroupedPartsComponent {
   /** Memo fingerprint of `groupBy`: its identity unless it carries one. */
   private readonly groupByKey = computed(
     () => {
-      const fn = this.groupBy() as AuiGroupBy & { [GROUPBY_MEMO_KEY]?: string };
-      return fn[GROUPBY_MEMO_KEY] ?? fn;
+      const fn = this.groupBy() as (AuiGroupBy & { [GROUPBY_MEMO_KEY]?: string }) | undefined;
+      return fn?.[GROUPBY_MEMO_KEY] ?? fn;
     },
     { equal: Object.is },
   );
@@ -318,6 +333,7 @@ export class AuiMessageGroupedPartsComponent {
     const toolUIs = this.toolUIs();
     this.groupByKey();
     const groupBy = untracked(this.groupBy);
+    if (!groupBy) return this.clusteredNodes(parts);
     const context: GroupByContext = toolUIs ? { toolUIs } : {};
     const tree = buildGroupTree(
       parts.map((part) => groupBy(part, context) ?? []),
@@ -351,6 +367,51 @@ export class AuiMessageGroupedPartsComponent {
     };
     return tree.map(toRender);
   });
+
+  /** The render tree for `groupingFunction` / parent-id clustering. */
+  private clusteredNodes(parts: readonly PartState[]): readonly RenderNode[] {
+    const grouping = this.groupingFunction() ?? groupMessagePartsByParentId;
+    const keys = getMessagePartKeys(parts);
+    const seen = new Set<string>();
+    const leaf = (index: number): RenderLeaf => {
+      let trackKey = `part-${keys[index] ?? index}`;
+      while (seen.has(trackKey)) trackKey += `@${index}`;
+      seen.add(trackKey);
+      return { kind: 'leaf', trackKey, index };
+    };
+    const nodes: RenderNode[] = [];
+    grouping(parts).forEach(({ groupKey, indices }, groupIndex) => {
+      if (indices.length === 0) return;
+      const leaves = indices.map(leaf);
+      if (groupKey === undefined) {
+        nodes.push(...leaves);
+        return;
+      }
+      const summary = getGroupSummary(parts, indices);
+      const group: AuiGroupPart = {
+        type: `group-${groupKey}`,
+        groupKey,
+        status: summary.status,
+        counts: summary.counts,
+        indices,
+        ...(summary.timing && { timing: summary.timing }),
+      };
+      this.childrenByGroup.set(group, leaves);
+      const identity = keys[indices[0]!];
+      nodes.push({
+        kind: 'group',
+        trackKey: JSON.stringify([
+          'group',
+          groupKey,
+          identity?.includes(':') ? `id:${identity}` : groupIndex,
+        ]),
+        group,
+        context: { $implicit: group, group, parts: indices.map((i) => parts[i]!) },
+        children: leaves,
+      });
+    });
+    return nodes;
+  }
 
   /** True while the trailing indicator should render. */
   protected readonly showIndicator = computed(() =>

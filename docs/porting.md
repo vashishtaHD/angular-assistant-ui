@@ -90,7 +90,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | MessagePrimitive.Quote, useMessageQuote | no | ported (as `*auiMessageQuote` and `injectMessageQuote`) |  |
 | MessagePrimitive.If | no | n/a (deprecated upstream, replaced by `*auiIf`) |  |
 | MessagePrimitive.GenerativeUI, GenerativeUIRender, GenerativeUIRenderError, GenerativeUIRenderProps, GenerativeUIComponentRegistry, GenerativeUIMessagePartComponent, GenerativeUIMessagePartProps, GenerativeUIMessagePart, GenerativeUINode, GenerativeUISpec | no | n/a (generative UI out of scope) |  |
-| MessagePrimitive.Unstable_PartsGrouped, MessagePrimitive.Unstable_PartsGroupedByParentId | no | n/a (deprecated upstream; adjacent grouping is subsumed by `aui-message-grouped-parts`, non-adjacent parent-id clustering is not ported) |  |
+| MessagePrimitive.Unstable_PartsGrouped, MessagePrimitive.Unstable_PartsGroupedByParentId | no | ported (as `aui-message-parts-grouped` with `groupingFunction` and `groupMessagePartsByParentId`) |  |
 | useMessageTiming | no | planned (Task 18) | Task 18 |
 | useToolCallElapsed | no | planned (Task 17) | Task 17 |
 | unstable_useMessageStallDetection, Unstable_MessageStallDetection, Unstable_MessageStallDetectionOptions | no | ported (as `injectMessageStallDetection`, `MessageStallDetection`, `MessageStallDetectionOptions`) |  |

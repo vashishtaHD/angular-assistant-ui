@@ -81,6 +81,12 @@ const assistantMessage = (id: string, value: string): ThreadMessage => ({
                             part.type === 'text' ? part.text : ''
                           }}</span></ng-template
                         >
+                        <ng-template auiPart="audio" let-part
+                          ><audio
+                            class="sub-audio"
+                            [attr.data-format]="part.type === 'audio' ? part.audio.format : ''"
+                          ></audio
+                        ></ng-template>
                       </aui-message-parts>
                     </div>
                   </ng-template>
@@ -137,6 +143,16 @@ describe('PartPrimitive.Messages', () => {
     ).toEqual(['s1', 's2']);
     // The outer thread's own text parts are untouched.
     expect(el.querySelectorAll('.outer-text').length).toBe(1);
+  });
+
+  it('renders an audio part through its auiPart="audio" template', async () => {
+    const audio = {
+      ...userMessage('s1', ''),
+      content: [{ type: 'audio', audio: { data: 'AAAA', format: 'mp3' } }],
+    } as unknown as ThreadMessage;
+    const { el } = await mount([audio]);
+    expect(el.querySelectorAll('.sub-audio').length).toBe(1);
+    expect(el.querySelector('.sub-audio')?.getAttribute('data-format')).toBe('mp3');
   });
 
   it('renders nothing while the tool call has no nested messages', async () => {

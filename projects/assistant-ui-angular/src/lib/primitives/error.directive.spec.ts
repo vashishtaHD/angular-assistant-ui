@@ -122,4 +122,24 @@ describe('ErrorPrimitive', () => {
     });
     expect(text(el, '.msg')).toBe('');
   });
+
+  it('announces a run another session drives as a status with data-run-state', async () => {
+    const el = await mount({
+      role: 'assistant',
+      content: [{ type: 'text', text: '' }],
+      status: { type: 'incomplete', reason: 'error', error: { code: 'run_in_progress' } },
+    });
+    expect(el.querySelector('.root')?.getAttribute('role')).toBe('status');
+    expect(el.querySelector('.root')?.getAttribute('data-run-state')).toBe('in-progress');
+  });
+
+  it('marks a stale run with data-run-state and keeps the alert role', async () => {
+    const el = await mount({
+      role: 'assistant',
+      content: [{ type: 'text', text: '' }],
+      status: { type: 'incomplete', reason: 'error', error: { code: 'run_stale' } },
+    });
+    expect(el.querySelector('.root')?.getAttribute('role')).toBe('alert');
+    expect(el.querySelector('.root')?.getAttribute('data-run-state')).toBe('stale');
+  });
 });

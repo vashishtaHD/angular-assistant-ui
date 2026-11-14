@@ -71,6 +71,13 @@ const warnedTypes = new Set<string>();
 export class AuiPartViewComponent {
   /** The templates projected into the owning `aui-message-parts`. */
   readonly templates = input.required<AuiPartTemplates>();
+  /**
+   * When true, a template for the part type (or `default`) wins over a
+   * registered tool or data UI, which then only renders for parts without
+   * one (React's `GroupedParts` render-function-first contract). Default
+   * false: registered UIs win, as in `aui-message-parts`.
+   */
+  readonly templatesFirst = input(false);
 
   private readonly aui = injectAui();
   /** Renders projected templates in this part's scope. */
@@ -100,6 +107,13 @@ export class AuiPartViewComponent {
   /** What this part renders, recomputed when the part or a registry changes. */
   protected readonly view = computed<PartView>(() => {
     const part = this.part();
+    if (this.templatesFirst()) {
+      const first =
+        part.type === 'text'
+          ? this.templates().get('text')
+          : (this.templates().get(part.type) ?? this.templates().get('default'));
+      if (first) return { kind: 'template', template: first };
+    }
     if (part.type === 'tool-call') {
       const registration = this.toolUI();
       if (registration?.renderText) {
