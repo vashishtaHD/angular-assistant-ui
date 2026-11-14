@@ -11,6 +11,7 @@ export { AuiButtonDirective } from './button.directive';
 export type { AuiButtonSize, AuiButtonVariant } from './button.directive';
 
 export {
+  AuiTooltipDirective,
   AuiTooltipIconButtonComponent,
   AuiTooltipPanelComponent,
 } from './tooltip-icon-button.component';
@@ -37,3 +38,15 @@ export type { AuiDropdownMenuAlign } from './dropdown-menu/dropdown-menu';
 // exported; do not use them directly. They are replaced when the menu moves to the
 // main entry's headless menu (Ruling R10).
 export { UiMenuContentDirective, UiMenuItemDirective } from './dropdown-menu/headless-menu';
+
+// Task 16: styled thread, messages, composer, action bars, branch picker and markdown text.
+export { AuiThreadComponent } from './thread/thread.component';
+export type {
+  AuiThreadAvatar,
+  AuiThreadWelcomeConfig,
+  AuiThreadWelcomeSuggestion,
+} from './thread/thread.component';
+export { AUI_THREAD_COMPONENTS } from './thread-components.token';
+export type { AuiThreadComponents } from './thread-components.token';
+export { AuiStyledCodeHeader, AuiStyledMarkdownText } from './markdown-text.component';
+// Task 16 end.
