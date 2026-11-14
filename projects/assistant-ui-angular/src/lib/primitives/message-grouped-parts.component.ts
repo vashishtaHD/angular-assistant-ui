@@ -23,6 +23,7 @@ import {
 import { getMessagePartKeys } from '@assistant-ui/core/internal';
 import type { AuiConfig } from '@assistant-ui/store/client';
 import { partScopeConfig } from '../scope/part-scope';
+import { textPartScopeConfig } from '../scope/text-part-scope';
 import { AuiScopeOutletComponent } from '../scope/scope-outlet.component';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
@@ -45,6 +46,8 @@ import {
   type AuiPartTemplates,
 } from './part-view.component';
 import { AuiPartTemplateDirective } from './message-parts.component';
+import { AuiPartInProgressDirective } from './part-in-progress.directive';
+import { AuiPartTextComponent } from './part-text.component';
 
 /**
  * A group of parts: a coalesced run of adjacent parts (`groupBy` mode) or a
@@ -264,6 +267,8 @@ const shouldShowIndicator = (
     NgTemplateOutlet,
     AuiScopeOutletComponent,
     AuiPartViewComponent,
+    AuiPartTextComponent,
+    AuiPartInProgressDirective,
     forwardRef(() => AuiGroupChildrenComponent),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -289,17 +294,18 @@ const shouldShowIndicator = (
     @if (showEmpty()) {
       @if (emptyTemplate(); as template) {
         <ng-container *ngTemplateOutlet="template; context: emptyContext(); injector: injector" />
-      } @else if (emptyTextTemplate()) {
-        <ng-container
-          *ngTemplateOutlet="emptyTextTemplate()!; context: emptyTextContext(); injector: injector"
-        />
       } @else {
-        <p style="white-space: pre-line">
-          <span [attr.data-status]="messageStatus().type"></span>
-          @if (messageStatus().type === 'running') {
-            <span style="font-family: revert">{{ ' ●' }}</span>
+        <ng-template #emptyBody>
+          @if (emptyTextTemplate()) {
+            <aui-part-view [templates]="partTemplates()" />
+          } @else {
+            <p style="white-space: pre-line">
+              <aui-part-text />
+              <span *auiPartInProgress style="font-family: revert">{{ ' ●' }}</span>
+            </p>
           }
-        </p>
+        </ng-template>
+        <aui-scope-outlet [config]="emptyScope()" [template]="emptyBody" />
       }
     }
     @if (showIndicator()) {
@@ -373,14 +379,10 @@ export class AuiMessageGroupedPartsComponent implements OnInit {
     $implicit: this.messageStatus(),
   }));
   protected readonly emptyTextTemplate = computed(() => this.partTemplates().get('text'));
-  /** The context for the consumer's text template: an empty text part. */
-  protected readonly emptyTextContext = computed<AuiPartTemplateContext>(() => ({
-    $implicit: {
-      type: 'text',
-      text: '',
-      status: this.messageStatus(),
-    } as AuiPartTemplateContext['$implicit'],
-  }));
+  /** A static empty text part with the message's running state, like TextMessagePartProvider. */
+  protected readonly emptyScope = computed(() =>
+    textPartScopeConfig('', this.messageStatus().type === 'running'),
+  );
   /** True for a message with no parts in `groupingFunction` / parent-id mode. */
   protected readonly showEmpty = computed(
     () => this.groupBy() === undefined && this.parts().length === 0,

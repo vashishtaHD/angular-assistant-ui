@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { configureTestBed } from '../../testing-internal/test-bed';
 import { createTestRuntime, type DemoMessage } from '../../testing-internal/test-runtime';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
+import { AuiPartInProgressDirective } from './part-in-progress.directive';
+import { AuiPartTextComponent } from './part-text.component';
 import { groupMessagePartsByParentId, type GroupingFunction } from '../utils/group-parts';
 import {
   AuiEmptyTemplateDirective,
@@ -244,10 +246,46 @@ class EmptyTextTemplateHostComponent {
   readonly config = hostConfig;
 }
 
-const mountEmpty = async (host: new () => unknown, running: boolean) => {
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessageGroupedPartsComponent,
+    AuiPartTemplateDirective,
+    AuiPartTextComponent,
+    AuiPartInProgressDirective,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <aui-message-parts-grouped>
+            <ng-template auiPart="text"
+              ><aui-part-text class="scoped" /><i *auiPartInProgress class="busy"
+                >...</i
+              ></ng-template
+            >
+          </aui-message-parts-grouped>
+        </ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class EmptyScopedTextHostComponent {
+  readonly config = hostConfig;
+}
+
+const mountEmpty = async (
+  host: new () => unknown,
+  running: boolean,
+  status?: DemoMessage['status'],
+) => {
   TestBed.resetTestingModule();
   const rt = createTestRuntime();
-  rt.append({ id: 'a1', role: 'assistant', content: [] });
+  rt.append({ id: 'a1', role: 'assistant', content: [], ...(status ? { status } : {}) });
   if (running) rt.setRunning(true);
   hostConfig = rt.config;
   configureTestBed({ imports: [host as never] });
@@ -271,6 +309,31 @@ describe('MessagePrimitive.Unstable_PartsGrouped empty message', () => {
     const done = await mountEmpty(EmptyTextTemplateHostComponent, false);
     expect(done.querySelector('.text-slot')?.textContent).toBe('|complete');
     expect(done.querySelector('p')).toBeNull();
+  });
+
+  it('lets the empty text template use part primitives (aui-part-text, *auiPartInProgress)', async () => {
+    const running = await mountEmpty(EmptyScopedTextHostComponent, true);
+    expect(running.querySelector('aui-part-text.scoped')?.getAttribute('data-status')).toBe(
+      'running',
+    );
+    expect(running.querySelector('.busy')).not.toBeNull();
+    const done = await mountEmpty(EmptyScopedTextHostComponent, false);
+    expect(done.querySelector('aui-part-text.scoped')?.getAttribute('data-status')).toBe(
+      'complete',
+    );
+    expect(done.querySelector('.busy')).toBeNull();
+  });
+
+  it('reports the collapsed running/complete status on the default paragraph', async () => {
+    const running = await mountEmpty(EmptyDefaultHostComponent, true);
+    expect(running.querySelector('p aui-part-text')?.getAttribute('data-status')).toBe('running');
+    const cancelled = await mountEmpty(EmptyDefaultHostComponent, false, {
+      type: 'incomplete',
+      reason: 'cancelled',
+    });
+    expect(cancelled.querySelector('p aui-part-text')?.getAttribute('data-status')).toBe(
+      'complete',
+    );
   });
 
   it('falls back to an empty text paragraph with the in-progress marker while running', async () => {
