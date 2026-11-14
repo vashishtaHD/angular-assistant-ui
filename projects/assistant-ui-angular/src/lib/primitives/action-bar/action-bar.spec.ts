@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { ExternalThread } from '@assistant-ui/core/store';
+import type { AssistantClient } from '@assistant-ui/store/client';
+import { AuiConfig } from '@assistant-ui/store/client';
 import { flushTapSync } from '@assistant-ui/tap';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../../testing-internal/test-bed';
@@ -8,6 +11,7 @@ import {
   type DemoMessage,
   type TestRuntime,
 } from '../../../testing-internal/test-runtime';
+import { injectAui } from '../../state/inject-aui';
 import { AuiProviderDirective } from '../../provider/aui-provider.directive';
 import { AuiMessageRootDirective } from '../message-root.directive';
 import {
@@ -29,6 +33,20 @@ import { AuiActionBarRootDirective } from './action-bar-root.directive';
 import { AUI_CLIPBOARD } from './clipboard';
 
 let current: TestRuntime;
+let probed: AssistantClient | undefined;
+
+@Component({
+  selector: 'aui-probe',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class ProbeComponent {
+  constructor() {
+    probed = injectAui();
+  }
+}
+
 const onReload = vi.fn(async () => undefined);
 const exported: AuiExportMarkdownEvent[] = [];
 const autohide = signal<'always' | 'not-last' | 'never'>('never');
@@ -43,6 +61,7 @@ const copiedDuration = signal(3000);
     AuiThreadMessagesComponent,
     AuiMessageTemplateDirective,
     AuiMessageRootDirective,
+    ProbeComponent,
     AuiActionBarRootDirective,
     AuiActionBarCopyDirective,
     AuiActionBarReloadDirective,
@@ -54,6 +73,7 @@ const copiedDuration = signal(3000);
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ng-container [auiProvider]="config()">
+      <aui-probe />
       <aui-thread-messages>
         <ng-template auiMessage>
           <div auiMessageRoot class="row">
@@ -114,13 +134,32 @@ class PlainExportHostComponent {
   readonly config = current.config;
 }
 
-const swap = (fixture: ComponentFixture<HostComponent>, rt: TestRuntime) => {
+const swap = (fixture: ComponentFixture<HostComponent>, target: TestRuntime | AuiConfig) => {
   flushTapSync(() => {
-    fixture.componentInstance.config.set(rt.config);
+    fixture.componentInstance.config.set('config' in target ? target.config : target);
     fixture.detectChanges();
   });
 };
 
+/** Store-native thread clients (no runtime behind them, so no `__internal_getRuntime`). */
+const nativeMessages = (ids: string[]) =>
+  ids.map((id) => ({
+    id,
+    role: id.startsWith('a') ? 'assistant' : 'user',
+    content: [{ type: 'text', text: `text ${id}` }],
+    createdAt: new Date(0),
+    status: { type: 'complete', reason: 'stop' },
+    attachments: [],
+    metadata: {
+      unstable_state: null,
+      unstable_annotations: [],
+      unstable_data: [],
+      steps: [],
+      custom: {},
+    },
+  })) as never;
+const nativeThreadConfig = (ids: string[]) =>
+  AuiConfig({ thread: ExternalThread({ messages: nativeMessages(ids) }) });
 const click = (el: HTMLElement) => flushTapSync(() => el.click());
 
 const settle = async (fixture: ComponentFixture<unknown>) => {
@@ -227,6 +266,70 @@ describe('action bar', () => {
     await settle(fixture);
     // Had the timer survived the rebind, the original message would still be copied.
     expect(q(1, '.copy').hasAttribute('data-copied')).toBe(false);
+    fixture.destroy();
+  });
+
+  it('copy clears the old flag when the provider moves to a thread without that message', async () => {
+    const write = vi.fn(async () => undefined);
+    current = createTestRuntime({ onReload });
+    const list = current.withThreadList();
+    configureTestBed({
+      imports: [HostComponent],
+      providers: [{ provide: AUI_CLIPBOARD, useValue: write }],
+    });
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.config.set(list.config);
+    fixture.detectChanges();
+    const aui = () => probed!;
+    await settle(fixture);
+    const mainId = aui().threads.getState().mainThreadId;
+    flushTapSync(() => {
+      list.runtimeFor(mainId).append(user);
+      list.runtimeFor(mainId).append(assistant);
+    });
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+    const copy = () => el.querySelectorAll<HTMLButtonElement>('.copy');
+    click(copy()[1]);
+    await new Promise((r) => setTimeout(r, 10));
+    await settle(fixture);
+    expect(copy()[1].hasAttribute('data-copied')).toBe(true);
+
+    // Another thread whose messages have other ids, then back.
+    const otherId = 'other-thread';
+    await list.adapter.initialize(otherId);
+    await aui().threads.reload();
+    await settle(fixture);
+    flushTapSync(() => void aui().threads.switchToThread(otherId));
+    await settle(fixture);
+    expect(aui().threads.getState().mainThreadId).toBe(otherId);
+    flushTapSync(() =>
+      list
+        .runtimeFor(otherId)
+        .append({ id: 'b1', role: 'user', content: [{ type: 'text', text: 'b' }] }),
+    );
+    await settle(fixture);
+    flushTapSync(() => void aui().threads.switchToThread(mainId));
+    await new Promise((r) => setTimeout(r, 10));
+    await settle(fixture);
+    expect(copy()[1].hasAttribute('data-copied')).toBe(false);
+    fixture.destroy();
+  });
+
+  it('copy keeps its flag across updates of the same store-native client', async () => {
+    const write = vi.fn(async () => undefined);
+    const { fixture, q } = await mount(undefined, undefined, [
+      { provide: AUI_CLIPBOARD, useValue: write },
+    ]);
+    swap(fixture, nativeThreadConfig(['u1', 'a1']));
+    await settle(fixture);
+    click(q(1, '.copy'));
+    await new Promise((r) => setTimeout(r, 10));
+    await settle(fixture);
+    expect(q(1, '.copy').hasAttribute('data-copied')).toBe(true);
+    swap(fixture, nativeThreadConfig(['u1', 'a1', 'u2']));
+    await settle(fixture);
+    expect(q(1, '.copy').hasAttribute('data-copied')).toBe(true);
     fixture.destroy();
   });
 
