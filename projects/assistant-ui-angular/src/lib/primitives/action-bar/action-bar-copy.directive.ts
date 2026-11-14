@@ -14,6 +14,7 @@ import { flushTapSync } from '@assistant-ui/tap';
 import { injectAuiContext } from '../../context/aui-context';
 import { injectAui } from '../../state/inject-aui';
 import { injectAuiState } from '../../state/inject-aui-state';
+import { hasMessage } from '../../scope/message-scope';
 import { AuiActionButtonHostDirective, injectActionButton } from '../action-button';
 import { AUI_CLIPBOARD } from './clipboard';
 
@@ -52,20 +53,24 @@ export class AuiActionBarCopyDirective {
   private readonly composerText = injectAuiState((s) => s.composer.text);
 
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private feedbackTarget: ((value: boolean) => void) | undefined;
-  private messageId: string | undefined;
+  private feedbackTarget: { id: string; set: (value: boolean) => void } | undefined;
+  private scope: { id: string | undefined; client: unknown };
+  /** Bumped whenever the message scope changes; invalidates pending writes. */
+  private generation = 0;
   private destroyed = false;
 
   constructor() {
-    this.messageId = this.currentMessageId();
+    this.scope = this.currentScope();
     const unsubscribe = this.source.subscribe(() => {
-      const id = this.currentMessageId();
-      if (id === this.messageId) return;
-      this.messageId = id;
+      const next = this.currentScope();
+      if (next.id === this.scope.id && next.client === this.scope.client) return;
+      this.scope = next;
+      this.generation++;
       this.reset();
     });
     inject(DestroyRef).onDestroy(() => {
       this.destroyed = true;
+      this.generation++;
       unsubscribe();
       this.reset();
     });
@@ -75,29 +80,37 @@ export class AuiActionBarCopyDirective {
     });
   }
 
-  private currentMessageId(): string | undefined {
+  /** The message id and message runtime currently in scope (both undefined when none). */
+  private currentScope(): { id: string | undefined; client: unknown } {
     try {
-      return getProxiedAssistantState(this.source.getClient()).optional.message?.id;
+      const client = this.source.getClient();
+      return {
+        id: getProxiedAssistantState(client).optional.message?.id,
+        client: (
+          client.message() as { __internal_getRuntime?: () => unknown }
+        ).__internal_getRuntime?.(),
+      };
     } catch {
       // The message left the thread: its scope no longer resolves.
-      return undefined;
+      return { id: undefined, client: undefined };
     }
   }
 
   /** Cancels the pending timer and clears the copied flag on the message that set it. */
   private reset(): void {
-    if (this.timer === undefined) return;
-    clearTimeout(this.timer);
+    if (this.timer !== undefined) clearTimeout(this.timer);
     this.timer = undefined;
     const target = this.feedbackTarget;
     this.feedbackTarget = undefined;
-    if (target) flushTapSync(() => target(false));
+    // A removed message has no flag left to clear (and its scope would throw).
+    if (target && hasMessage(this.aui, target.id)) flushTapSync(() => target.set(false));
   }
 
   private copy(): void {
     const value = this.isEditing() ? this.composerText() : this.aui.message.getCopyText();
     if (!value) return;
     const copiedMessageId = this.aui.message.getState().id;
+    const generation = this.generation;
     const setIsCopied = this.aui.message.setIsCopied;
     let write: void | Promise<void>;
     try {
@@ -108,11 +121,11 @@ export class AuiActionBarCopyDirective {
     }
     Promise.resolve(write).then(
       () => {
-        if (this.destroyed || this.currentMessageId() !== copiedMessageId) return;
+        if (this.destroyed || generation !== this.generation) return;
         if (this.timer !== undefined) clearTimeout(this.timer);
         flushTapSync(() => {
-          this.feedbackTarget?.(false);
-          this.feedbackTarget = setIsCopied;
+          this.feedbackTarget?.set(false);
+          this.feedbackTarget = { id: copiedMessageId, set: setIsCopied };
           setIsCopied(true);
         });
         const duration = this.copiedDuration();

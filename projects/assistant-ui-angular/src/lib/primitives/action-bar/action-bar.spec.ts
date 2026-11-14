@@ -53,7 +53,7 @@ const copiedDuration = signal(3000);
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ng-container [auiProvider]="config">
+    <ng-container [auiProvider]="config()">
       <aui-thread-messages>
         <ng-template auiMessage>
           <div auiMessageRoot class="row">
@@ -80,7 +80,7 @@ const copiedDuration = signal(3000);
   `,
 })
 class HostComponent {
-  readonly config = current.config;
+  readonly config = signal(current.config);
   readonly autohide = autohide;
   readonly float = float;
   readonly hideWhenRunning = hideWhenRunning;
@@ -113,6 +113,13 @@ class HostComponent {
 class PlainExportHostComponent {
   readonly config = current.config;
 }
+
+const swap = (fixture: ComponentFixture<HostComponent>, rt: TestRuntime) => {
+  flushTapSync(() => {
+    fixture.componentInstance.config.set(rt.config);
+    fixture.detectChanges();
+  });
+};
 
 const click = (el: HTMLElement) => flushTapSync(() => el.click());
 
@@ -188,20 +195,77 @@ describe('action bar', () => {
     await new Promise((r) => setTimeout(r, 10));
     await settle(fixture);
     expect(q(1, '.copy').hasAttribute('data-copied')).toBe(true);
-    // Core logs a recoverable "key not found" while the removed row's scope
-    // is torn down; that is upstream noise, not part of this contract.
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error');
+    const warn = vi.spyOn(console, 'warn');
     const clear = vi.spyOn(globalThis, 'clearTimeout');
     flushTapSync(() => current.setMessages([user]));
     await settle(fixture);
     expect(rows().length).toBe(1);
     expect(clear).toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
     fixture.destroy();
   });
 
-  it('copy is disabled while the assistant message is running', async () => {
+  it('copy resets when the message client is replaced under an unchanged id', async () => {
+    const write = vi.fn(async () => undefined);
+    const { fixture, q } = await mount(undefined, undefined, [
+      { provide: AUI_CLIPBOARD, useValue: write },
+    ]);
+    const first = current;
+    click(q(1, '.copy'));
+    await new Promise((r) => setTimeout(r, 10));
+    await settle(fixture);
+    expect(q(1, '.copy').hasAttribute('data-copied')).toBe(true);
+
+    // Same ids, different runtime: a different message client.
+    const second = createTestRuntime({ onReload });
+    flushTapSync(() => [user, assistant].forEach((m) => second.append(m)));
+    swap(fixture, second);
+    await settle(fixture);
+    swap(fixture, first);
+    await settle(fixture);
+    // Had the timer survived the rebind, the original message would still be copied.
+    expect(q(1, '.copy').hasAttribute('data-copied')).toBe(false);
+    fixture.destroy();
+  });
+
+  it('copy ignores a pending write that completes after an A, B, A scope round trip', async () => {
+    let finish!: () => void;
+    const write = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const { fixture, q } = await mount(undefined, undefined, [
+      { provide: AUI_CLIPBOARD, useValue: write },
+    ]);
+    const first = current;
+    click(q(1, '.copy'));
+    const second = createTestRuntime({ onReload });
+    flushTapSync(() => [user, assistant].forEach((m) => second.append(m)));
+    swap(fixture, second);
+    await settle(fixture);
+    swap(fixture, first);
+    await settle(fixture);
+    finish();
+    await new Promise((r) => setTimeout(r, 10));
+    await settle(fixture);
+    expect(q(1, '.copy').hasAttribute('data-copied')).toBe(false);
+    fixture.destroy();
+  });
+
+  it('copy and export are disabled for a message with no text', async () => {
     const { fixture, q } = await mount([user, { ...assistant, content: [] }]);
     expect(q(1, '.copy').disabled).toBe(true);
+    expect(q(1, '.export').disabled).toBe(true);
+    fixture.destroy();
+  });
+
+  it('copy and export are disabled while the assistant message is running', async () => {
+    const { fixture, q } = await mount();
+    expect(q(1, '.copy').disabled).toBe(false);
+    expect(q(1, '.export').disabled).toBe(false);
+    flushTapSync(() => current.setRunning(true));
+    await settle(fixture);
+    expect(q(1, '.copy').disabled).toBe(true);
+    expect(q(1, '.export').disabled).toBe(true);
     fixture.destroy();
   });
 

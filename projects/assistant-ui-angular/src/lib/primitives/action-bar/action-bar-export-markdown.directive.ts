@@ -1,5 +1,6 @@
 // Ported from packages/react/src/primitives/actionBar/ActionBarExportMarkdown.tsx @ 7d74276
 import { Directive, NgZone, booleanAttribute, inject, input, output } from '@angular/core';
+import { actionBarCopyDisabled } from '@assistant-ui/core/store/internal';
 import { injectAui } from '../../state/inject-aui';
 import { injectAuiState } from '../../state/inject-aui-state';
 import { AuiActionButtonHostDirective, injectActionButton } from '../action-button';
@@ -41,15 +42,11 @@ export class AuiActionBarExportMarkdownDirective {
 
   private readonly aui = injectAui();
   private readonly zone = inject(NgZone);
-  private readonly exportable = injectAuiState(
-    (s) =>
-      (s.message.role !== 'assistant' || s.message.status?.type !== 'running') &&
-      s.message.parts.some((part) => part.type === 'text' && part.text.length > 0),
-  );
+  private readonly blocked = injectAuiState(actionBarCopyDisabled);
 
   constructor() {
     injectActionButton({
-      disabled: () => this.disabled() || !this.exportable(),
+      disabled: () => this.disabled() || this.blocked(),
       onClick: () => this.export(),
     });
   }
