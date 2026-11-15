@@ -17,6 +17,7 @@ import {
 } from 'angular-assistant-ui';
 import { AuiButtonDirective } from '../button.directive';
 import { AuiIconComponent } from '../icons/icon.component';
+import { AuiTooltipDirective } from '../tooltip-icon-button.component';
 import { AuiAttachmentTileComponent } from './attachment-tile.component';
 
 /**
@@ -78,14 +79,19 @@ export class AuiComposerAttachmentsStyledComponent {}
 export class AuiMessageAttachmentsStyledComponent {}
 
 /**
- * A round ghost icon button ("Add Attachment") that opens the file picker and
+ * A round ghost icon button ("Add Attachment", also its `[auiTooltip]`) that opens the file picker and
  * adds the chosen files to the composer (`button[auiComposerAddAttachment]`).
  * Rejected files are reported through `(attachmentError)`.
  */
 @Component({
   selector: 'aui-composer-add-attachment-styled',
   standalone: true,
-  imports: [AuiComposerAddAttachmentDirective, AuiButtonDirective, AuiIconComponent],
+  imports: [
+    AuiComposerAddAttachmentDirective,
+    AuiButtonDirective,
+    AuiIconComponent,
+    AuiTooltipDirective,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   host: { class: 'aui-composer-add-attachment-host' },
@@ -97,7 +103,7 @@ export class AuiMessageAttachmentsStyledComponent {}
       size="icon"
       class="aui-composer-add-attachment"
       aria-label="Add Attachment"
-      title="Add Attachment"
+      auiTooltip="Add Attachment"
       [multiple]="multiple()"
       (attachmentError)="attachmentError.emit($event)"
     >

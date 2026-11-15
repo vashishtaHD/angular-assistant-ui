@@ -63,7 +63,7 @@ export type {
 } from './tool-fallback/tool-fallback-utils';
 export { AuiToolGroupComponent } from './tool-group.component';
 export type { AuiToolGroupVariant } from './tool-group.component';
-export { AuiReasoningComponent } from './reasoning.component';
+export { AuiReasoningComponent, AuiReasoningGroupComponent } from './reasoning.component';
 export { injectAttachmentSrc } from './attachments/attachment-src';
 export { AuiAttachmentTileComponent } from './attachments/attachment-tile.component';
 export {
