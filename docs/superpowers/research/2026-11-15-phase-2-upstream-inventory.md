@@ -1,7 +1,7 @@
 # Phase 2 inventory: what upstream ships that a chat app uses
 
-Upstream SHA `7d7427653f6ba47b0b954510eed9c594d64e74d5`. Paths are relative to the upstream root
-(`.../scratchpad/upstream/aui`). Abbreviations: `R` = `packages/react/src`, `C` = `packages/core/src`,
+Upstream SHA `7d7427653f6ba47b0b954510eed9c594d64e74d5`. Paths are relative to the root of a local checkout of
+upstream assistant-ui at that SHA. Abbreviations: `R` = `packages/react/src`, `C` = `packages/core/src`,
 `CR` = `packages/core/src/react`, `V` = `packages/vue/src`, `S` = `packages/store/src`,
 `UI` = `packages/ui/src/components`.
 

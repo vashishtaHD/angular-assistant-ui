@@ -8,7 +8,7 @@ Research this design argues from (committed alongside it):
 - `docs/superpowers/research/2026-11-15-phase-2-upstream-inventory.md`: every upstream export, hook, styled component and core API, with file paths. **Inventory** below means this file.
 - `docs/superpowers/research/2026-11-15-phase-2-mastra-wiring.md`: how thread lists, attachments, approval and history work over Mastra, with verified and inferred claims marked. **Mastra notes** below means this file.
 
-Upstream source: SHA `7d7427653f6ba47b0b954510eed9c594d64e74d5` (sparse clone in the session scratchpad; re-clone at that SHA if it is missing).
+Upstream source: SHA `7d7427653f6ba47b0b954510eed9c594d64e74d5` (work from a local checkout of upstream assistant-ui at that SHA).
 
 ## 1. Intent
 

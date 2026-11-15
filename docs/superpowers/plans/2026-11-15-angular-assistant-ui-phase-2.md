@@ -19,7 +19,7 @@
 - `docs/superpowers/research/2026-11-15-phase-2-upstream-inventory.md` (**INV**)
 - `docs/superpowers/research/2026-11-15-phase-2-mastra-wiring.md` (**MW**)
 
-**Upstream:** SHA `7d7427653f6ba47b0b954510eed9c594d64e74d5`. The read-only clone is at `C:/Users/vashi/AppData/Local/Temp/claude/fe10045899320718/81df7be4-d8b7-4b77-b21a-0b53f303247a/scratchpad/upstream/aui`. Abbreviations:
+**Upstream:** SHA `7d7427653f6ba47b0b954510eed9c594d64e74d5`. Work from a read-only local checkout of upstream assistant-ui at that SHA (7d74276). Abbreviations:
 - `R` = `packages/react/src`
 - `C` = `packages/core/src`
 - `V` = `packages/vue/src`
@@ -64,7 +64,7 @@
   6. Task 21.
 - **Concurrent edits** touch `public-api.ts` and `docs/porting.md`. Each task appends its own delimited block and edits only its own rows. Resolve merge conflicts by keeping both sides.
 - **Reviewers:** per-task and final reviews go to a Codex `gpt-6.1-sol` agent via `delegate_task`, per the user's request. Implementers are subagents.
-- **Worktrees:** create them at short paths (e.g. `C:/w/aui-tN`) to avoid Windows long-path failures on cleanup.
+- **Worktrees:** create them at short paths (a short directory near the drive root, one per task) to avoid Windows long-path failures on cleanup.
 
 ---
 

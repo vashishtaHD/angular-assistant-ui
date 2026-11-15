@@ -2,8 +2,8 @@
 
 Legend: [V] verified in source/docs (path:line given); [I] inference, needs a spike/test.
 Abbreviations:
-- UP  = C:/Users/vashi/AppData/Local/Temp/claude/fe10045899320718/81df7be4-d8b7-4b77-b21a-0b53f303247a/scratchpad/upstream/aui
-- WT  = C:/Users/vashi/.t3/projects/angular-assistant-ui/.claude/worktrees/phase-1
+- UP  = a local checkout of upstream assistant-ui at 7d74276 (the repository root)
+- WT  = the root of this repository's working tree
 - NM  = WT/node_modules
 - MAI = NM/@mastra/ai-sdk/dist (v1.12.0)
 - MSV = NM/@mastra/server/dist (v1.83.0)
