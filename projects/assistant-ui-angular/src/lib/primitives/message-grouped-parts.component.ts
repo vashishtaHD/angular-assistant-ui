@@ -305,8 +305,10 @@ const shouldShowIndicator = (
             </p>
           }
         </ng-template>
-        @for (scope of emptyScopes(); track scope) {
-          <aui-scope-outlet [config]="scope" [template]="emptyBody" />
+        @if (emptyRunning()) {
+          <aui-scope-outlet [config]="emptyRunningScope" [template]="emptyBody" />
+        } @else {
+          <aui-scope-outlet [config]="emptySettledScope" [template]="emptyBody" />
         }
       }
     }
@@ -381,14 +383,15 @@ export class AuiMessageGroupedPartsComponent implements OnInit {
     $implicit: this.messageStatus(),
   }));
   protected readonly emptyTextTemplate = computed(() => this.partTemplates().get('text'));
-  private readonly emptyRunning = computed(() => this.messageStatus().type === 'running');
+  protected readonly emptyRunning = computed(() => this.messageStatus().type === 'running');
   /**
-   * A static empty text part with the message's running state, like TextMessagePartProvider. One
-   * scope per running state: the outlet is remounted when the run ends rather than updated in
-   * place, because that update arrives in the same store notification as the message's own status
-   * change and the child scope kept serving the running part.
+   * Static empty text parts, running and settled, like TextMessagePartProvider. Each has its own
+   * outlet (`@if` / `@else`), so the outlet is remounted when the run ends rather than updated in
+   * place: that update arrives in the same store notification as the message's own status change,
+   * and the child scope kept serving the running part.
    */
-  protected readonly emptyScopes = computed(() => [textPartScopeConfig('', this.emptyRunning())]);
+  protected readonly emptyRunningScope = textPartScopeConfig('', true);
+  protected readonly emptySettledScope = textPartScopeConfig('', false);
   /** True for a message with no parts in `groupingFunction` / parent-id mode. */
   protected readonly showEmpty = computed(
     () => this.groupBy() === undefined && this.parts().length === 0,
