@@ -496,6 +496,20 @@ export {
   type AssistantTransportRuntimeOptions,
 } from './lib/runtime/assistant-transport';
 
+// Task 17: tool-call elapsed time and streaming argument status (used by the styled tool fallback).
+export { injectToolCallElapsed } from './lib/tools/tool-call-elapsed';
+export {
+  computeToolArgsStatus,
+  injectToolArgsStatus,
+  type ToolArgsStatus,
+} from './lib/tools/tool-args-status';
+// End Task 17.
+
+// Task 16 (fix round 1): scope-safe dynamic rendering and registered tool UI precedence.
+export { AuiComponentOutletDirective } from './lib/scope/component-outlet.directive';
+export { AuiToolUIOutletComponent } from './lib/primitives/tool-ui-outlet.component';
+// Task 16 end.
+
 // Task 18: thread list item by index and message timing.
 export { AuiThreadListItemByIndexComponent } from './lib/primitives/thread-list/thread-list-item-by-index.component';
 export { injectMessageTiming } from './lib/state/inject-message-timing';

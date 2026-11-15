@@ -32,6 +32,12 @@ describe('styles.css (Task 16 block)', () => {
     expect(plain).toMatch(/overflow-x:\s*auto/);
   });
 
+  it('uses logical directions so the thread mirrors in RTL', () => {
+    expect(block).not.toMatch(/(margin|padding|border)-(left|right)\s*:/);
+    expect(block).not.toMatch(/border-(top|bottom)-(left|right)-radius/);
+    expect(block).not.toMatch(/[\s;{](left|right)\s*:/);
+  });
+
   it('keeps the hidden attribute effective on flex containers', () => {
     expect(block).toMatch(/\.aui-root \[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
   });
