@@ -212,6 +212,24 @@ describe('dropdown menu', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it('closes on Escape pressed while focus is outside the menu (overlay fallback)', async () => {
+    const { fixture, trigger } = await open();
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    try {
+      outside.focus();
+      expect(menu()!.contains(document.activeElement)).toBe(false);
+      key(outside, 'Escape');
+      fixture.detectChanges();
+      await settle();
+      expect(menu()).toBeNull();
+      expect(trigger.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(trigger);
+    } finally {
+      outside.remove();
+    }
+  });
+
   it('closes on outside click', async () => {
     const { fixture } = await open();
     (overlayRoot().querySelector('.cdk-overlay-backdrop') as HTMLElement).click();
