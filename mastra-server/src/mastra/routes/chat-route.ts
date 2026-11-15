@@ -28,9 +28,21 @@ const PART_TYPES = new Set([
 const isKnownPartType = (type: string) =>
   PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type);
 
-const part = z.looseObject({
-  type: z.string().refine(isKnownPartType, { message: 'Unsupported message part type' }),
-});
+/** What a `steering-message` part may carry: AI SDK's `Array<TextUIPart | FileUIPart>`. */
+const steeringParts = z.array(z.looseObject({ type: z.enum(['text', 'file']) }));
+
+const part = z
+  .looseObject({
+    type: z.string().refine(isKnownPartType, { message: 'Unsupported message part type' }),
+  })
+  .superRefine((value, ctx) => {
+    if (value.type !== 'steering-message') return;
+    const nested = steeringParts.safeParse(value['parts']);
+    if (nested.success) return;
+    for (const issue of nested.error.issues) {
+      ctx.addIssue({ code: 'custom', message: issue.message, path: ['parts', ...issue.path] });
+    }
+  });
 
 /**
  * The only fields the chat route reads. Zod strips every other key, so an agent option such as

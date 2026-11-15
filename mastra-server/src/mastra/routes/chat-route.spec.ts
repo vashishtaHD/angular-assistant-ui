@@ -608,6 +608,52 @@ describe('remote URLs in message parts (SSRF)', () => {
     expect(res.text).not.toContain('PRIVATE_INTERNAL_CONTENT');
   });
 
+  it('answers 400, not 500, for malformed or unsupported parts nested in a steering message', async () => {
+    const nested: unknown[][] = [
+      [null],
+      ['text'],
+      [42],
+      [{ text: 'no type' }],
+      [{ type: 'image', image: internal }],
+      [{ type: 'steering-message', id: 's2', parts: [] }],
+      [{ type: 'source-url', sourceId: 's', url: internal }],
+    ];
+    for (const parts of nested) {
+      const { res, fetched, t } = await postRecordingFetch({
+        messages: [{ id: 'u', role: 'user', parts: [{ type: 'steering-message', parts }] }],
+        memory: { thread: 't' },
+      });
+      expect(res.status, JSON.stringify(parts)).toBe(400);
+      expect(fetched, JSON.stringify(parts)).toEqual([]);
+      expect(t.sm.calls(), JSON.stringify(parts)).toHaveLength(0);
+    }
+  });
+
+  it('accepts the nested text and inline file parts a steering message may carry', async () => {
+    const { res, fetched } = await postRecordingFetch({
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          parts: [
+            {
+              type: 'steering-message',
+              id: 's1',
+              parts: [
+                { type: 'text', text: 'also' },
+                { type: 'file', url: 'data:text/plain;base64,aGk=', mediaType: 'text/plain' },
+              ],
+            },
+            { type: 'text', text: 'hi' },
+          ],
+        },
+      ],
+      memory: { thread: 't1' },
+    });
+    expect(res.status).toBe(200);
+    expect(fetched.filter((url) => !url.startsWith('data:'))).toEqual([]);
+  });
+
   it('rejects https, file and protocol-relative URLs, and file parts in assistant messages', async () => {
     for (const url of ['https://example.com/a.pdf', 'file:///etc/passwd', '//127.0.0.1/x']) {
       const { res, fetched } = await postRecordingFetch({
