@@ -334,7 +334,7 @@ Found in the phase 1 final review and deliberately not done in phase 1.
 - The message config memo in `aui-thread-messages` is not pruned when the id list becomes empty (harmless).
 - An early store listener that throws in `create()` stops notifying the remaining early listeners.
   No current listener throws; wrapping each in `try/catch` would harden it.
-- CI (`.github/workflows/ci.yml`) has never run: no remote exists yet. Push, get a green `verify` and
+- CI (`.github/workflows/ci.yml`) has never run: the `origin` remote exists, but nothing has been pushed yet. Push, get a green `verify` and
   three `compat` jobs, and record the run before relying on the compat table.
 - The compat smoke (Task 20) passes locally for Angular 18.2, 20 and 22, the last on Node 24.15.0
   (`npx -y -p node@24.15.0 -- node scripts/compat.mjs ng22`); it still needs its first CI run.
