@@ -7,6 +7,12 @@ The files under projects/assistant-ui-angular/mastra/src/vendor/ are vendored an
 @assistant-ui/ai-sdk (packages/ai-sdk/src, https://github.com/assistant-ui/assistant-ui),
 Copyright (c) 2026 AgentbaseAI Inc., under the same MIT License.
 
+projects/assistant-ui-angular/src/lib/tools/tool-args-status.ts copies, with
+modifications, the field-state walk of assistant-stream's partial-JSON parser
+(packages/assistant-stream/src/utils/json/parse-partial-json-object.ts,
+assistant-stream 0.3.57, https://github.com/assistant-ui/assistant-ui),
+Copyright (c) 2026 AgentbaseAI Inc., under the same MIT License.
+
 The original license text follows.
 
 MIT License

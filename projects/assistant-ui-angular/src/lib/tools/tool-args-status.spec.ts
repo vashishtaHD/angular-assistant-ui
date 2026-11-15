@@ -78,6 +78,15 @@ describe('computeToolArgsStatus', () => {
     expect(result.status).toBe('running');
   });
 
+  it('ignores a marker whose metadata does not have the parser shape', () => {
+    const args: Record<string | symbol, unknown> = { city: 'Par' };
+    args[Symbol('aui.parse-partial-json-object.meta')] = { state: 'complete', partialPath: 'city' };
+    const result = computeToolArgsStatus(running(args as Record<string, unknown>));
+    // Falls back to the lifecycle: still streaming while the call runs.
+    expect(result.argsStatus).toBe('streaming');
+    expect(result.propStatus['city']).toBe('streaming');
+  });
+
   it('reports status for an argument named __proto__', () => {
     const result = computeToolArgsStatus({
       type: 'tool-call',

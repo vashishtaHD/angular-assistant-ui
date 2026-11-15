@@ -15,6 +15,7 @@ import {
   injectAuiState,
   injectScrollLock,
   injectToolCallElapsed,
+  type ToolUIComponent,
   type ToolUIProps,
 } from 'angular-assistant-ui';
 import {
@@ -24,6 +25,7 @@ import {
 } from '../collapsible/collapsible';
 import { AuiIconComponent } from '../icons/icon.component';
 import type { AuiIconName } from '../icons/icon-shapes';
+import { watchAuiState } from '../watch-aui-state';
 import { AuiToolFallbackApprovalComponent } from './tool-fallback-approval.component';
 import { AuiToolFallbackAskUserComponent } from './tool-fallback-ask-user.component';
 import {
@@ -51,7 +53,7 @@ const STATUS_ICONS: Record<StatusType, AuiIconName> = {
  * tool-call part of the enclosing part scope, so it works as a part template
  * (`<ng-template auiPart="tool-call"><aui-tool-fallback /></ng-template>`),
  * as the `ToolFallback` slot of the styled thread, and as a UI registered with
- * `registerToolUI(name, AuiToolFallbackComponent)`.
+ * `registerToolUI(name, AuiToolFallbackToolUIComponent)`.
  *
  * A collapsible trigger names the tool and its state: running (a spinning icon
  * and a shimmering label), waiting, failed, cancelled (only when the part's
@@ -156,11 +158,12 @@ const STATUS_ICONS: Record<StatusType, AuiIconName> = {
 })
 export class AuiToolFallbackComponent {
   /**
-   * The tool UI props, accepted so the component satisfies the
-   * `registerToolUI` contract. The component reads the enclosing part scope
-   * instead, so the input may be left unset.
+   * The tool UI props, when a renderer passes them. Optional and unused: the
+   * component reads the enclosing part scope, so it also works as a no-input
+   * slot. Register it with `registerToolUI` through
+   * {@link AuiToolFallbackToolUIComponent}.
    */
-  readonly tool = input<ToolUIProps>(undefined as unknown as ToolUIProps);
+  readonly tool = input<ToolUIProps | undefined>(undefined);
 
   private readonly lockScroll = injectScrollLock(inject(ElementRef), ANIMATION_DURATION);
   private readonly elapsed = injectToolCallElapsed();
@@ -232,18 +235,31 @@ export class AuiToolFallbackComponent {
   });
 
   // Each time the call starts waiting on the user it opens, overriding an
-  // earlier toggle; a toggle holds until the next time.
-  private waitingRuns = 0;
-  private wasWaiting = false;
-  private readonly waitingEpoch = computed(() => {
-    const waiting = this.requiresAction();
-    if (waiting && !this.wasWaiting) this.waitingRuns++;
-    this.wasWaiting = waiting;
-    return this.waitingRuns;
-  });
+  // earlier toggle; a toggle holds until the next time. The waiting cycles
+  // are counted from the store subscription, so a cycle that starts and ends
+  // between two renders still counts. Until the first count (after the first
+  // render) the epoch derives from the current status.
+  private readonly waitingRuns = signal<number | null>(null);
+  private readonly waitingEpoch = computed(
+    () => this.waitingRuns() ?? (this.requiresAction() ? 1 : 0),
+  );
   private readonly userOpen = signal<{ readonly epoch: number; readonly open: boolean } | null>(
     null,
   );
+
+  constructor() {
+    watchAuiState(
+      (s) => s.part.type === 'tool-call' && s.part.status.type === 'requires-action',
+      (waiting, previous) => {
+        if (previous === undefined) {
+          this.waitingRuns.set(waiting ? 1 : 0);
+        } else if (waiting) {
+          this.waitingRuns.update((runs) => (runs ?? 0) + 1);
+        }
+      },
+    );
+  }
+
   /** @internal */
   protected readonly open = computed(() => {
     const epoch = this.waitingEpoch();
@@ -256,4 +272,27 @@ export class AuiToolFallbackComponent {
     this.lockScroll();
     this.userOpen.set({ epoch: this.waitingEpoch(), open });
   }
+}
+
+/**
+ * {@link AuiToolFallbackComponent} for `registerToolUI`: it takes the required
+ * `tool` input of the `ToolUIComponent` contract and renders the fallback in
+ * the same part scope.
+ *
+ * @example
+ * ```ts
+ * registerToolUI('bookMeeting', AuiToolFallbackToolUIComponent);
+ * ```
+ */
+@Component({
+  selector: 'aui-tool-fallback-tool-ui',
+  standalone: true,
+  imports: [AuiToolFallbackComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
+  template: `<aui-tool-fallback [tool]="tool()" />`,
+})
+export class AuiToolFallbackToolUIComponent implements ToolUIComponent {
+  /** The tool-call part and its callbacks. */
+  readonly tool = input.required<ToolUIProps>();
 }

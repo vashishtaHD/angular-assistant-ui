@@ -1,5 +1,6 @@
 // Ported from packages/core/src/react/model-context/useToolArgsStatus.ts @ 7d74276
-// and the field-state walk of assistant-stream's parse-partial-json-object (MIT, assistant-ui).
+// and the field-state walk of packages/assistant-stream/src/utils/json/parse-partial-json-object.ts
+// (assistant-stream 0.3.57, MIT, Copyright (c) 2026 AgentbaseAI Inc.; see NOTICE)
 import { assertInInjectionContext, computed, type Signal } from '@angular/core';
 import type { AssistantState } from '@assistant-ui/store/client';
 import { injectAuiState } from '../state/inject-aui-state';
@@ -30,15 +31,29 @@ interface PartialMeta {
 
 // assistant-stream tags the objects its partial-JSON parser returns with a
 // module-private symbol. The main entry may not import assistant-stream (it is
-// an optional peer), so the tag is found by its description instead; a spec
-// pins the description against the real parser.
+// an optional peer), so the tag is found by its description instead. This is a
+// private seam, not a public contract: it is verified against assistant-stream
+// 0.3.57 (the floor of the `^0.3.57` peer range) by specs that use the real
+// parser and completion helper. A tag whose description or metadata shape
+// differs is ignored, and the status falls back to the tool's lifecycle.
 const META_DESCRIPTION = 'aui.parse-partial-json-object.meta';
+
+const isPartialMeta = (value: unknown): value is PartialMeta => {
+  if (typeof value !== 'object' || value === null) return false;
+  const { state, partialPath } = value as Record<string, unknown>;
+  return (
+    (state === 'partial' || state === 'complete') &&
+    Array.isArray(partialPath) &&
+    partialPath.every((segment) => typeof segment === 'string')
+  );
+};
 
 const metaOf = (value: unknown): PartialMeta | undefined => {
   if (typeof value !== 'object' || value === null) return undefined;
   for (const symbol of Object.getOwnPropertySymbols(value)) {
     if (symbol.description === META_DESCRIPTION) {
-      return (value as Record<symbol, PartialMeta | undefined>)[symbol];
+      const meta = (value as Record<symbol, unknown>)[symbol];
+      return isPartialMeta(meta) ? meta : undefined;
     }
   }
   return undefined;

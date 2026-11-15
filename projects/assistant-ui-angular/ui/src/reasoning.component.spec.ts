@@ -177,6 +177,67 @@ describe('aui-reasoning', () => {
     fixture.destroy();
   });
 
+  it('times a stream that starts and ends between two renders', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(20_000);
+    const { fixture, rt, el } = await mount([
+      message([{ type: 'reasoning', text: 'Idle' }], { type: 'complete', reason: 'stop' }),
+    ]);
+    await waitFor(fixture, () => expect(trigger(el)).not.toBeNull());
+    expect(trigger(el).textContent).not.toContain('(');
+
+    flushTapSync(() => {
+      rt.setMessages([message([{ type: 'reasoning', text: 'Quick' }], { type: 'running' })]);
+      rt.setRunning(true);
+    });
+    now.mockReturnValue(23_000);
+    flushTapSync(() => {
+      rt.setMessages([
+        message([{ type: 'reasoning', text: 'Quick done' }], { type: 'complete', reason: 'stop' }),
+      ]);
+      rt.setRunning(false);
+    });
+    await waitFor(fixture, () => expect(trigger(el)?.textContent).toContain('Reasoning (3s)'));
+    now.mockRestore();
+    fixture.destroy();
+  });
+
+  it('renders each reasoning part of a run as markdown in its own part scope', async () => {
+    const { fixture, rt, el } = await mount([
+      message(
+        [
+          { type: 'reasoning', text: 'First **bold** idea' },
+          { type: 'reasoning', text: '- item one\n- item two' },
+        ],
+        { type: 'running' },
+      ),
+    ]);
+    flushTapSync(() => rt.setRunning(true));
+    await waitFor(fixture, () => {
+      const root = roots(el)[0]!;
+      expect(root.querySelector('.aui-md-strong')?.textContent).toBe('bold');
+      expect(root.querySelectorAll('.aui-md-li').length).toBe(2);
+    });
+    expect(roots(el)[0]!.querySelectorAll('aui-markdown-text').length).toBe(2);
+    expect(roots(el)[0]!.textContent).not.toContain('**');
+
+    // A streamed update reaches the second part's renderer.
+    flushTapSync(() =>
+      rt.setMessages([
+        message(
+          [
+            { type: 'reasoning', text: 'First **bold** idea' },
+            { type: 'reasoning', text: '- item one\n- item two\n- item three' },
+          ],
+          { type: 'running' },
+        ),
+      ]),
+    );
+    await waitFor(fixture, () =>
+      expect(roots(el)[0]!.querySelectorAll('.aui-md-li').length).toBe(3),
+    );
+    fixture.destroy();
+  });
+
   it('toggles on click and locks the scroll container while animating', async () => {
     const { fixture, el } = await mount([message([{ type: 'reasoning', text: 'Idle' }])]);
     await waitFor(fixture, () => expect(trigger(el)).not.toBeNull());

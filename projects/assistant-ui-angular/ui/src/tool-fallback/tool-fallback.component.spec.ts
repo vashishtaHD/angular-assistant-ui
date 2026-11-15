@@ -1,6 +1,7 @@
 // Ported from packages/ui/src/components/vue/assistant-ui/tool-fallback.test.ts @ 7d74276
 // (plus the approval, ask-user, running, error and cancelled cases the Angular kit adds)
-import { ChangeDetectionStrategy, Component, type Type } from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Injector, inject, type Type } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { flushTapSync } from '@assistant-ui/tap';
 import {
@@ -20,12 +21,14 @@ import {
   type TestRuntime,
   type TestRuntimeCallbacks,
 } from '../../../src/testing-internal/test-runtime';
-import { AuiToolFallbackComponent } from './tool-fallback.component';
+import {
+  AuiToolFallbackComponent,
+  AuiToolFallbackToolUIComponent,
+} from './tool-fallback.component';
 
-// Compile-time check: the fallback satisfies the `registerToolUI` contract.
-const asToolUI: Type<ToolUIComponent> = AuiToolFallbackComponent;
+// Compile-time check: the registration adapter satisfies the `registerToolUI` contract.
+const asToolUI: Type<ToolUIComponent> = AuiToolFallbackToolUIComponent;
 void asToolUI;
-void registerToolUI;
 
 let current: TestRuntime;
 
@@ -55,6 +58,65 @@ let current: TestRuntime;
 })
 class HostComponent {
   readonly config = current.config;
+}
+
+@Component({
+  selector: 'aui-test-registrar',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class RegistrarComponent {
+  constructor() {
+    registerToolUI('computer_call', AuiToolFallbackToolUIComponent);
+  }
+}
+
+/** A thread-style slot: renders a no-input component with the injector of its own position. */
+@Component({
+  selector: 'aui-test-slot',
+  standalone: true,
+  imports: [NgComponentOutlet],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<ng-container *ngComponentOutlet="component; injector: injector" />`,
+})
+class SlotComponent {
+  readonly component = AuiToolFallbackComponent;
+  readonly injector = inject(Injector);
+}
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessagePartsComponent,
+    AuiPartTemplateDirective,
+    RegistrarComponent,
+    SlotComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div [auiProvider]="config">
+      @if (register) {
+        <aui-test-registrar />
+      }
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <aui-message-parts>
+            <ng-template auiPart="tool-call"
+              ><span class="slot"><aui-test-slot /></span
+            ></ng-template>
+          </aui-message-parts>
+        </ng-template>
+      </aui-thread-messages>
+    </div>
+  `,
+})
+class ComposedHostComponent {
+  readonly config = current.config;
+  register = false;
 }
 
 const settle = async (fixture: ComponentFixture<unknown>) => {
@@ -92,10 +154,16 @@ const toolMessage = (
   ...(status ? { status } : {}),
 });
 
-async function mount(messages: DemoMessage[], callbacks: TestRuntimeCallbacks = {}) {
+async function mount(
+  messages: DemoMessage[],
+  callbacks: TestRuntimeCallbacks = {},
+  host: Type<unknown> = HostComponent,
+  setup?: (instance: never) => void,
+) {
   current = createTestRuntime(callbacks);
-  configureTestBed({ imports: [HostComponent] });
-  const fixture = TestBed.createComponent(HostComponent);
+  configureTestBed({ imports: [host] });
+  const fixture = TestBed.createComponent(host);
+  setup?.(fixture.componentInstance as never);
   document.body.appendChild(fixture.nativeElement);
   fixture.detectChanges();
   flushTapSync(() => current.setMessages(messages));
@@ -154,6 +222,35 @@ describe('aui-tool-fallback labels (Vue tool-fallback.test.ts)', () => {
     await settle(fixture);
     expect(content.hasAttribute('data-open')).toBe(true);
     expect(trigger(el)!.getAttribute('aria-expanded')).toBe('true');
+    fixture.destroy();
+  });
+});
+
+describe('aui-tool-fallback composition', () => {
+  it('renders as a no-input slot through NgComponentOutlet', async () => {
+    const { fixture, el } = await mount([toolMessage({ result: 'ok' })], {}, ComposedHostComponent);
+    await waitFor(fixture, () =>
+      expect(
+        el.querySelector('.slot [data-slot="aui_tool-fallback-trigger"]')?.textContent,
+      ).toContain('Used tool: computer_call'),
+    );
+    fixture.destroy();
+  });
+
+  it('renders as a UI registered with registerToolUI', async () => {
+    const { fixture, el } = await mount(
+      [toolMessage({ result: 'ok' })],
+      {},
+      ComposedHostComponent,
+      (host: ComposedHostComponent) => (host.register = true),
+    );
+    await waitFor(fixture, () => {
+      expect(el.querySelector('.slot')).toBeNull();
+      expect(
+        el.querySelector('aui-tool-fallback-tool-ui [data-slot="aui_tool-fallback-trigger"]')
+          ?.textContent,
+      ).toContain('Used tool: computer_call');
+    });
     fixture.destroy();
   });
 });
@@ -227,6 +324,29 @@ describe('aui-tool-fallback status states', () => {
 describe('aui-tool-fallback approval card', () => {
   const pending = (approval: ToolPart['approval'] = { id: 'approval-1' }) =>
     toolMessage({ toolName: 'bookMeeting', args: { title: 'Sync', when: 'tomorrow' }, approval });
+
+  it('reopens for a new waiting cycle even when it passes between two renders', async () => {
+    const { fixture, rt, el } = await mount([pending()]);
+    await waitFor(fixture, () => expect(trigger(el)!.getAttribute('aria-expanded')).toBe('true'));
+    trigger(el)!.click();
+    await settle(fixture);
+    expect(trigger(el)!.getAttribute('aria-expanded')).toBe('false');
+
+    // The call settles and starts waiting again with no render in between.
+    flushTapSync(() =>
+      rt.setMessages([
+        toolMessage({
+          toolName: 'bookMeeting',
+          args: { title: 'Sync', when: 'tomorrow' },
+          result: 'ok',
+        }),
+      ]),
+    );
+    flushTapSync(() => rt.setMessages([pending({ id: 'approval-2' })]));
+    await settle(fixture);
+    expect(trigger(el)!.getAttribute('aria-expanded')).toBe('true');
+    fixture.destroy();
+  });
 
   it('Approve calls respondToApproval({ approved: true }) and shows the receipt', async () => {
     const onRespondToToolApproval = vi.fn((options: { approvalId: string; approved: boolean }) => {

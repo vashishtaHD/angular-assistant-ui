@@ -36,7 +36,10 @@ export type { AuiDropdownMenuAlign } from './dropdown-menu/dropdown-menu';
 
 // Task 17: tool fallback (approval card, approval receipt, ask-user form), tool group,
 // reasoning and styled attachments.
-export { AuiToolFallbackComponent } from './tool-fallback/tool-fallback.component';
+export {
+  AuiToolFallbackComponent,
+  AuiToolFallbackToolUIComponent,
+} from './tool-fallback/tool-fallback.component';
 export { AuiToolFallbackApprovalComponent } from './tool-fallback/tool-fallback-approval.component';
 export { AuiToolFallbackAskUserComponent } from './tool-fallback/tool-fallback-ask-user.component';
 export {

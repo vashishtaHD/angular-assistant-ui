@@ -741,9 +741,9 @@
   line-height: 1.625;
 }
 
-.aui-reasoning-paragraph {
+.aui-reasoning-part {
+  display: block;
   margin: 0 0 var(--aui-space-2);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
