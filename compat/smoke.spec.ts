@@ -178,6 +178,62 @@ test('an attachment chip appears after choosing a file', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('the image preview dialog locks a scrolled page and restores its offset', async ({ page }) => {
+  const errors = await open(page);
+
+  // Make the document itself scrollable and scroll it to a nonzero offset.
+  await page.evaluate(() => {
+    const pad = document.createElement('div');
+    pad.id = 'compat-scroll-pad';
+    pad.style.height = '3000px';
+    document.body.appendChild(pad);
+    document.documentElement.style.overflow = 'auto';
+    document.body.style.overflow = 'visible';
+    document.body.style.height = 'auto';
+    window.scrollTo(0, 400);
+  });
+  expect(await page.evaluate(() => window.scrollY)).toBe(400);
+  const appTop = () =>
+    page.evaluate(() => document.querySelector('app-root')!.getBoundingClientRect().top);
+  const before = await appTop();
+
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Add Attachment' }).click();
+  await (
+    await chooser
+  ).setFiles({
+    name: 'dot.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
+  const tile = page.locator('.aui-composer-attachments [data-previewable]');
+  await expect(tile).toHaveCount(1, { timeout: 5_000 });
+  // Opening the preview (which focuses inside it) must not move the page.
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await tile.dispatchEvent('click');
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  const html = page.locator('html');
+  await expect(html).toHaveClass(/cdk-global-scrollblock/);
+  await expect(html).toHaveCSS('position', 'fixed');
+  expect(await page.evaluate(() => document.documentElement.style.top)).toBe('-400px');
+  expect(await appTop()).toBe(before);
+  // Scrolling while the dialog is open does not move the page behind it.
+  await page.mouse.wheel(0, 600);
+  await page.waitForTimeout(100);
+  expect(await appTop()).toBe(before);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(html).not.toHaveClass(/cdk-global-scrollblock/);
+  expect(await page.evaluate(() => window.scrollY)).toBe(400);
+
+  expect(errors).toEqual([]);
+});
+
 test('approving a tool call renders the receipt', async ({ page }) => {
   const errors = await open(page);
 
