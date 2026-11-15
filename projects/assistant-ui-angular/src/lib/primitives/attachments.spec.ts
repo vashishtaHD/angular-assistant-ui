@@ -351,7 +351,17 @@ describe('attachment primitives', () => {
     );
     // In flight: the submission's attachments.
     expect(sent.map((node) => node.getAttribute('data-id'))).toEqual(draftIds);
-    await t.settle();
+    // The acknowledgement lands on a 60 ms timer; wait for it rather than a fixed number of passes.
+    await vi.waitFor(
+      () => {
+        t.fixture.detectChanges();
+        const ids = Array.from(t.el.querySelectorAll('.row .sent'), (node) =>
+          node.getAttribute('data-id'),
+        );
+        expect(ids).toEqual(draftIds.map((id) => `acked-${id}`));
+      },
+      { interval: 5, timeout: 2000 },
+    );
     await t.settle();
     const after = Array.from(t.el.querySelectorAll('.row .sent'));
     // Same DOM nodes (so the same components and scopes) ...
