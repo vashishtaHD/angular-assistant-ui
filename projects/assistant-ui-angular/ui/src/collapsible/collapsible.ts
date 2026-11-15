@@ -2,14 +2,21 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   Directive,
   ViewEncapsulation,
   computed,
   inject,
   model,
+  signal,
+  type OnChanges,
+  type SimpleChanges,
 } from '@angular/core';
 
 let nextId = 0;
+
+/** Matches the 0.2s `grid-template-rows` transition in styles.css. */
+const CLOSE_ANIMATION_MS = 200;
 
 /**
  * Collapsible root. `open` is a two-way `model`. Children are
@@ -27,16 +34,49 @@ let nextId = 0;
   },
   template: `<ng-content />`,
 })
-export class AuiCollapsibleComponent {
+export class AuiCollapsibleComponent implements OnChanges {
   /** Whether the content is shown. */
   readonly open = model(false);
 
   /** Id of the content element, for `aria-controls`. */
   readonly contentId = `aui-collapsible-content-${nextId++}`;
 
+  /** True while closed content still animates shut (it stays painted). */
+  private readonly closing = signal(false);
+  private closingTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * True once the content is closed and its closing animation is over: the
+   * content is then `hidden` with an inline `display: none`.
+   */
+  readonly collapsed = computed(() => !this.open() && !this.closing());
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.closingTimer));
+  }
+
+  /** Tracks a bound `open` change for the closing animation. */
+  ngOnChanges(changes: SimpleChanges): void {
+    const change = changes['open'];
+    if (change && !change.firstChange) this.track(!!change.previousValue);
+  }
+
   /** Flips `open`. */
   toggle(): void {
+    const wasOpen = this.open();
     this.open.update((value) => !value);
+    this.track(wasOpen);
+  }
+
+  /** Keeps just-closed content painted for the closing animation, then hides it. */
+  private track(wasOpen: boolean): void {
+    clearTimeout(this.closingTimer);
+    if (this.open() || !wasOpen) {
+      this.closing.set(false);
+      return;
+    }
+    this.closing.set(true);
+    this.closingTimer = setTimeout(() => this.closing.set(false), CLOSE_ANIMATION_MS);
   }
 }
 
@@ -59,7 +99,9 @@ export class AuiCollapsibleTriggerDirective {
 
 /**
  * Collapsible body. Height animates through CSS (`grid-template-rows` from
- * `0fr` to `1fr`), so no height measuring is needed.
+ * `0fr` to `1fr`), so no height measuring is needed. Once closed and done
+ * animating (200ms), the body is `hidden` with an inline `display: none`, so
+ * author CSS cannot paint a closed body.
  */
 @Component({
   selector: 'aui-collapsible-content',
@@ -73,6 +115,8 @@ export class AuiCollapsibleTriggerDirective {
     '[attr.data-closed]': 'root.open() ? null : ""',
     '[attr.aria-hidden]': 'hidden() ? "true" : null',
     '[attr.inert]': 'hidden() ? "" : null',
+    '[attr.hidden]': 'root.collapsed() ? "" : null',
+    '[style.display]': 'root.collapsed() ? "none" : null',
   },
   template: `<div class="aui-collapsible-inner"><ng-content /></div>`,
 })

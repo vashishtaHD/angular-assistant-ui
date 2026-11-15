@@ -13,6 +13,7 @@ import {
   type ToolUIProps,
 } from 'angular-assistant-ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { displayOf, useFlexAuthorClass } from '../../../src/testing-internal/author-css';
 import { configureTestBed } from '../../../src/testing-internal/test-bed';
 import {
   createTestRuntime,
@@ -100,6 +101,55 @@ class CustomToolGroupComponent {
   protected readonly messageId = injectAuiState((s) => s.message.id);
 }
 
+@Component({
+  selector: 'app-custom-reasoning-group',
+  standalone: true,
+  imports: [AuiGroupChildrenComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<section
+    class="custom-reasoning-group"
+    [attr.data-count]="group().indices.length"
+    [attr.data-message]="messageId()"
+  >
+    <aui-group-children [group]="group()" />
+  </section>`,
+})
+class CustomReasoningGroupComponent {
+  readonly group = input.required<AuiGroupPart>();
+  protected readonly messageId = injectAuiState((s) => s.message.id);
+}
+
+@Component({
+  selector: 'app-custom-user-attachments',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<div class="custom-user-attachments">{{ id() }}:{{ count() }}</div>`,
+})
+class CustomUserAttachmentsComponent {
+  protected readonly id = injectAuiState((s) => s.message.id);
+  protected readonly count = injectAuiState((s) => s.message.attachments?.length ?? 0);
+}
+
+@Component({
+  selector: 'app-custom-composer-attachments',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<div class="custom-composer-attachments">{{ type() }}</div>`,
+})
+class CustomComposerAttachmentsComponent {
+  protected readonly type = injectAuiState((s) => s.composer.type);
+}
+
+@Component({
+  selector: 'app-custom-add-attachment',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<button type="button" class="custom-add" aria-label="Attach">{{ type() }}</button>`,
+})
+class CustomAddAttachmentComponent {
+  protected readonly type = injectAuiState((s) => s.composer.type);
+}
+
 const settle = async (fixture: ComponentFixture<unknown>) => {
   for (let i = 0; i < 4; i++) {
     await fixture.whenStable();
@@ -166,11 +216,11 @@ describe('aui-thread parts (Task 17 wiring)', () => {
     const content = root.querySelector('[data-slot="aui_assistant-message-content"]')!;
     const chain = content.querySelector('[data-slot="aui_chain-of-thought"]');
     expect(chain).not.toBeNull();
-    expect(tags(chain!, 'aui-reasoning, aui-tool-group')).toEqual([
-      'aui-reasoning',
+    expect(tags(chain!, 'aui-reasoning-group, aui-tool-group')).toEqual([
+      'aui-reasoning-group',
       'aui-tool-group',
     ]);
-    expect(chain!.querySelector('aui-reasoning')?.textContent).toContain('thinking hard');
+    expect(chain!.querySelector('aui-reasoning-group')?.textContent).toContain('thinking hard');
     const group = chain!.querySelector('aui-tool-group')!;
     expect(
       group.querySelector('[data-slot="aui_tool-group-root"]')?.getAttribute('data-variant'),
@@ -271,7 +321,10 @@ describe('aui-thread parts (Task 17 wiring)', () => {
     const message = root.querySelector('[data-slot="aui_user-message-root"]')!;
     const attachments = message.querySelector('aui-message-attachments-styled');
     expect(attachments).not.toBeNull();
-    expect(message.firstElementChild).toBe(attachments);
+    const wrapper = message.querySelector('.aui-user-message-content-wrapper')!;
+    expect(
+      attachments!.compareDocumentPosition(wrapper) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const tile = attachments!.querySelector('[data-slot="aui_attachment-tile"]');
     expect(tile?.getAttribute('aria-label')).toBe('Document attachment notes.txt');
     expect(
@@ -316,5 +369,209 @@ describe('aui-thread parts (Task 17 wiring)', () => {
     Object.defineProperty(drag, 'dataTransfer', { value: { types: ['Files'] } });
     shell.dispatchEvent(drag);
     expect(drag.defaultPrevented).toBe(true);
+  });
+});
+
+describe('aui-thread parts (fix round 1)', () => {
+  const waitingCall: DemoMessage = {
+    id: 'a1',
+    role: 'assistant',
+    content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'approve', args: {} }],
+    status: { type: 'requires-action', reason: 'tool-calls' },
+  };
+
+  it('keeps a tool group open while a call requires action, and closes it once answered', async () => {
+    const { fixture, root } = await mount({ setup: (rt) => rt.append(waitingCall) });
+    const trigger = () =>
+      root.querySelector<HTMLButtonElement>('[data-slot="aui_tool-group-trigger"]')!;
+    const content = () => root.querySelector('[data-slot="aui_tool-group-content"]')!;
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+
+    trigger().click();
+    await settle(fixture);
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    expect(content().hasAttribute('data-open')).toBe(true);
+    trigger().click();
+    await settle(fixture);
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+
+    runtime.setMessages([
+      {
+        ...waitingCall,
+        content: [{ ...tool('c1', 'approve') }],
+        status: { type: 'complete', reason: 'stop' },
+      },
+    ]);
+    await settle(fixture);
+    expect(trigger().getAttribute('aria-expanded')).toBe('false');
+    // The user can open it again afterwards.
+    trigger().click();
+    await settle(fixture);
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  describe('reasoning groups', () => {
+    const twoReasoning: DemoMessage = {
+      id: 'a1',
+      role: 'assistant',
+      content: [
+        { type: 'reasoning', text: 'first thought' },
+        { type: 'reasoning', text: 'second thought' },
+        { type: 'text', text: 'Answer.' },
+      ],
+    };
+    const reasoningRoots = (root: Element) =>
+      root.querySelectorAll('[data-slot="aui_reasoning-root"]');
+
+    it('renders one default reasoning group around the run, one part per reasoning part', async () => {
+      const { root } = await mount({ setup: (rt) => rt.append(twoReasoning) });
+      expect(root.querySelectorAll('aui-reasoning-group')).toHaveLength(1);
+      expect(reasoningRoots(root)).toHaveLength(1);
+      const parts = Array.from(reasoningRoots(root)[0]!.querySelectorAll('.aui-reasoning-part'));
+      expect(parts.map((p) => p.textContent?.trim())).toEqual(['first thought', 'second thought']);
+    });
+
+    it('keeps the default group around a Reasoning part override', async () => {
+      const { root } = await mount({
+        providers: [
+          { provide: AUI_THREAD_COMPONENTS, useValue: { Reasoning: CustomReasoningComponent } },
+        ],
+        setup: (rt) => rt.append(twoReasoning),
+      });
+      expect(reasoningRoots(root)).toHaveLength(1);
+      expect(
+        Array.from(reasoningRoots(root)[0]!.querySelectorAll('.custom-reasoning')).map(
+          (el) => el.textContent,
+        ),
+      ).toEqual(['first thought', 'second thought']);
+    });
+
+    it('replaces only the group wrapper through ReasoningGroup', async () => {
+      const { root } = await mount({
+        providers: [
+          {
+            provide: AUI_THREAD_COMPONENTS,
+            useValue: { ReasoningGroup: CustomReasoningGroupComponent },
+          },
+        ],
+        setup: (rt) => rt.append(twoReasoning),
+      });
+      expect(reasoningRoots(root)).toHaveLength(0);
+      const group = root.querySelector('.custom-reasoning-group')!;
+      expect(group.getAttribute('data-count')).toBe('2');
+      expect(group.getAttribute('data-message')).toBe('a1');
+      expect(
+        Array.from(group.querySelectorAll('.aui-reasoning-part')).map((p) => p.textContent?.trim()),
+      ).toEqual(['first thought', 'second thought']);
+    });
+
+    it('combines ReasoningGroup and Reasoning overrides', async () => {
+      const { root } = await mount({
+        providers: [
+          {
+            provide: AUI_THREAD_COMPONENTS,
+            useValue: {
+              ReasoningGroup: CustomReasoningGroupComponent,
+              Reasoning: CustomReasoningComponent,
+            },
+          },
+        ],
+        setup: (rt) => rt.append(twoReasoning),
+      });
+      const group = root.querySelector('.custom-reasoning-group')!;
+      expect(
+        Array.from(group.querySelectorAll('.custom-reasoning')).map((el) => el.textContent),
+      ).toEqual(['first thought', 'second thought']);
+    });
+  });
+
+  it('replaces the attachment defaults independently, each in its own scope', async () => {
+    const { root } = await mount({
+      providers: [
+        {
+          provide: AUI_THREAD_COMPONENTS,
+          useValue: {
+            UserMessageAttachments: CustomUserAttachmentsComponent,
+            ComposerAttachments: CustomComposerAttachmentsComponent,
+            ComposerAddAttachment: CustomAddAttachmentComponent,
+          },
+        },
+      ],
+      setup: (rt) =>
+        rt.append({
+          id: 'u1',
+          role: 'user',
+          content: [{ type: 'text', text: 'see attached' }],
+          attachments: [
+            {
+              id: 'att1',
+              type: 'document',
+              name: 'notes.txt',
+              contentType: 'text/plain',
+              status: { type: 'complete' },
+              content: [{ type: 'text', text: 'hello' }],
+            },
+          ],
+        }),
+    });
+    expect(root.querySelector('aui-message-attachments-styled')).toBeNull();
+    expect(root.querySelector('aui-composer-attachments-styled')).toBeNull();
+    expect(root.querySelector('aui-composer-add-attachment-styled')).toBeNull();
+    const message = root.querySelector('[data-slot="aui_user-message-root"]')!;
+    expect(message.querySelector('.custom-user-attachments')?.textContent).toBe('u1:1');
+    const shell = root.querySelector('[data-slot="aui_composer-shell"]')!;
+    expect(shell.querySelector('.custom-composer-attachments')?.textContent).toBe('thread');
+    expect(shell.querySelector('.aui-composer-action-start .custom-add')?.textContent).toBe(
+      'thread',
+    );
+    // The rest of the styled message and composer stay.
+    expect(message.querySelector('.aui-user-message-content')?.textContent).toContain(
+      'see attached',
+    );
+    expect(shell.querySelector('.aui-composer-send')).not.toBeNull();
+  });
+
+  describe('closed disclosures', () => {
+    const closedSurface = (el: Element) => {
+      el.classList.add('flex');
+      return {
+        hidden: el.hasAttribute('hidden'),
+        inline: (el as HTMLElement).style.display,
+        display: displayOf(el),
+      };
+    };
+
+    it('hide a closed tool group and reasoning group with hidden and inline display: none', async () => {
+      useFlexAuthorClass();
+      const { root } = await mount({ setup: (rt) => rt.append(mixedAssistant()) });
+      const toolContent = root.querySelector('[data-slot="aui_tool-group-content"]')!;
+      const reasoningContent = root.querySelector('[data-slot="aui_reasoning-content"]')!;
+      const closed = { hidden: true, inline: 'none', display: 'none' };
+      expect(closedSurface(toolContent)).toEqual(closed);
+      expect(closedSurface(reasoningContent)).toEqual(closed);
+      for (const fallback of Array.from(
+        root.querySelectorAll('[data-slot="aui_tool-fallback-content"]'),
+      )) {
+        expect(closedSurface(fallback)).toEqual(closed);
+      }
+    });
+
+    it('show an opened tool group at once, and hide it again after the closing animation', async () => {
+      useFlexAuthorClass();
+      const { fixture, root } = await mount({ setup: (rt) => rt.append(mixedAssistant()) });
+      const trigger = root.querySelector<HTMLButtonElement>(
+        '[data-slot="aui_tool-group-trigger"]',
+      )!;
+      const content = root.querySelector('[data-slot="aui_tool-group-content"]')!;
+      trigger.click();
+      await settle(fixture);
+      expect(closedSurface(content)).toEqual({ hidden: false, inline: '', display: 'flex' });
+      trigger.click();
+      // The delayed hide itself is covered by the collapsible spec, with fake timers.
+      await vi.waitFor(async () => {
+        await settle(fixture);
+        expect(closedSurface(content)).toEqual({ hidden: true, inline: 'none', display: 'none' });
+      });
+    });
   });
 });

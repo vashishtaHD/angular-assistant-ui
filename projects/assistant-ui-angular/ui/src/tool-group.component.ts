@@ -10,6 +10,7 @@ import {
   input,
   model,
   numberAttribute,
+  viewChild,
 } from '@angular/core';
 import { injectScrollLock } from 'angular-assistant-ui';
 import {
@@ -30,7 +31,10 @@ export type AuiToolGroupVariant = 'outline' | 'ghost' | 'muted';
  * `aui-message-grouped-parts` with a `groupBy` that puts tool calls in
  * `group-tool` (a run of adjacent tool calls coalesces into one group). It is
  * closed by default (`open` is a two-way `model`); toggling locks the scroll
- * container while the body animates. While `active`, the trigger shows a
+ * container while the body animates. To keep it open (or closed), reject a
+ * toggle by calling `open.set(previous)` on the component from the
+ * `(openChange)` handler; the disclosure then stays as it was. While
+ * `active`, the trigger shows a
  * spinner and a shimmering label.
  *
  * @example
@@ -114,9 +118,17 @@ export class AuiToolGroupComponent {
     return `${count} tool ${count === 1 ? 'call' : 'calls'}`;
   });
 
+  private readonly collapsible = viewChild.required(AuiCollapsibleComponent);
+
   /** @internal */
   protected setOpen(open: boolean): void {
     this.lockScroll();
     this.open.set(open);
+    // A parent that rejects the change restores `open` from its `(openChange)`
+    // handler; the binding to the disclosure is then unchanged, so put the
+    // disclosure back in step by hand.
+    const settled = this.open();
+    const disclosure = this.collapsible();
+    if (settled !== open && disclosure.open() !== settled) disclosure.open.set(settled);
   }
 }

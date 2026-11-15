@@ -1,6 +1,6 @@
 // Ported from packages/ui/src/components/react/assistant-ui/elements/reasoning.aui.test.tsx @ 7d74276
 // ("connects tool-group-root to its scroll lock") plus grouping through `aui-message-grouped-parts`
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, viewChild } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { flushTapSync } from '@assistant-ui/tap';
 import {
@@ -179,4 +179,36 @@ describe('aui-tool-group', () => {
     }
     fixture.destroy();
   });
+
+  it('stays open when the parent rejects a close from (openChange)', async () => {
+    configureTestBed({ imports: [LockedHostComponent] });
+    const fixture = TestBed.createComponent(LockedHostComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const trigger = el.querySelector('[data-slot="aui_tool-group-trigger"]') as HTMLButtonElement;
+    const content = el.querySelector('[data-slot="aui_tool-group-content"]') as HTMLElement;
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    trigger.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.requests[0]).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(content.hasAttribute('data-open')).toBe(true);
+  });
 });
+
+@Component({
+  standalone: true,
+  imports: [AuiToolGroupComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<aui-tool-group [count]="1" [open]="true" (openChange)="reject($event)"
+    ><p>call</p></aui-tool-group
+  >`,
+})
+class LockedHostComponent {
+  readonly requests: boolean[] = [];
+  private readonly group = viewChild.required(AuiToolGroupComponent);
+  reject(open: boolean) {
+    this.requests.push(open);
+    if (!open) this.group().open.set(true);
+  }
+}

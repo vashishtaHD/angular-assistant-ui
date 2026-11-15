@@ -6,6 +6,7 @@ import {
   computed,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { AuiGroupChildrenComponent, type AuiGroupPart } from 'angular-assistant-ui';
 import { AuiToolGroupComponent } from '../tool-group.component';
@@ -13,7 +14,7 @@ import { AuiToolGroupComponent } from '../tool-group.component';
 /**
  * The default `ToolGroup` slot of `aui-thread`: a ghost `aui-tool-group`
  * around a run of consecutive tool calls. It is closed until the user opens
- * it, and stays open while a call in it requires action.
+ * it, and stays open while a call in it requires action (a close is rejected).
  * @internal Part of `aui-thread`.
  */
 @Component({
@@ -28,7 +29,7 @@ import { AuiToolGroupComponent } from '../tool-group.component';
     [count]="group().indices.length"
     [active]="group().status.type === 'running'"
     [open]="open()"
-    (openChange)="userOpen.set($event)"
+    (openChange)="onOpenChange($event)"
   >
     <aui-group-children [group]="group()" />
   </aui-tool-group>`,
@@ -36,10 +37,25 @@ import { AuiToolGroupComponent } from '../tool-group.component';
 export class AuiThreadToolGroupComponent {
   /** The `group-tool` group to render. */
   readonly group = input.required<AuiGroupPart>();
+  private readonly toolGroup = viewChild.required(AuiToolGroupComponent);
+  private readonly userOpen = signal(false);
+  private readonly requiresAction = computed(() => this.group().counts.requiresAction > 0);
+  /** @internal Upstream's `open || group.counts.requiresAction > 0`. */
+  protected readonly open = computed(() => this.userOpen() || this.requiresAction());
+  private restoring = false;
+
   /** @internal */
-  protected readonly userOpen = signal(false);
-  /** @internal */
-  protected readonly open = computed(
-    () => this.userOpen() || this.group().counts.requiresAction > 0,
-  );
+  protected onOpenChange(open: boolean): void {
+    // Restoring the tool group's `open` below emits it back here; that is not the user's choice.
+    if (this.restoring) return;
+    this.userOpen.set(open);
+    // Controlled open: a close while action is required does not take.
+    if (open === this.open()) return;
+    this.restoring = true;
+    try {
+      this.toolGroup().open.set(this.open());
+    } finally {
+      this.restoring = false;
+    }
+  }
 }

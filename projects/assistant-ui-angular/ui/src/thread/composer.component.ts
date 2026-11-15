@@ -24,11 +24,13 @@ import {
 import { AuiButtonDirective } from '../button.directive';
 import { AuiIconComponent } from '../icons/icon.component';
 import { AuiTooltipDirective } from '../tooltip-icon-button.component';
+import { AuiThreadSlotComponent } from './slot.component';
 import { AuiThreadSettings } from './thread-settings';
 
 /**
  * The thread composer (the `Composer` slot): a file drop zone holding the
- * pending attachments, an auto-growing input, the add-attachment button and a
+ * pending attachments (the `ComposerAttachments` slot), an auto-growing input,
+ * the add-attachment button (the `ComposerAddAttachment` slot) and a
  * send button that turns into a stop button while the run can be cancelled.
  * The placeholder is `composerPlaceholder` of `aui-thread`.
  * @internal Part of `aui-thread`.
@@ -40,8 +42,7 @@ import { AuiThreadSettings } from './thread-settings';
     AuiIfDirective,
     AuiComposerRootDirective,
     AuiComposerAttachmentDropzoneDirective,
-    AuiComposerAttachmentsStyledComponent,
-    AuiComposerAddAttachmentStyledComponent,
+    AuiThreadSlotComponent,
     AuiComposerInputDirective,
     AuiComposerSendDirective,
     AuiComposerCancelDirective,
@@ -54,7 +55,7 @@ import { AuiThreadSettings } from './thread-settings';
   host: { style: 'display: contents' },
   template: `<form auiComposerRoot class="aui-composer-root">
     <div auiComposerAttachmentDropzone class="aui-composer-shell" data-slot="aui_composer-shell">
-      <aui-composer-attachments-styled />
+      <aui-thread-slot [component]="slots().ComposerAttachments" />
       <textarea
         auiComposerInput
         autoFocus
@@ -65,7 +66,9 @@ import { AuiThreadSettings } from './thread-settings';
         [attr.placeholder]="placeholder()"
       ></textarea>
       <div class="aui-composer-action-wrapper">
-        <div class="aui-composer-action-start"><aui-composer-add-attachment-styled /></div>
+        <div class="aui-composer-action-start">
+          <aui-thread-slot [component]="slots().ComposerAddAttachment" />
+        </div>
         <div class="aui-composer-action-end">
           <button
             *auiIf="showSend"
@@ -99,6 +102,15 @@ export class AuiThreadComposerComponent {
   protected readonly placeholder = computed(
     () => this.settings?.composerPlaceholder() ?? 'Send a message...',
   );
+  /** @internal The attachment slots, with the defaults when used outside `aui-thread`. */
+  protected readonly slots = computed(() => {
+    const components = this.settings?.components();
+    return {
+      ComposerAttachments: components?.ComposerAttachments ?? AuiComposerAttachmentsStyledComponent,
+      ComposerAddAttachment:
+        components?.ComposerAddAttachment ?? AuiComposerAddAttachmentStyledComponent,
+    };
+  });
   /** @internal The stop control only cancels the send while no run it could stop is going. */
   protected readonly isSending = injectAuiState(
     (s) =>

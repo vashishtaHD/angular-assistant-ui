@@ -21,11 +21,19 @@ import {
   type AssistantState,
 } from 'angular-assistant-ui';
 import { AuiStyledMarkdownText } from '../markdown-text.component';
-import { AuiReasoningComponent } from '../reasoning.component';
+import {
+  AuiComposerAddAttachmentStyledComponent,
+  AuiComposerAttachmentsStyledComponent,
+  AuiMessageAttachmentsStyledComponent,
+} from '../attachments/attachments.component';
 import { AUI_THREAD_COMPONENTS, type AuiThreadComponents } from '../thread-components.token';
 import { AuiToolFallbackComponent } from '../tool-fallback/tool-fallback.component';
 import { AuiThreadAssistantMessageComponent } from './assistant-message.component';
 import { AuiThreadComposerComponent } from './composer.component';
+import {
+  AuiThreadReasoningGroupComponent,
+  AuiThreadReasoningPartComponent,
+} from './default-reasoning.component';
 import { AuiThreadToolGroupComponent } from './default-tool-group.component';
 import { AuiThreadEditComposerComponent } from './edit-composer.component';
 import { AuiThreadHistorySkeletonComponent } from './history-skeleton.component';
@@ -58,8 +66,12 @@ const DEFAULT_COMPONENTS: AuiThreadComponents = {
   Welcome: AuiThreadWelcomeComponent,
   ToolFallback: AuiToolFallbackComponent,
   Text: AuiStyledMarkdownText,
-  Reasoning: AuiReasoningComponent,
+  Reasoning: AuiThreadReasoningPartComponent,
   ToolGroup: AuiThreadToolGroupComponent,
+  ReasoningGroup: AuiThreadReasoningGroupComponent,
+  UserMessageAttachments: AuiMessageAttachmentsStyledComponent,
+  ComposerAttachments: AuiComposerAttachmentsStyledComponent,
+  ComposerAddAttachment: AuiComposerAddAttachmentStyledComponent,
 };
 
 /**

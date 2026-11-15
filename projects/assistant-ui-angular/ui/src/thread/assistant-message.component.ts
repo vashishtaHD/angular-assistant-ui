@@ -19,10 +19,13 @@ import {
   groupPartByType,
 } from 'angular-assistant-ui';
 import { AuiStyledMarkdownText } from '../markdown-text.component';
-import { AuiReasoningComponent } from '../reasoning.component';
 import { AuiToolFallbackComponent } from '../tool-fallback/tool-fallback.component';
 import { AuiThreadAssistantActionBarComponent } from './action-bars';
 import { AuiThreadBranchPickerComponent } from './branch-picker.component';
+import {
+  AuiThreadReasoningGroupComponent,
+  AuiThreadReasoningPartComponent,
+} from './default-reasoning.component';
 import { AuiThreadToolGroupComponent } from './default-tool-group.component';
 import { AuiThreadMessageErrorComponent } from './message-error.component';
 import { AuiThreadSlotComponent } from './slot.component';
@@ -42,10 +45,10 @@ const MESSAGE_GROUP_BY = groupPartByType({
  *
  * The parts are grouped as upstream does: adjacent reasoning parts and tool
  * calls form a chain of thought (`data-slot="aui_chain-of-thought"`), in which
- * each run of tool calls renders through the `ToolGroup` slot and each
- * reasoning part through the `Reasoning` slot (the default `aui-reasoning`
- * collapses the whole run from its first part). Text renders through `Text`,
- * and a tool call through its registered tool UI, or `ToolFallback` without one.
+ * each run of tool calls renders through the `ToolGroup` slot and each run of
+ * reasoning parts through the `ReasoningGroup` slot, with each reasoning part
+ * inside it through `Reasoning`. Text renders through `Text`, and a tool call
+ * through its registered tool UI, or `ToolFallback` without one.
  * @internal Part of `aui-thread`.
  */
 @Component({
@@ -95,8 +98,10 @@ const MESSAGE_GROUP_BY = groupPartByType({
             />
           </ng-template>
           <ng-template auiGroup="group-reasoning" let-group>
-            <!-- The Reasoning slot of the run's first part renders the whole run. -->
-            <aui-group-children [group]="group" />
+            <ng-container
+              [auiComponentOutlet]="slots().ReasoningGroup"
+              [auiComponentOutletInputs]="{ group: group }"
+            />
           </ng-template>
           <ng-template auiPart="text">
             <aui-thread-slot [component]="slots().Text" />
@@ -140,9 +145,10 @@ export class AuiThreadAssistantMessageComponent {
     const components = this.settings?.components();
     return {
       Text: components?.Text ?? AuiStyledMarkdownText,
-      Reasoning: components?.Reasoning ?? AuiReasoningComponent,
+      Reasoning: components?.Reasoning ?? AuiThreadReasoningPartComponent,
       ToolFallback: components?.ToolFallback ?? AuiToolFallbackComponent,
       ToolGroup: components?.ToolGroup ?? AuiThreadToolGroupComponent,
+      ReasoningGroup: components?.ReasoningGroup ?? AuiThreadReasoningGroupComponent,
     };
   });
 }

@@ -215,6 +215,14 @@
   transition:
     grid-template-rows 0.2s ease-out,
     visibility 0s;
+  /* A body leaving display: none has no start value to transition from. */
+  animation: aui-collapsible-open 0.2s ease-out;
+}
+
+@keyframes aui-collapsible-open {
+  from {
+    grid-template-rows: 0fr;
+  }
 }
 
 .aui-collapsible-inner {
@@ -226,6 +234,7 @@
   .aui-collapsible-content,
   .aui-collapsible-content[data-open] {
     transition: none;
+    animation: none;
   }
 }
 
@@ -377,6 +386,7 @@
 
 .aui-tool-fallback,
 .aui-tool-group,
+.aui-reasoning-group,
 .aui-reasoning {
   display: block;
   width: 100%;
@@ -1410,7 +1420,7 @@
   animation: aui-slide-in-bottom 0.15s ease-out;
 }
 
-.aui-user-message-root > .aui-message-attachments {
+.aui-user-message-root .aui-message-attachments {
   grid-column: 1 / -1;
   grid-row-start: 1;
 }
