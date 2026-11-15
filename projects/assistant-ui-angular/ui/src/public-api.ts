@@ -97,6 +97,7 @@ export type {
   ThreadListGroups,
 } from './thread-list/thread-list-groups';
 export { AuiThreadListSidebarComponent } from './thread-list-sidebar.component';
+export type { AuiSidebarCollapsible } from './thread-list-sidebar.component';
 export { AuiAssistantModalComponent } from './assistant-modal.component';
 export {
   AuiQuoteBlockComponent,

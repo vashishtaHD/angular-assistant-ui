@@ -1,4 +1,5 @@
-// Covers packages/ui/src/components/react/assistant-ui/elements/quote.aui.tsx @ 7d74276
+// Ported from packages/ui/src/components/react/assistant-ui/elements/quote.aui.tsx @ 7d74276
+// No upstream test exists; this covers the element's rendered behaviour.
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import {

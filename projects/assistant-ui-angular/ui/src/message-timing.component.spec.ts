@@ -1,4 +1,5 @@
-// Covers packages/ui/src/components/react/assistant-ui/elements/message-timing.aui.tsx @ 7d74276
+// Ported from packages/ui/src/components/react/assistant-ui/elements/message-timing.aui.tsx @ 7d74276
+// No upstream test exists; this covers the element's rendered behaviour.
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import {
@@ -6,11 +7,12 @@ import {
   AuiProviderDirective,
   AuiThreadMessagesComponent,
 } from 'angular-assistant-ui';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { displayOf, useFlexAuthorClass } from '../../src/testing-internal/author-css';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
+import { useFlexAuthorClass } from '../../src/testing-internal/author-css';
 import { configureTestBed } from '../../src/testing-internal/test-bed';
 import { createTestRuntime, type TestRuntime } from '../../src/testing-internal/test-runtime';
 import { AuiMessageTimingComponent, formatTimingMs } from './message-timing.component';
+import { overlayRoot } from './test-helpers';
 
 let runtime: TestRuntime;
 
@@ -64,7 +66,12 @@ async function mount(timing: Record<string, number> | undefined) {
   mounted = root;
   fixture.detectChanges();
   await settle(fixture);
-  return { fixture, root, settle: () => settle(fixture) };
+  return {
+    fixture,
+    root,
+    settle: () => settle(fixture),
+    popover: () => overlayRoot().querySelector<HTMLElement>('[data-slot="message-timing-popover"]'),
+  };
 }
 
 beforeEach(() => useFlexAuthorClass());
@@ -101,13 +108,19 @@ describe('aui-message-timing', () => {
     const trigger = triggers[0]!;
     expect(trigger.textContent?.trim()).toBe('1.50s');
     expect(trigger.getAttribute('aria-label')).toBe('Message timing');
-    const popover = t.root.querySelector<HTMLElement>('[data-slot="message-timing-popover"]')!;
-    popover.classList.add('flex');
-    expect(displayOf(popover)).toBe('none');
+    // Closed: nothing is rendered, in the row or in the overlay.
+    expect(t.root.querySelector('[data-slot="message-timing-popover"]')).toBeNull();
+    expect(t.popover()).toBeNull();
+    expect(trigger.hasAttribute('aria-describedby')).toBe(false);
 
     trigger.dispatchEvent(new FocusEvent('focus'));
     await t.settle();
-    expect(displayOf(popover)).not.toBe('none');
+    const popover = t.popover()!;
+    // Open: rendered into the CDK overlay so no scrolling ancestor clips it.
+    expect(popover).not.toBeNull();
+    expect(t.root.contains(popover)).toBe(false);
+    expect(popover.hidden).toBe(false);
+    expect(popover.getAttribute('role')).toBe('tooltip');
     expect(trigger.getAttribute('aria-describedby')).toBe(popover.id);
     const rows = Array.from(popover.querySelectorAll('.aui-message-timing-row'), (row) =>
       Array.from(row.children, (cell) => cell.textContent?.trim()),
@@ -121,13 +134,60 @@ describe('aui-message-timing', () => {
 
     trigger.dispatchEvent(new FocusEvent('blur'));
     await t.settle();
-    expect(displayOf(popover)).toBe('none');
+    expect(t.popover()).toBeNull();
+    expect(trigger.hasAttribute('aria-describedby')).toBe(false);
     trigger.dispatchEvent(new MouseEvent('mouseenter'));
     await t.settle();
-    expect(displayOf(popover)).not.toBe('none');
+    expect(t.popover()).not.toBeNull();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await t.settle();
+    expect(t.popover()).toBeNull();
+    trigger.dispatchEvent(new MouseEvent('mouseenter'));
+    await t.settle();
     trigger.dispatchEvent(new MouseEvent('mouseleave'));
     await t.settle();
-    expect(displayOf(popover)).toBe('none');
+    expect(t.popover()).toBeNull();
+  });
+
+  it('flips to the other side when the preferred side runs out of viewport', async () => {
+    // jsdom has no layout: put the badge at the right edge of a 1024px viewport
+    // and give the overlay pane a size, so the CDK has something to measure.
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      const rect = (left: number, top: number, width: number, height: number) =>
+        ({
+          left,
+          top,
+          width,
+          height,
+          right: left + width,
+          bottom: top + height,
+          x: left,
+          y: top,
+        }) as DOMRect;
+      if (this.matches('[data-slot="message-timing-trigger"]')) return rect(990, 300, 30, 20);
+      if (this.classList.contains('cdk-overlay-pane')) return rect(0, 0, 140, 80);
+      return original.call(this);
+    };
+    // The CDK reads the viewport size from the root element's client box.
+    const root = document.documentElement;
+    Object.defineProperty(root, 'clientWidth', { configurable: true, value: 1024 });
+    Object.defineProperty(root, 'clientHeight', { configurable: true, value: 768 });
+    onTestFinished(() => {
+      Element.prototype.getBoundingClientRect = original;
+      delete (root as { clientWidth?: number }).clientWidth;
+      delete (root as { clientHeight?: number }).clientHeight;
+    });
+    const t = await mount({
+      streamStartTime: 1,
+      totalStreamTime: 80,
+      totalChunks: 2,
+      toolCallCount: 0,
+    });
+    const trigger = t.root.querySelector<HTMLElement>('[data-slot="message-timing-trigger"]')!;
+    trigger.dispatchEvent(new FocusEvent('focus'));
+    await t.settle();
+    expect(t.popover()!.getAttribute('data-side')).toBe('left');
   });
 
   it('omits the optional rows', async () => {
@@ -137,8 +197,12 @@ describe('aui-message-timing', () => {
       totalChunks: 2,
       toolCallCount: 0,
     });
+    t.root
+      .querySelector('[data-slot="message-timing-trigger"]')!
+      .dispatchEvent(new FocusEvent('focus'));
+    await t.settle();
     const labels = Array.from(
-      t.root.querySelectorAll('.aui-message-timing-row > :first-child'),
+      t.popover()!.querySelectorAll('.aui-message-timing-row > :first-child'),
       (el) => el.textContent?.trim(),
     );
     expect(labels).toEqual(['Total', 'Chunks']);

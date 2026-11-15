@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import type { RemoteThreadListAdapter, RemoteThreadMetadata } from '@assistant-ui/core';
 import { AuiProviderDirective } from 'angular-assistant-ui';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { configureTestBed } from '../../../src/testing-internal/test-bed';
 import { createTestRuntime } from '../../../src/testing-internal/test-runtime';
 import { overlayRoot } from '../test-helpers';
@@ -195,6 +195,54 @@ describe('aui-thread-list', () => {
     expect(t.titles()).toEqual(['Renamed']);
     expect(document.activeElement).toBe(t.slots('item-trigger')[0]);
   });
+
+  it.each([
+    ['ltr', 'ArrowRight', 'ArrowLeft'],
+    ['rtl', 'ArrowLeft', 'ArrowRight'],
+  ] as const)(
+    'keyboard (%s): the forward arrow goes from the item to More and opens its menu, the back arrow returns',
+    async (direction, forward, back) => {
+      const original = window.getComputedStyle;
+      window.getComputedStyle = ((el: Element, pseudo?: string | null) => {
+        const style = original.call(window, el, pseudo);
+        return new Proxy(style, {
+          get: (target, prop) =>
+            prop === 'direction' ? direction : Reflect.get(target, prop, target),
+        });
+      }) as typeof window.getComputedStyle;
+      onTestFinished(() => {
+        window.getComputedStyle = original;
+      });
+      const t = await mount(makeAdapter([{ remoteId: 'a', title: 'Alpha' }]));
+      const press = async (key: string) => {
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+        );
+        await t.settle();
+      };
+      const trigger = t.slots('item-trigger')[0]!;
+      const more = t.slots('item-more')[0]!;
+      trigger.focus();
+
+      await press(forward);
+      expect(document.activeElement).toBe(more);
+      expect(more.getAttribute('aria-expanded')).toBe('false');
+
+      await press(forward);
+      expect(more.getAttribute('aria-expanded')).toBe('true');
+      const first = overlayRoot().querySelector<HTMLElement>('[role="menuitem"]')!;
+      expect(document.activeElement).toBe(first);
+      expect(first.textContent?.trim()).toBe('Rename');
+
+      await press(back);
+      expect(more.getAttribute('aria-expanded')).toBe('false');
+      expect(overlayRoot().querySelector('[role="menuitem"]')).toBeNull();
+      expect(document.activeElement).toBe(more);
+
+      await press(back);
+      expect(document.activeElement).toBe(trigger);
+    },
+  );
 
   it('Escape cancels a rename without calling rename', async () => {
     const adapter = makeAdapter([{ remoteId: 'a', title: 'Alpha' }]);

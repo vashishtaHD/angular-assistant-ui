@@ -19,6 +19,7 @@ import {
   model,
   signal,
   viewChild,
+  type AfterViewInit,
   type OnChanges,
   type SimpleChanges,
 } from '@angular/core';
@@ -28,6 +29,7 @@ import {
   AuiAssistantModalRootDirective,
   AuiAssistantModalTriggerDirective,
   AuiThreadListNewDirective,
+  injectAuiEvent,
   injectAuiState,
 } from 'angular-assistant-ui';
 import { AuiButtonDirective } from './button.directive';
@@ -231,7 +233,7 @@ const isRtl = (element: Element): boolean => getComputedStyle(element).direction
     </ng-template>
   </div>`,
 })
-export class AuiAssistantModalComponent implements OnChanges {
+export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
   /** Whether the panel is open. Two-way bindable. */
   readonly open = model(false);
   /** Open the panel when a run starts. */
@@ -265,13 +267,30 @@ export class AuiAssistantModalComponent implements OnChanges {
   private overlayRef: OverlayRef | null = null;
   private drag: ResizeDrag | null = null;
 
+  private viewReady = false;
+
   constructor() {
     inject(DestroyRef).onDestroy(() => this.detach());
+    // Like upstream, every run start brings the running chat into view, also when
+    // the panel is already open on the thread list. (The headless root opens it.)
+    injectAuiEvent('thread.runStart', () => {
+      if (!this.openOnRunStart() || this.view() === 'thread') return;
+      this.view.set('thread');
+      this.cdr.markForCheck();
+    });
   }
 
   /** @internal */
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['open'] && !changes['open'].firstChange) this.sync(this.open());
+    // Before the view exists the panel template is not available yet;
+    // `ngAfterViewInit` handles an initially open modal.
+    if (changes['open'] && this.viewReady) this.sync(this.open());
+  }
+
+  /** @internal Creates the panel of a modal that starts open. */
+  ngAfterViewInit(): void {
+    this.viewReady = true;
+    if (this.open()) this.sync(true);
   }
 
   /** @internal Mirrors the root's open state (trigger, Escape, run start). */

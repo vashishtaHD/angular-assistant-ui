@@ -1,8 +1,9 @@
 // Ported from packages/ui/src/components/react/assistant-ui/elements/assistant-modal.aui.test.tsx @ 7d74276
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import type { RemoteThreadListAdapter, RemoteThreadMetadata } from '@assistant-ui/core';
-import { AuiProviderDirective } from 'angular-assistant-ui';
+import { AuiProviderDirective, injectAui } from 'angular-assistant-ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../src/testing-internal/test-bed';
 import { createTestRuntime } from '../../src/testing-internal/test-runtime';
@@ -35,16 +36,31 @@ const makeAdapter = (titles: string[]): RemoteThreadListAdapter => ({
   })),
 });
 
-let config: ReturnType<ReturnType<typeof createTestRuntime>['withThreadList']>['config'];
+let list: ReturnType<ReturnType<typeof createTestRuntime>['withThreadList']>;
+let initialOpen = false;
+
+@Component({
+  selector: 'aui-modal-probe',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class ProbeComponent {
+  readonly aui = injectAui();
+}
 
 @Component({
   standalone: true,
-  imports: [AuiProviderDirective, AuiAssistantModalComponent],
+  imports: [AuiProviderDirective, AuiAssistantModalComponent, ProbeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<div [auiProvider]="config"><aui-assistant-modal /></div>`,
+  template: `<div [auiProvider]="config">
+    <aui-modal-probe />
+    <aui-assistant-modal [(open)]="open" />
+  </div>`,
 })
 class HostComponent {
-  readonly config = config;
+  readonly config = list.config;
+  readonly open = signal(initialOpen);
 }
 
 const settle = async (fixture: ComponentFixture<unknown>) => {
@@ -58,8 +74,9 @@ const settle = async (fixture: ComponentFixture<unknown>) => {
 let restoreLayout: () => void;
 let mounted: HTMLElement | undefined;
 
-async function mount(titles: string[] = []) {
-  config = createTestRuntime().withThreadList(makeAdapter(titles)).config;
+async function mount(titles: string[] = [], open = false) {
+  list = createTestRuntime().withThreadList(makeAdapter(titles));
+  initialOpen = open;
   configureTestBed({ imports: [HostComponent] });
   const fixture = TestBed.createComponent(HostComponent);
   const root = fixture.nativeElement as HTMLElement;
@@ -74,6 +91,13 @@ async function mount(titles: string[] = []) {
     panel: () => overlayRoot().querySelector<HTMLElement>('.aui-modal-content'),
     part: (name: string) => overlayRoot().querySelector<HTMLElement>(`.aui-modal-${name}`),
     settle: () => settle(fixture),
+    /** Starts a run on the main thread (fires `thread.runStart`). */
+    startRun: async () => {
+      const { aui } = fixture.debugElement.query(By.directive(ProbeComponent))
+        .componentInstance as ProbeComponent;
+      list.runtimeFor(aui.threads.getState().mainThreadId).setRunning(true);
+      await settle(fixture);
+    },
   };
 }
 
@@ -94,6 +118,52 @@ afterEach(() => {
 });
 
 describe('aui-assistant-modal', () => {
+  it('creates the panel when it starts open, and follows later external open changes', async () => {
+    const t = await mount([], true);
+    expect(t.launcher().getAttribute('aria-expanded')).toBe('true');
+    expect(t.panel()).not.toBeNull();
+    expect(t.panel()!.querySelector('aui-thread')).not.toBeNull();
+
+    t.fixture.componentInstance.open.set(false);
+    await t.settle();
+    expect(t.panel()).toBeNull();
+    expect(t.launcher().getAttribute('aria-expanded')).toBe('false');
+
+    t.fixture.componentInstance.open.set(true);
+    await t.settle();
+    expect(t.panel()).not.toBeNull();
+
+    // The launcher writes back through the two-way binding.
+    t.launcher().click();
+    await t.settle();
+    expect(t.fixture.componentInstance.open()).toBe(false);
+    expect(t.panel()).toBeNull();
+  });
+
+  it('a run start opens the closed panel on the thread view', async () => {
+    const t = await mount(['Alpha']);
+    expect(t.panel()).toBeNull();
+    await t.startRun();
+    expect(t.panel()).not.toBeNull();
+    expect(t.part('thread-list')).toBeNull();
+    expect(t.part('thread')!.hasAttribute('inert')).toBe(false);
+  });
+
+  it('a run start while the open panel shows Threads switches back to the running thread', async () => {
+    const t = await mount(['Alpha', 'Beta']);
+    t.launcher().click();
+    await t.settle();
+    t.part('threads')!.click();
+    await t.settle();
+    expect(t.part('thread-list')).not.toBeNull();
+    expect(t.part('thread')!.hasAttribute('inert')).toBe(true);
+
+    await t.startRun();
+    expect(t.part('thread-list')).toBeNull();
+    expect(t.part('thread')!.hasAttribute('inert')).toBe(false);
+    expect(t.part('title')!.textContent?.trim()).not.toBe('Threads');
+  });
+
   it('the launcher opens and closes the panel, which holds aui-thread', async () => {
     const t = await mount();
     const launcher = t.launcher();

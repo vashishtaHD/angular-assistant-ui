@@ -1,4 +1,5 @@
-// Mirrors packages/react/src/hooks/useMessageTiming.ts @ 7d74276
+// Ported from packages/react/src/hooks/useMessageTiming.ts @ 7d74276
+// No upstream test exists; this covers the hook's behaviour.
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { afterEach, describe, expect, it } from 'vitest';
