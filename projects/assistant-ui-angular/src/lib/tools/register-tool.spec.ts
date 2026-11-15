@@ -7,6 +7,11 @@ import { RuntimeAdapter } from '@assistant-ui/core/store';
 import { AuiConfig, type AssistantClient } from '@assistant-ui/store/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../testing-internal/test-bed';
+import { AuiMessagePartsComponent } from '../primitives/message-parts.component';
+import {
+  AuiMessageTemplateDirective,
+  AuiThreadMessagesComponent,
+} from '../primitives/thread-messages.component';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
 import { createExternalStoreRuntime } from '../runtime/factories';
 import { injectAui } from '../state/inject-aui';
@@ -119,11 +124,36 @@ class HostComponent {
   readonly config = config;
 }
 
-const mount = async (store: ReturnType<typeof scriptedStore>) => {
+/** Also renders the thread, so a registered tool UI mounts for its tool call. */
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    RegistrarComponent,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessagePartsComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<ng-container [auiProvider]="config">
+    <aui-test-registrar />
+    <aui-thread-messages>
+      <ng-template auiMessage><aui-message-parts /></ng-template>
+    </aui-thread-messages>
+  </ng-container>`,
+})
+class ThreadHostComponent {
+  readonly config = config;
+}
+
+const mount = async (
+  store: ReturnType<typeof scriptedStore>,
+  host: typeof HostComponent | typeof ThreadHostComponent = HostComponent,
+) => {
   destroyRuntime = () => store.destroy();
   config = AuiConfig({ threads: RuntimeAdapter(store.runtime) });
-  configureTestBed({ imports: [HostComponent] });
-  const fixture = TestBed.createComponent(HostComponent);
+  configureTestBed({ imports: [host] });
+  const fixture = TestBed.createComponent<unknown>(host);
   fixture.detectChanges();
   await settle(fixture);
   return fixture;
@@ -177,16 +207,25 @@ describe('registerTool with a scripted transport', () => {
       render: ConfirmComponent,
     };
     register = makeAssistantTool(tool);
-    const fixture = await mount(scriptedStore('confirm', {}));
+    const fixture = await mount(scriptedStore('confirm', {}), ThreadHostComponent);
+    const root = fixture.nativeElement as HTMLElement;
 
     send('do it?');
-    await vi.waitFor(() => expect(toolPart()).toMatchObject({ toolName: 'confirm' }));
+    await vi.waitFor(async () => {
+      await settle(fixture);
+      expect(root.querySelector('aui-test-confirm button.confirm')).not.toBeNull();
+    });
     // The turn has ended and the tool keeps waiting for the user.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(toolPart()).not.toHaveProperty('result');
 
-    aui.thread().message({ index: 1 }).part({ index: 0 }).addToolResult({ ok: true });
+    // The user answers through the registered UI's own addResult.
+    root.querySelector<HTMLButtonElement>('aui-test-confirm button.confirm')!.click();
     await vi.waitFor(() => expect(toolPart()).toMatchObject({ result: { ok: true } }));
+    await vi.waitFor(async () => {
+      await settle(fixture);
+      expect(root.textContent).toContain('Done.');
+    });
     fixture.destroy();
   });
 });
