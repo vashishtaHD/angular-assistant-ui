@@ -4,6 +4,10 @@
 //
 // Modified: imports come from the public `@assistant-ui/ai-sdk`, `@assistant-ui/core`,
 // `@ai-sdk/react` and `ai` entries; the types the package does not export come from `./types`.
+// React hooks come from `@assistant-ui/tap/react-shim`, as in the published package build, so
+// `useEffectEvent` falls back on React 18 and 19.0/19.1.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- the ambient types must reach the ng-packagr build, which only compiles files reachable from the entry
+/// <reference path="./tap-react-shim.d.ts" />
 import { Chat, useChat } from '@ai-sdk/react';
 import type { MessageRepository } from '@assistant-ui/core/internal';
 import {
@@ -31,7 +35,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-} from 'react';
+} from '@assistant-ui/tap/react-shim';
 import { useResourceCleanup } from './useResourceCleanup';
 import { DynamicChatTransport, getResumedStreamIds } from './DynamicChatTransport';
 import { getResumableAdapter } from './getResumableAdapter';

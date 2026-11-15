@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- the ambient types must reach the ng-packagr build, which only compiles files reachable from the entry
+/// <reference path="./vendor/tap-react-shim.d.ts" />
 import type {
   AttachmentAdapter,
   RemoteThreadListAdapter,
@@ -6,7 +8,7 @@ import type {
 } from '@assistant-ui/core';
 import { useAui } from '@assistant-ui/store';
 import { createAssistantStream } from 'assistant-stream';
-import { useMemo } from 'react';
+import { useMemo } from '@assistant-ui/tap/react-shim';
 import { resolveMastraAuth, type MastraAuth } from './auth.token';
 import {
   ARCHIVED_KEY,

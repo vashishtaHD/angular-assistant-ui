@@ -25,6 +25,8 @@ jobs:
       # testing, react-interop) into dist/assistant-ui-angular.
       - run: npm run build:lib
       - run: npm run check:ui-styles
+      # No FESM imports a React-19-only API (useEffectEvent, ...) straight from react.
+      - run: npm run check:react-compat
       # Packs it as published; the compat jobs check the tarball's entries,
       # ui/styles.css, LICENSE and NOTICE.
       - run: npm pack ./dist/assistant-ui-angular --dry-run

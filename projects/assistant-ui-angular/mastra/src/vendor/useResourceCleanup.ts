@@ -1,6 +1,10 @@
 // Ported from packages/ai-sdk/src/runtime/useResourceCleanup.ts @ 7d74276
 // Copyright (c) 2026 AgentbaseAI Inc. MIT License (see NOTICE).
-import { useEffect, useRef } from 'react';
+//
+// Modified: React hooks come from `@assistant-ui/tap/react-shim` (as in the published build).
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- the ambient types must reach the ng-packagr build, which only compiles files reachable from the entry
+/// <reference path="./tap-react-shim.d.ts" />
+import { useEffect, useRef } from '@assistant-ui/tap/react-shim';
 import { useAssistantClientDestroySignal } from '@assistant-ui/store/internal';
 
 export const useResourceCleanup = (

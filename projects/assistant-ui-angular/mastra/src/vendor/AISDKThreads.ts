@@ -8,9 +8,12 @@
 //   the cloud adapter swap/reload effect and the SDK identity are removed.
 // - Every thread owns its chat entry (the upstream `cloud` path), so a visited thread stays mounted
 //   with `backgroundThreads` and its chat stops when the thread body unmounts.
-// - Imports come from public package entries.
+// - Imports come from public package entries; React hooks come from `@assistant-ui/tap/react-shim`
+//   (as in the published package build).
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- the ambient types must reach the ng-packagr build, which only compiles files reachable from the entry
+/// <reference path="./tap-react-shim.d.ts" />
 import { resource, useResource, withKey } from '@assistant-ui/tap';
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from '@assistant-ui/tap/react-shim';
 import type { Chat } from '@ai-sdk/react';
 import type { ChatTransport, UIMessage } from 'ai';
 import type { RemoteThreadListAdapter } from '@assistant-ui/core';
