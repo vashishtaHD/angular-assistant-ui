@@ -154,6 +154,58 @@ describe('live completion adapter: failure, cacheKey and enabled', () => {
     await t.settle(60);
     expect(t.host.fetcher).toHaveBeenCalledTimes(2);
   });
+
+  it('reopening the same query after a rendered failure retries it once', async () => {
+    const t = await setupLive();
+    t.host.fail.set(true);
+    await t.type('~ab');
+    await t.settle(60);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(1);
+    t.host.fail.set(false);
+    await t.type('x');
+    await t.type('~ab');
+    await t.settle(60);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(2);
+    expect(t.popover.itemList().map((i) => i.id)).toEqual(['r-ab-a']);
+    await t.settle(100);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('the first reopen retries a fetch that failed after the popover closed', async () => {
+    const t = await setupLive();
+    let reject!: (error: Error) => void;
+    t.host.fetcher.mockImplementationOnce(
+      () => new Promise<readonly TriggerItem[]>((_, rej) => (reject = rej)),
+    );
+    await t.type('~ab');
+    await t.settle(30);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(1);
+    await t.type('x');
+    expect(t.popover.open()).toBe(false);
+    reject(new Error('boom'));
+    await t.settle(30);
+
+    await t.type('~ab');
+    await t.settle(60);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(2);
+    expect(t.popover.itemList().map((i) => i.id)).toEqual(['r-ab-a']);
+  });
+
+  it('disabling and re-enabling while the popover is closed drops the cached results', async () => {
+    const t = await setupLive();
+    await t.type('~ab');
+    await t.settle(60);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(1);
+    await t.type('x');
+    t.host.enabled.set(false);
+    await t.settle(30);
+    t.host.enabled.set(true);
+    await t.settle(30);
+
+    await t.type('~ab');
+    await t.settle(60);
+    expect(t.host.fetcher).toHaveBeenCalledTimes(2);
+  });
 });
 
 /** Must live inside the provider: the adapter injects the assistant client. */
