@@ -509,3 +509,8 @@ export {
 export { AuiComponentOutletDirective } from './lib/scope/component-outlet.directive';
 export { AuiToolUIOutletComponent } from './lib/primitives/tool-ui-outlet.component';
 // Task 16 end.
+
+// Task 18: thread list item by index and message timing.
+export { AuiThreadListItemByIndexComponent } from './lib/primitives/thread-list/thread-list-item-by-index.component';
+export { injectMessageTiming } from './lib/state/inject-message-timing';
+// Task 18 end.

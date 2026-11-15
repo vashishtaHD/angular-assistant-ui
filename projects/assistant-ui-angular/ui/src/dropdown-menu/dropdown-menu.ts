@@ -62,7 +62,13 @@ function positions(align: AuiDropdownMenuAlign): ConnectedPosition[] {
   selector: '[auiDropdownMenuTrigger]',
   standalone: true,
   exportAs: 'auiDropdownMenuTrigger',
-  hostDirectives: [AuiMenuRootDirective, AuiMenuTriggerDirective],
+  hostDirectives: [
+    // `sideKeys`: ArrowRight (ArrowLeft in RTL) also opens the menu, and the
+    // opposite arrow inside it closes it, for triggers in a horizontal
+    // focus group (Task 18: the thread list item "more" button).
+    { directive: AuiMenuRootDirective, inputs: ['sideKeys'] },
+    AuiMenuTriggerDirective,
+  ],
   host: { class: 'aui-dropdown-menu-trigger' },
 })
 export class AuiDropdownMenuTriggerDirective {

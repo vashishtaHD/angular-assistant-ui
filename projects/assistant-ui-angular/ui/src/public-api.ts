@@ -84,3 +84,27 @@ export { AUI_THREAD_COMPONENTS } from './thread-components.token';
 export type { AuiThreadComponents } from './thread-components.token';
 export { AuiStyledCodeHeader, AuiStyledMarkdownText } from './markdown-text.component';
 // Task 16 end.
+// Task 18: thread list, sidebar, assistant modal, quote, follow-ups, timing and trigger popover.
+export { AuiThreadListComponent } from './thread-list/thread-list.component';
+export {
+  groupThreadList,
+  injectThreadListGroups,
+  startOfLocalDay,
+} from './thread-list/thread-list-groups';
+export type {
+  ThreadListGroup,
+  ThreadListGroupLabel,
+  ThreadListGroups,
+} from './thread-list/thread-list-groups';
+export { AuiThreadListSidebarComponent } from './thread-list-sidebar.component';
+export type { AuiSidebarCollapsible } from './thread-list-sidebar.component';
+export { AuiAssistantModalComponent } from './assistant-modal.component';
+export {
+  AuiQuoteBlockComponent,
+  AuiQuoteComposerComponent,
+  AuiSelectionToolbarStyledComponent,
+} from './quote/quote';
+export { AuiFollowUpSuggestionsComponent } from './follow-up-suggestions.component';
+export { AuiMessageTimingComponent, formatTimingMs } from './message-timing.component';
+export { AuiComposerTriggerPopoverStyledComponent } from './composer-trigger-popover.component';
+// Task 18 end.
