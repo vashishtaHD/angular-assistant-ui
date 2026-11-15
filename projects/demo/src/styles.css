@@ -1,3 +1,11 @@
+/*
+ * The styled kit's stylesheet (angular-assistant-ui/ui/styles.css: themes, .aui-dark and
+ * every aui-* component) comes first in angular.json's "styles". In this workspace the
+ * package name resolves to the library sources, so the built copy in dist/ is listed
+ * there, as the demo's TypeScript paths do; an app installing the package writes
+ * @import 'angular-assistant-ui/ui/styles.css'; instead.
+ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,5 +16,7 @@ body {
 }
 
 body {
-  @apply bg-slate-50 font-sans text-slate-900 antialiased;
+  @apply font-sans antialiased;
+  background: var(--aui-background);
+  color: var(--aui-foreground);
 }

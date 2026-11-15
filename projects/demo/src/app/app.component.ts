@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { ChatComponent } from './chat/chat.component';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [ChatComponent],
+  imports: [RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full' },
-  template: `<app-chat />`,
+  template: `<router-outlet />`,
 })
 export class AppComponent {}

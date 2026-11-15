@@ -56,7 +56,7 @@
                 "input": "projects/demo/public"
               }
             ],
-            "styles": ["projects/demo/src/styles.css"],
+            "styles": ["dist/assistant-ui-angular/ui/styles.css", "projects/demo/src/styles.css"],
             "scripts": [],
             "allowedCommonJsDependencies": [
               "react",

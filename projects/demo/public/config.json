@@ -1,3 +1,5 @@
 {
-  "mastraChatUrl": "http://localhost:4111/chat/chatAgent"
+  "mastraUrl": "http://localhost:4111",
+  "agentId": "chatAgent",
+  "authToken": ""
 }
