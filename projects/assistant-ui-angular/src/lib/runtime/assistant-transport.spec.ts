@@ -290,6 +290,79 @@ describe('createAssistantTransportRuntime', () => {
     fixture.destroy();
   });
 
+  it('finishes a backgrounded run into its own thread while another thread is shown', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const signals: AbortSignal[] = [];
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      signals.push(init.signal as AbortSignal);
+      if (signals.length === 1) {
+        return sseResponse({
+          messages: [
+            { id: 'u1', role: 'user', text: 'one' },
+            { id: 'a1', role: 'assistant', text: 'reply' },
+          ],
+        });
+      }
+      return new Response(
+        createAssistantStream(async (controller) => {
+          await gate;
+          controller.enqueue({
+            type: 'update-state',
+            path: [],
+            operations: [
+              {
+                type: 'set',
+                path: ['messages'],
+                value: [
+                  { id: 'u1', role: 'user', text: 'one' },
+                  { id: 'a1', role: 'assistant', text: 'reply' },
+                  { id: 'u2', role: 'user', text: 'two' },
+                  { id: 'a2', role: 'assistant', text: 'second reply' },
+                ] as never,
+              },
+            ],
+          });
+        }).pipeThrough(new AssistantTransportEncoder()),
+        { status: 200 },
+      );
+    });
+    const fixture = await mount();
+    const ids = () =>
+      aui
+        .thread()
+        .getState()
+        .messages.map((m) => m.id);
+
+    send('one');
+    await vi.waitFor(() => expect(ids()).toEqual(['u1', 'a1']));
+    await vi.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    const threadA = aui.threads().getState().mainThreadId;
+
+    send('two');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(aui.thread().getState().isRunning).toBe(true));
+    await aui.threads().switchToNewThread();
+    await vi.waitFor(() => expect(aui.threads().getState().mainThreadId).not.toBe(threadA));
+    const threadB = aui.threads().getState().mainThreadId;
+
+    // A's run finishes while B is shown: B stays idle and empty.
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(fixture);
+    expect(aui.threads().getState().mainThreadId).toBe(threadB);
+    expect(aui.thread().getState().isRunning).toBe(false);
+    expect(ids()).toEqual([]);
+    expect(signals[1]!.aborted).toBe(false);
+
+    // Back on A, the run has published its reply and stopped.
+    await aui.threads().switchToThread(threadA);
+    await vi.waitFor(() => expect(ids()).toEqual(['u1', 'a1', 'u2', 'a2']));
+    expect(aui.thread().getState().isRunning).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fixture.destroy();
+  });
+
   it('stays destroyed: a thread mounted after destroy() never runs', async () => {
     fetchMock.mockImplementation(async () => sseResponse({ messages: [] }));
     const fixture = await mount();
