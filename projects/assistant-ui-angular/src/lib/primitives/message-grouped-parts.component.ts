@@ -297,7 +297,7 @@ const shouldShowIndicator = (
       } @else {
         <ng-template #emptyBody>
           @if (emptyTextTemplate()) {
-            <aui-part-view [templates]="partTemplates()" />
+            <aui-part-view [templates]="partTemplates()" [templateStatus]="messageStatus()" />
           } @else {
             <p style="white-space: pre-line">
               <aui-part-text />
@@ -305,7 +305,9 @@ const shouldShowIndicator = (
             </p>
           }
         </ng-template>
-        <aui-scope-outlet [config]="emptyScope()" [template]="emptyBody" />
+        @for (scope of emptyScopes(); track scope) {
+          <aui-scope-outlet [config]="scope" [template]="emptyBody" />
+        }
       }
     }
     @if (showIndicator()) {
@@ -379,10 +381,14 @@ export class AuiMessageGroupedPartsComponent implements OnInit {
     $implicit: this.messageStatus(),
   }));
   protected readonly emptyTextTemplate = computed(() => this.partTemplates().get('text'));
-  /** A static empty text part with the message's running state, like TextMessagePartProvider. */
-  protected readonly emptyScope = computed(() =>
-    textPartScopeConfig('', this.messageStatus().type === 'running'),
-  );
+  private readonly emptyRunning = computed(() => this.messageStatus().type === 'running');
+  /**
+   * A static empty text part with the message's running state, like TextMessagePartProvider. One
+   * scope per running state: the outlet is remounted when the run ends rather than updated in
+   * place, because that update arrives in the same store notification as the message's own status
+   * change and the child scope kept serving the running part.
+   */
+  protected readonly emptyScopes = computed(() => [textPartScopeConfig('', this.emptyRunning())]);
   /** True for a message with no parts in `groupingFunction` / parent-id mode. */
   protected readonly showEmpty = computed(
     () => this.groupBy() === undefined && this.parts().length === 0,

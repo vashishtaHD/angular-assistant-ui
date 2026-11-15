@@ -311,6 +311,14 @@ describe('MessagePrimitive.Unstable_PartsGrouped empty message', () => {
     expect(done.querySelector('p')).toBeNull();
   });
 
+  it('passes the raw message status to the empty text template (upstream EmptyPartFallback)', async () => {
+    const cancelled = await mountEmpty(EmptyTextTemplateHostComponent, false, {
+      type: 'incomplete',
+      reason: 'cancelled',
+    });
+    expect(cancelled.querySelector('.text-slot')?.textContent).toBe('|incomplete');
+  });
+
   it('lets the empty text template use part primitives (aui-part-text, *auiPartInProgress)', async () => {
     const running = await mountEmpty(EmptyScopedTextHostComponent, true);
     expect(running.querySelector('aui-part-text.scoped')?.getAttribute('data-status')).toBe(
@@ -341,5 +349,53 @@ describe('MessagePrimitive.Unstable_PartsGrouped empty message', () => {
     expect(running.querySelector('p')?.textContent?.trim()).toBe('●');
     const done = await mountEmpty(EmptyDefaultHostComponent, false);
     expect(done.querySelector('p')?.textContent).toBe('');
+  });
+
+  it('clears the running marker of a mounted empty message when the run stops or errors', async () => {
+    const mountRunning = async (host: new () => unknown) => {
+      TestBed.resetTestingModule();
+      const rt = createTestRuntime();
+      rt.append({ id: 'a1', role: 'assistant', content: [] });
+      rt.setRunning(true);
+      hostConfig = rt.config;
+      configureTestBed({ imports: [host as never] });
+      const fixture = TestBed.createComponent(host);
+      fixture.detectChanges();
+      await settle(fixture);
+      return { rt, fixture, el: fixture.nativeElement as HTMLElement };
+    };
+    const finish = async (rt: ReturnType<typeof createTestRuntime>, end: 'stop' | 'error') => {
+      flushTapSync(() => {
+        if (end === 'error') {
+          rt.setMessages([
+            {
+              id: 'a1',
+              role: 'assistant',
+              content: [],
+              status: { type: 'incomplete', reason: 'error', error: 'boom' },
+            },
+          ]);
+        }
+        rt.setRunning(false);
+      });
+    };
+    for (const end of ['stop', 'error'] as const) {
+      const text = await mountRunning(EmptyTextTemplateHostComponent);
+      expect(text.el.querySelector('.text-slot')?.textContent).toBe('|running');
+      await finish(text.rt, end);
+      await settle(text.fixture);
+      expect(text.el.querySelector('.text-slot')?.textContent).toBe(
+        end === 'error' ? '|incomplete' : '|complete',
+      );
+
+      const scoped = await mountRunning(EmptyScopedTextHostComponent);
+      expect(scoped.el.querySelector('.busy'), end).not.toBeNull();
+      await finish(scoped.rt, end);
+      await settle(scoped.fixture);
+      expect(scoped.el.querySelector('.busy'), end).toBeNull();
+      expect(scoped.el.querySelector('aui-part-text.scoped')?.getAttribute('data-status')).toBe(
+        'complete',
+      );
+    }
   });
 });

@@ -76,6 +76,12 @@ export class AuiPartViewComponent {
    * false: registered UIs win, as in `aui-message-parts`.
    */
   readonly templatesFirst = input(false);
+  /**
+   * The `status` a template sees in place of the part's own (the scope's `s.part` keeps its
+   * status). Used for an empty message, whose text template gets the raw message status like
+   * upstream's `EmptyPartFallback`, while its static part only says running or complete.
+   */
+  readonly templateStatus = input<AssistantState['part']['status'] | undefined>(undefined);
 
   /** Renders projected templates in this part's scope. */
   protected readonly injector = inject(Injector);
@@ -89,9 +95,11 @@ export class AuiPartViewComponent {
   });
 
   /** The template context; `NgTemplateOutlet` forwards it without recreating. */
-  protected readonly context = computed<AuiPartTemplateContext>(() => ({
-    $implicit: this.part(),
-  }));
+  protected readonly context = computed<AuiPartTemplateContext>(() => {
+    const part = this.part();
+    const status = this.templateStatus();
+    return { $implicit: status ? ({ ...part, status } as AssistantState['part']) : part };
+  });
 
   /** What this part renders, recomputed when the part or a registry changes. */
   protected readonly view = computed<PartView>(() => {
