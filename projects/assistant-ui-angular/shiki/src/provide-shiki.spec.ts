@@ -23,7 +23,13 @@ describe('provideShikiHighlighter', () => {
     expect(html).toContain('<pre class="shiki');
     expect(html).toContain('<span style="');
     expect(html).toContain('light-dark(');
-    expect(html).not.toMatch(/style="[^"]*[^-]color:#[0-9a-f]+/i);
+    // A plain hex `color` declaration anywhere in a style (first or after `;`), not the
+    // `--shiki-*` variables, would be a single-theme colour.
+    const inlineHex = /style="(?:[^"]*[;\s])?color:\s*#[0-9a-f]+/i;
+    expect('<span style="color:#24292E">').toMatch(inlineHex);
+    expect('<span style="font-style:italic;color:#24292E">').toMatch(inlineHex);
+    expect('<span style="--shiki-light:#24292E">').not.toMatch(inlineHex);
+    expect(html).not.toMatch(inlineHex);
     expect(html).toContain('--shiki-dark:');
     expect(html).toContain('--shiki-light:');
     expect(html).toContain('const');
