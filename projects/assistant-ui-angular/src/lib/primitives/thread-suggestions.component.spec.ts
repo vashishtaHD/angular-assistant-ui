@@ -242,4 +242,18 @@ describe('aui-thread-suggestions', () => {
     expect(aui.composer().getState().text).toBe('draft');
     fixture.destroy();
   });
+
+  it('forwards the composer runConfig with the prompt to the queue callback', async () => {
+    const { fixture, rt, aui, q } = await mount([suggestion(1)], true);
+    flushTapSync(() => rt.setRunning(true));
+    await settle(fixture);
+    flushTapSync(() => aui.composer().setRunConfig({ custom: { tag: 'queued' } }));
+    q('send')[0]!.click();
+    await settle(fixture);
+    const calls = [...rt.enqueue.mock.calls, ...rt.steer.mock.calls] as unknown[][];
+    expect(calls).toHaveLength(1);
+    expect(calls[0]![0]).toMatchObject({ runConfig: { custom: { tag: 'queued' } } });
+    expect(JSON.stringify(calls[0]![0])).toContain('"P1"');
+    fixture.destroy();
+  });
 });
