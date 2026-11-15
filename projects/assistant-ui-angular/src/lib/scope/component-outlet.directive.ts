@@ -27,7 +27,9 @@ import { AUI_CONTEXT } from '../context/aui-context';
  * the template is rendered in.
  *
  * `auiComponentOutletInputs` sets inputs by name; the component must declare
- * them. A `null` component renders nothing.
+ * them. Like `NgComponentOutlet`, each change of the map sets only the keys
+ * whose values changed and resets removed keys to `undefined`; a new
+ * component type is created afresh. A `null` component renders nothing.
  *
  * @example
  * ```html
@@ -61,17 +63,24 @@ export class AuiComponentOutletDirective implements OnChanges {
   });
   private ref: ComponentRef<unknown> | null = null;
   private rendered: Type<unknown> | null = null;
+  /** The inputs last set on {@link ref}, to diff the next map against. */
+  private applied = new Map<string, unknown>();
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.viewContainer.clear());
   }
 
-  /** Creates the component when it changes and forwards the inputs. */
+  /**
+   * Creates the component when its type changes, then applies the inputs
+   * diff: changed or added keys are set, removed keys are reset to
+   * `undefined` (as `NgComponentOutlet` does), unchanged keys are left alone.
+   */
   ngOnChanges(): void {
     const component = this.component() ?? null;
     if (component !== this.rendered) {
       this.viewContainer.clear();
       this.ref = null;
+      this.applied = new Map();
       this.rendered = component;
       if (component) {
         this.ref = this.viewContainer.createComponent(component, {
@@ -79,9 +88,19 @@ export class AuiComponentOutletDirective implements OnChanges {
         });
       }
     }
-    const inputs = this.inputs();
-    if (this.ref && inputs) {
-      for (const [name, value] of Object.entries(inputs)) this.ref.setInput(name, value);
+    const ref = this.ref;
+    if (!ref) return;
+    const inputs = this.inputs() ?? {};
+    for (const name of [...this.applied.keys()]) {
+      if (!Object.prototype.hasOwnProperty.call(inputs, name)) {
+        ref.setInput(name, undefined);
+        this.applied.delete(name);
+      }
+    }
+    for (const [name, value] of Object.entries(inputs)) {
+      if (this.applied.has(name) && Object.is(this.applied.get(name), value)) continue;
+      ref.setInput(name, value);
+      this.applied.set(name, value);
     }
   }
 }

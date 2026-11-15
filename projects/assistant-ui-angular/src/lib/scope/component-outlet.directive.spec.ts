@@ -1,10 +1,18 @@
 // Scope-safe dynamic rendering: components created from inside scoped templates
 // (part templates, the edit composer template) must read the scope the template
 // renders in, not the scope of its declaration site.
-import { ChangeDetectionStrategy, Component, input, type Type } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  signal,
+  viewChild,
+  type ComponentRef,
+  type Type,
+} from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { flushTapSync } from '@assistant-ui/tap';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../testing-internal/test-bed';
 import { createTestRuntime, type TestRuntime } from '../../testing-internal/test-runtime';
 import { AuiActionBarEditDirective } from '../primitives/action-bar/action-bar-edit.directive';
@@ -131,6 +139,46 @@ class ScopeHostComponent {
   readonly editProbe: Type<unknown> = EditProbeComponent;
 }
 
+@Component({
+  selector: 'aui-test-inputs-probe',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<span class="inputs-probe"
+    >{{ kind }}:{{ label() ?? 'unset' }}:{{ tone() ?? 'unset' }}</span
+  >`,
+})
+class InputsProbeComponent {
+  protected readonly kind = 'a';
+  readonly label = input<string | undefined>(undefined);
+  readonly tone = input<string | undefined>(undefined);
+}
+
+@Component({
+  selector: 'aui-test-other-inputs-probe',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<span class="inputs-probe">b:{{ label() ?? 'unset' }}:{{ tone() ?? 'unset' }}</span>`,
+})
+class OtherInputsProbeComponent {
+  readonly label = input<string | undefined>(undefined);
+  readonly tone = input<string | undefined>(undefined);
+}
+
+@Component({
+  standalone: true,
+  imports: [AuiProviderDirective, AuiComponentOutletDirective],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<ng-container [auiProvider]="config">
+    <ng-container [auiComponentOutlet]="component()" [auiComponentOutletInputs]="inputs()" />
+  </ng-container>`,
+})
+class InputsHostComponent {
+  readonly config = runtime.config;
+  readonly component = signal<Type<unknown>>(InputsProbeComponent);
+  readonly inputs = signal<Record<string, unknown> | undefined>({ label: 'one', tone: 'warm' });
+  readonly outlet = viewChild.required(AuiComponentOutletDirective);
+}
+
 const groupBy = () => ['group-tools'] as const;
 
 @Component({
@@ -220,6 +268,45 @@ describe('AuiComponentOutletDirective', () => {
     expect(root.querySelector('.edit-type')).toBeNull();
     expect(runtime.runtime.thread.composer.getState().text).toBe('draft');
     expect(root.querySelector('.part-probe')?.textContent).toBe('probe:original');
+  });
+
+  it('diffs inputs: unchanged keys are not set again, removed keys reset to undefined', async () => {
+    runtime = createTestRuntime();
+    const { fixture, root } = await mount(InputsHostComponent);
+    const probe = () => root.querySelector('.inputs-probe')?.textContent;
+    expect(probe()).toBe('a:one:warm');
+
+    const outlet = fixture.componentInstance.outlet();
+    const ref = (outlet as unknown as { ref: ComponentRef<unknown> }).ref;
+    const setInput = vi.spyOn(ref, 'setInput');
+
+    fixture.componentInstance.inputs.set({ label: 'one', tone: 'cool' });
+    await settle(fixture);
+    expect(probe()).toBe('a:one:cool');
+    expect(setInput.mock.calls).toEqual([['tone', 'cool']]);
+
+    setInput.mockClear();
+    fixture.componentInstance.inputs.set({ label: 'one' });
+    await settle(fixture);
+    expect(probe()).toBe('a:one:unset');
+    expect(setInput.mock.calls).toEqual([['tone', undefined]]);
+
+    setInput.mockClear();
+    fixture.componentInstance.inputs.set(undefined);
+    await settle(fixture);
+    expect(probe()).toBe('a:unset:unset');
+    expect(setInput.mock.calls).toEqual([['label', undefined]]);
+  });
+
+  it('recreates the component when its type changes, applying the current inputs', async () => {
+    runtime = createTestRuntime();
+    const { fixture, root } = await mount(InputsHostComponent);
+    fixture.componentInstance.inputs.set({ tone: 'warm' });
+    await settle(fixture);
+    fixture.componentInstance.component.set(OtherInputsProbeComponent);
+    await settle(fixture);
+    expect(root.querySelectorAll('.inputs-probe')).toHaveLength(1);
+    expect(root.querySelector('.inputs-probe')?.textContent).toBe('b:unset:warm');
   });
 });
 
