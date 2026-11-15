@@ -20,6 +20,7 @@ import {
   scriptedTextTurn,
   scriptedToolOutputTurn,
   toolApprovalOf,
+  turnToolCallId,
 } from './scripted-scenarios';
 
 let mounted: MountedAui | undefined;
@@ -36,6 +37,20 @@ const lastText = (aui: AssistantClient): string => {
     .map((part) => (part.type === 'text' ? part.text : ''))
     .join('');
 };
+
+/** Types `text` into the composer and sends it. */
+const sendText = (aui: AssistantClient, text: string) => {
+  aui.thread().composer().setText(text);
+  aui.thread().composer().send();
+};
+
+/** The first tool-call part of the message at `index`, loosely typed. */
+const toolCallOf = (aui: AssistantClient, index: number) =>
+  aui
+    .thread()
+    .getState()
+    .messages[index]?.content.find((part) => part.type === 'tool-call') as
+    { toolCallId: string; toolName: string; result?: unknown; approval?: unknown } | undefined;
 
 async function mountChat(
   script: (messages: UIMessage[]) => ScriptedTurn,
@@ -295,72 +310,110 @@ describe('the readers look only at the current turn', () => {
     expect(askUserAnswerOf(messages, 'ask-1')).toBe('Blue');
   });
 
-  it('asks for approval again when the same request is sent a second time', async () => {
+  it('approves the same request twice: each turn keeps its own answer', async () => {
     const { aui, mounted, sends } = await mountChat((messages) => {
-      const approval = toolApprovalOf(messages, 'call-1');
+      const toolCallId = turnToolCallId(messages, 'call');
+      const approval = toolApprovalOf(messages, toolCallId);
       if (!approval) {
-        return scriptedApprovalTurn({ toolCallId: 'call-1', toolName: 'bookMeeting', input: {} });
+        return scriptedApprovalTurn({ toolCallId, toolName: 'bookMeeting', input: {} });
       }
-      return scriptedToolOutputTurn({ toolCallId: 'call-1', output: 'ok', text: 'Booked.' });
+      return approval.approved
+        ? scriptedToolOutputTurn({ toolCallId, output: 'ok', text: 'Booked.' })
+        : scriptedTextTurn(`Not booked: ${approval.reason ?? 'no reason'}.`);
     }, lastAssistantMessageIsCompleteWithApprovalResponses);
-    const sendText = (text: string) => {
-      aui.thread().composer().setText(text);
-      aui.thread().composer().send();
-    };
 
-    sendText('Book');
-    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(2));
+    sendText(aui, 'Book');
+    await mounted.waitFor(() => expect(toolCallOf(aui, 1)?.approval).toBeDefined());
     await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
-    await aui.thread().message({ index: 1 }).part({ toolCallId: 'call-1' }).respondToToolApproval({
+    const first = toolCallOf(aui, 1)!.toolCallId;
+    await aui.thread().message({ index: 1 }).part({ toolCallId: first }).respondToToolApproval({
       approved: true,
     });
     await mounted.waitFor(() => expect(lastText(aui)).toContain('Booked.'));
     await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
 
-    sendText('Book again');
-    await mounted.waitFor(() => expect(sends).toHaveLength(3));
-    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(4));
+    sendText(aui, 'Book again');
+    await mounted.waitFor(() => expect(toolCallOf(aui, 3)?.approval).toBeDefined());
     await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
-    // The third send played a new approval request instead of reusing the first answer.
-    expect(toolApprovalOf(sends[2]!, 'call-1')).toBeUndefined();
-    const messages = aui.thread().getState().messages;
-    expect(messages).toHaveLength(4);
-    const last = messages[3]!.content.find((part) => part.type === 'tool-call');
-    expect(last).toMatchObject({ toolName: 'bookMeeting', approval: { id: 'approval-call-1' } });
-    expect(last).toMatchObject({ result: undefined });
-    expect(last).not.toHaveProperty('approval.approved');
-    expect(lastText(aui)).not.toContain('Booked.');
+    // The new request asked again, under its own call id.
+    expect(sends).toHaveLength(3);
+    const second = toolCallOf(aui, 3)!.toolCallId;
+    expect(second).not.toBe(first);
+    expect(toolCallOf(aui, 3)).toMatchObject({ result: undefined });
+    expect(toolCallOf(aui, 3)).not.toHaveProperty('approval.approved');
+
+    await aui.thread().message({ index: 3 }).part({ toolCallId: second }).respondToToolApproval({
+      approved: false,
+      reason: 'busy',
+    });
+    await mounted.waitFor(() => expect(lastText(aui)).toContain('Not booked: busy.'));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+
+    // The second resubmit carries the second answer; the first turn keeps its own.
+    expect(sends).toHaveLength(4);
+    expect(toolApprovalOf(sends[3]!, second)).toEqual({ approved: false, reason: 'busy' });
+    expect(toolCallOf(aui, 1)).toMatchObject({ toolCallId: first, approval: { approved: true } });
+    expect(toolCallOf(aui, 3)).toMatchObject({
+      toolCallId: second,
+      approval: { approved: false, reason: 'busy' },
+    });
   });
 
-  it('asks the question again when the same request is sent a second time', async () => {
+  it('answers the same question twice: each turn keeps its own answer', async () => {
     const { aui, mounted, sends } = await mountChat((messages) => {
-      const answer = askUserAnswerOf(messages, 'ask-1');
+      const toolCallId = turnToolCallId(messages, 'ask');
+      const answer = askUserAnswerOf(messages, toolCallId);
       return answer === undefined
-        ? scriptedAskUserTurn({ question: 'Colour?', options: ['Blue', 'Red'] })
+        ? scriptedAskUserTurn({ toolCallId, question: 'Colour?', options: ['Blue', 'Red'] })
         : scriptedTextTurn(`You chose ${String(answer)}.`);
     }, lastAssistantMessageIsCompleteWithToolCalls);
-    const sendText = (text: string) => {
-      aui.thread().composer().setText(text);
-      aui.thread().composer().send();
-    };
 
-    sendText('Ask me');
-    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(2));
+    sendText(aui, 'Ask me');
+    await mounted.waitFor(() => expect(toolCallOf(aui, 1)?.toolName).toBe('askUser'));
     await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
-    aui.thread().message({ index: 1 }).part({ toolCallId: 'ask-1' }).addToolResult('Blue');
+    const first = toolCallOf(aui, 1)!.toolCallId;
+    aui.thread().message({ index: 1 }).part({ toolCallId: first }).addToolResult('Blue');
     await mounted.waitFor(() => expect(lastText(aui)).toContain('You chose Blue.'));
     await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
 
-    sendText('Ask me again');
-    await mounted.waitFor(() => expect(sends).toHaveLength(3));
-    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(4));
+    sendText(aui, 'Ask me again');
+    await mounted.waitFor(() => expect(toolCallOf(aui, 3)?.toolName).toBe('askUser'));
     await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
-    expect(askUserAnswerOf(sends[2]!, 'ask-1')).toBeUndefined();
-    const messages = aui.thread().getState().messages;
-    expect(messages).toHaveLength(4);
-    expect(messages[3]!.content.find((part) => part.type === 'tool-call')).toMatchObject({
-      toolName: 'askUser',
-      args: { question: 'Colour?' },
-    });
+    expect(sends).toHaveLength(3);
+    const second = toolCallOf(aui, 3)!.toolCallId;
+    expect(second).not.toBe(first);
+    expect(askUserAnswerOf(sends[2]!, second)).toBeUndefined();
+
+    aui.thread().message({ index: 3 }).part({ toolCallId: second }).addToolResult('Red');
+    await mounted.waitFor(() => expect(lastText(aui)).toContain('You chose Red.'));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+
+    // The second resubmit carries the second answer; the first turn keeps its own.
+    expect(sends).toHaveLength(4);
+    expect(askUserAnswerOf(sends[3]!, second)).toBe('Red');
+    expect(toolCallOf(aui, 1)).toMatchObject({ toolCallId: first, result: 'Blue' });
+    expect(toolCallOf(aui, 3)).toMatchObject({ toolCallId: second, result: 'Red' });
+  });
+});
+
+describe('turnToolCallId', () => {
+  const user = (id: string) => ({ id, role: 'user', parts: [{ type: 'text', text: 'hi' }] });
+  const assistant = (id: string) => ({ id, role: 'assistant', parts: [] });
+
+  it('derives the id from the last user message, so each turn gets its own', () => {
+    const turn1 = [user('u1'), assistant('a1')] as unknown as UIMessage[];
+    const turn2 = [...turn1, user('u2')] as unknown as UIMessage[];
+    expect(turnToolCallId(turn1, 'ask')).toBe('ask-u1');
+    expect(turnToolCallId(turn2, 'ask')).toBe('ask-u2');
+  });
+
+  it('stays the same across the resubmits of one turn', () => {
+    const sent = [user('u1')] as unknown as UIMessage[];
+    const resubmit = [user('u1'), assistant('a1')] as unknown as UIMessage[];
+    expect(turnToolCallId(resubmit, 'call')).toBe(turnToolCallId(sent, 'call'));
+  });
+
+  it('falls back to the prefix when there is no user message', () => {
+    expect(turnToolCallId([], 'call')).toBe('call');
   });
 });

@@ -75,12 +75,13 @@ export interface ScriptedApprovalCall extends ScriptedTurnOptions {
  * @example
  * ```ts
  * createScriptedChatTransport((messages) => {
- *   const approval = toolApprovalOf(messages, 'call-1');
+ *   const toolCallId = turnToolCallId(messages, 'call-book'); // unique per turn
+ *   const approval = toolApprovalOf(messages, toolCallId);
  *   if (!approval) {
- *     return scriptedApprovalTurn({ toolCallId: 'call-1', toolName: 'bookMeeting', input: { title: 'Sync' } });
+ *     return scriptedApprovalTurn({ toolCallId, toolName: 'bookMeeting', input: { title: 'Sync' } });
  *   }
  *   return approval.approved
- *     ? scriptedToolOutputTurn({ toolCallId: 'call-1', output: { confirmed: true }, text: 'Booked.' })
+ *     ? scriptedToolOutputTurn({ toolCallId, output: { confirmed: true }, text: 'Booked.' })
  *     : scriptedTextTurn('Not booked.');
  * });
  * ```
@@ -151,7 +152,10 @@ export interface ScriptedAskUser extends ScriptedTurnOptions {
   options?: readonly string[];
   /** Whether several options can be picked. */
   multiple?: boolean;
-  /** The tool call id. Default `ask-1`. */
+  /**
+   * The tool call id. Default `ask-1`, which suits a single question; pass
+   * {@link turnToolCallId} when the question can be asked more than once.
+   */
   toolCallId?: string;
   /** The tool name. Default `askUser`, the reference Mastra server's tool. */
   toolName?: string;
@@ -169,9 +173,10 @@ export interface ScriptedAskUser extends ScriptedTurnOptions {
  * @example
  * ```ts
  * createScriptedChatTransport((messages) => {
- *   const answer = askUserAnswerOf(messages, 'ask-1');
+ *   const toolCallId = turnToolCallId(messages, 'ask-city'); // unique per turn
+ *   const answer = askUserAnswerOf(messages, toolCallId);
  *   return answer === undefined
- *     ? scriptedAskUserTurn({ question: 'Which city?', options: ['Paris', 'Rome'] })
+ *     ? scriptedAskUserTurn({ toolCallId, question: 'Which city?', options: ['Paris', 'Rome'] })
  *     : scriptedTextTurn(`Going to ${answer}.`);
  * });
  * ```
@@ -218,15 +223,46 @@ const isToolPart = (part: { type: string }): part is ScriptedToolPart =>
 /**
  * The messages of the current turn: those after the last user message (all
  * of them when there is no user message). A resubmit after an approval or a
- * tool result keeps the same turn; a new user message starts a new one, so a
- * script that reuses fixed tool-call ids does not read an earlier turn's
- * answer as the answer to the new request.
+ * tool result keeps the same turn; a new user message starts a new one, so the
+ * readers never take an earlier turn's answer for the new request. This does
+ * not make fixed ids safe for repeated requests: give each turn its own id with
+ * {@link turnToolCallId}.
  */
 export function currentTurnMessages(messages: readonly UIMessage[]): readonly UIMessage[] {
   for (let index = messages.length - 1; index >= 0; index--) {
     if (messages[index]!.role === 'user') return messages.slice(index + 1);
   }
   return messages;
+}
+
+/**
+ * A tool-call id unique to the current turn: `<prefix>-<id of the last user
+ * message>` (just `prefix` when there is no user message). It stays the same
+ * across the resubmits of one turn, so a script computes it once per send and
+ * uses it for both the call and the reader.
+ *
+ * Use it instead of a fixed id when the same request can be made more than
+ * once: the AI SDK resolves `addToolOutput` and approval responses to the
+ * FIRST message holding the id, so with a fixed id a second answer would
+ * overwrite the first turn's call and leave the new one unanswered.
+ *
+ * @example
+ * ```ts
+ * createScriptedChatTransport((messages) => {
+ *   const toolCallId = turnToolCallId(messages, 'ask-city');
+ *   const answer = askUserAnswerOf(messages, toolCallId);
+ *   return answer === undefined
+ *     ? scriptedAskUserTurn({ toolCallId, question: 'Which city?', options: ['Paris', 'Rome'] })
+ *     : scriptedTextTurn(`Going to ${String(answer)}.`);
+ * });
+ * ```
+ */
+export function turnToolCallId(messages: readonly UIMessage[], prefix: string): string {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!;
+    if (message.role === 'user') return `${prefix}-${message.id}`;
+  }
+  return prefix;
 }
 
 /**

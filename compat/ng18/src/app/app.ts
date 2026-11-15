@@ -26,6 +26,7 @@ import {
   scriptedTextTurn,
   scriptedToolOutputTurn,
   toolApprovalOf,
+  turnToolCallId,
 } from 'angular-assistant-ui/testing';
 import { AuiThreadComponent, AuiThreadListComponent } from 'angular-assistant-ui/ui';
 
@@ -82,27 +83,30 @@ const transport = createScriptedChatTransport((messages) => {
     case 'markdown':
       return scriptedTextTurn('Some **bold** text.\n\n', '```ts\nconst answer = 42;\n```\n');
     case 'book': {
-      const approval = toolApprovalOf(messages, 'call-book');
+      // A fresh id per turn: the AI SDK resolves answers to the first message with the id.
+      const toolCallId = turnToolCallId(messages, 'call-book');
+      const approval = toolApprovalOf(messages, toolCallId);
       if (!approval) {
         return scriptedApprovalTurn({
-          toolCallId: 'call-book',
+          toolCallId,
           toolName: 'bookMeeting',
           input: { title: 'Sync', when: 'Monday 10am' },
         });
       }
       return approval.approved
         ? scriptedToolOutputTurn({
-            toolCallId: 'call-book',
+            toolCallId,
             output: { confirmed: true },
             text: 'Booked.',
           })
         : scriptedTextTurn('Not booked.');
     }
     case 'ask': {
-      const answer = askUserAnswerOf(messages, 'ask-city');
+      const toolCallId = turnToolCallId(messages, 'ask-city');
+      const answer = askUserAnswerOf(messages, toolCallId);
       return answer === undefined
         ? scriptedAskUserTurn({
-            toolCallId: 'ask-city',
+            toolCallId,
             question: 'Which city?',
             options: ['Paris', 'Rome'],
           })

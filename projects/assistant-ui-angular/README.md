@@ -269,8 +269,13 @@ From `angular-assistant-ui/testing` (needs the `ai` package):
   for approval), `scriptedToolOutputTurn` (the continuation after an answer) and
   `scriptedAskUserTurn` (an `askUser` client tool call). `toolApprovalOf`, `askUserAnswerOf` and
   `findToolPart` read the user's answer from the messages a resubmit sends. They look only at the
-  current turn (`currentTurnMessages`: the messages after the last user message), so a repeated
-  request with the same fixed tool-call id asks again instead of reusing an earlier answer.
+  current turn (`currentTurnMessages`: the messages after the last user message), so they never
+  take an earlier turn's answer for a new request.
+- `turnToolCallId(messages, prefix)`: a tool-call id unique to the current turn (`<prefix>-<last
+  user message id>`), stable across that turn's resubmits. Use it for any call the user can trigger
+  more than once instead of a fixed id. The AI SDK resolves a tool output or approval response to the
+  **first** message holding the call id, so with a fixed id a second answer overwrites the first
+  turn's call and the new call stays unanswered.
 - `createScriptedAttachmentAdapter(options)` and `scriptedFile(name, content)`: an offline
   attachment adapter (deterministic ids, scripted rejections, upload progress and failed sends) and
   test files.

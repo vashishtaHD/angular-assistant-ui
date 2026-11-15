@@ -28,6 +28,7 @@ export {
   scriptedTextTurn,
   scriptedToolOutputTurn,
   toolApprovalOf,
+  turnToolCallId,
   type ScriptedApprovalCall,
   type ScriptedAskUser,
   type ScriptedToolOutput,

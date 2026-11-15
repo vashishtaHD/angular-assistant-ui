@@ -187,7 +187,8 @@ test('approving a tool call renders the receipt', async ({ page }) => {
   await expect(approve).toBeVisible({ timeout: 10_000 });
   await approve.click();
 
-  const receipt = page.locator('[data-slot="aui_tool-fallback-approval-receipt"]');
+  const receiptSlot = '[data-slot="aui_tool-fallback-approval-receipt"]';
+  const receipt = page.locator(receiptSlot).first();
   await expect(receipt).toHaveAttribute('data-outcome', 'allowed', { timeout: 5_000 });
   await expect(receipt).toContainText('Approved');
   // The answer resubmits automatically and the scripted continuation arrives.
@@ -201,6 +202,19 @@ test('approving a tool call renders the receipt', async ({ page }) => {
     { timeout: 10_000 },
   );
   await expect(assistantMessages(page).last()).not.toContainText('Booked.');
+
+  // Denying the second call answers that call only; the first turn keeps its approval.
+  await assistantMessages(page).last().getByRole('button', { name: 'Deny' }).click();
+  await expect(assistantMessages(page).last()).toContainText('Not booked.', { timeout: 5_000 });
+  await expect(assistantMessages(page).last().locator(receiptSlot)).toHaveAttribute(
+    'data-outcome',
+    'refused',
+  );
+  await expect(assistantMessages(page).first()).toContainText('Booked.');
+  await expect(assistantMessages(page).first().locator(receiptSlot)).toHaveAttribute(
+    'data-outcome',
+    'allowed',
+  );
 
   expect(errors).toEqual([]);
 });
@@ -227,6 +241,16 @@ test('answering an ask-user question resubmits the choice', async ({ page }) => 
     assistantMessages(page).last().locator('[data-slot="aui_tool-fallback-ask-user"]'),
   ).toContainText('Which city?', { timeout: 10_000 });
   await expect(assistantMessages(page).last()).not.toContainText('You picked');
+
+  // Answering the second question resubmits that answer; the first turn keeps its own.
+  const second = assistantMessages(page).last().locator('[data-slot="aui_tool-fallback-ask-user"]');
+  await second.getByRole('radio', { name: 'Rome' }).check();
+  await second.getByRole('button', { name: 'Submit' }).click();
+  await expect(assistantMessages(page).last()).toContainText('You picked Rome.', {
+    timeout: 5_000,
+  });
+  await expect(assistantMessages(page).first()).toContainText('You picked Paris.');
+  await expect(form).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });
