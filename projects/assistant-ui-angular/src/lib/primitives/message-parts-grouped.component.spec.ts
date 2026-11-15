@@ -278,6 +278,34 @@ class EmptyScopedTextHostComponent {
   readonly config = hostConfig;
 }
 
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadMessagesComponent,
+    AuiMessageTemplateDirective,
+    AuiMessageGroupedPartsComponent,
+    AuiPartTemplateDirective,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <ng-container [auiProvider]="config">
+      <aui-thread-messages>
+        <ng-template auiMessage>
+          <aui-message-parts-grouped>
+            <ng-template auiPart="text" let-part
+              ><input class="note" /><b class="status">{{ part.status.type }}</b></ng-template
+            >
+          </aui-message-parts-grouped>
+        </ng-template>
+      </aui-thread-messages>
+    </ng-container>
+  `,
+})
+class EmptyInputTextHostComponent {
+  readonly config = hostConfig;
+}
+
 const mountEmpty = async (
   host: new () => unknown,
   running: boolean,
@@ -396,6 +424,46 @@ describe('MessagePrimitive.Unstable_PartsGrouped empty message', () => {
       expect(scoped.el.querySelector('aui-part-text.scoped')?.getAttribute('data-status')).toBe(
         'complete',
       );
+    }
+  });
+
+  it('keeps the empty text template view (focus and typed value) when the run ends', async () => {
+    const ends = [
+      { type: 'incomplete', reason: 'cancelled' },
+      { type: 'complete', reason: 'stop' },
+    ] as const;
+    for (const status of ends) {
+      TestBed.resetTestingModule();
+      const rt = createTestRuntime();
+      rt.append({ id: 'a1', role: 'assistant', content: [] });
+      rt.setRunning(true);
+      hostConfig = rt.config;
+      configureTestBed({ imports: [EmptyInputTextHostComponent] });
+      const fixture = TestBed.createComponent(EmptyInputTextHostComponent);
+      document.body.appendChild(fixture.nativeElement);
+      try {
+        fixture.detectChanges();
+        await settle(fixture);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('.status')?.textContent).toBe('running');
+        const input = el.querySelector<HTMLInputElement>('input.note')!;
+        input.focus();
+        input.value = 'draft note';
+        expect(document.activeElement).toBe(input);
+
+        flushTapSync(() => {
+          rt.setMessages([{ id: 'a1', role: 'assistant', content: [], status }]);
+          rt.setRunning(false);
+        });
+        await settle(fixture);
+        expect(el.querySelector('.status')?.textContent, status.type).toBe(status.type);
+        // The same input element, still focused and holding what was typed.
+        expect(el.querySelector('input.note'), status.type).toBe(input);
+        expect(document.activeElement, status.type).toBe(input);
+        expect(input.value, status.type).toBe('draft note');
+      } finally {
+        fixture.nativeElement.remove();
+      }
     }
   });
 });

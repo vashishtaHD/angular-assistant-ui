@@ -23,7 +23,7 @@ import {
 import { getMessagePartKeys } from '@assistant-ui/core/internal';
 import type { AuiConfig } from '@assistant-ui/store/client';
 import { partScopeConfig } from '../scope/part-scope';
-import { textPartScopeConfig } from '../scope/text-part-scope';
+import { emptyMessagePartScopeConfig } from '../scope/text-part-scope';
 import { AuiScopeOutletComponent } from '../scope/scope-outlet.component';
 import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
@@ -305,11 +305,7 @@ const shouldShowIndicator = (
             </p>
           }
         </ng-template>
-        @if (emptyRunning()) {
-          <aui-scope-outlet [config]="emptyRunningScope" [template]="emptyBody" />
-        } @else {
-          <aui-scope-outlet [config]="emptySettledScope" [template]="emptyBody" />
-        }
+        <aui-scope-outlet [config]="emptyScope" [template]="emptyBody" />
       }
     }
     @if (showIndicator()) {
@@ -383,15 +379,14 @@ export class AuiMessageGroupedPartsComponent implements OnInit {
     $implicit: this.messageStatus(),
   }));
   protected readonly emptyTextTemplate = computed(() => this.partTemplates().get('text'));
-  protected readonly emptyRunning = computed(() => this.messageStatus().type === 'running');
   /**
-   * Static empty text parts, running and settled, like TextMessagePartProvider. Each has its own
-   * outlet (`@if` / `@else`), so the outlet is remounted when the run ends rather than updated in
-   * place: that update arrives in the same store notification as the message's own status change,
-   * and the child scope kept serving the running part.
+   * The empty text part, running or complete after the message, like upstream's
+   * TextMessagePartProvider. One config for the component's life: its part reads the message
+   * status when the scope renders, so the outlet keeps its view (focus, input and child state)
+   * when the run ends. Passing the running flag through a new config instead lost the update,
+   * because it arrived in the same store notification as the message's own status change.
    */
-  protected readonly emptyRunningScope = textPartScopeConfig('', true);
-  protected readonly emptySettledScope = textPartScopeConfig('', false);
+  protected readonly emptyScope = emptyMessagePartScopeConfig();
   /** True for a message with no parts in `groupingFunction` / parent-id mode. */
   protected readonly showEmpty = computed(
     () => this.groupBy() === undefined && this.parts().length === 0,
