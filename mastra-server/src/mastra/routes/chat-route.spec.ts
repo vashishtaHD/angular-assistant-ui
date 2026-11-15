@@ -629,6 +629,36 @@ describe('remote URLs in message parts (SSRF)', () => {
     }
   });
 
+  it('answers 400 for text and file parts missing required fields, nested or top level', async () => {
+    const malformed: unknown[] = [
+      { type: 'text' },
+      { type: 'text', text: null },
+      { type: 'text', text: 42 },
+      { type: 'file', url: 'data:text/plain;base64,aGk=' },
+      { type: 'file', url: 'data:text/plain;base64,aGk=', mediaType: 42 },
+      { type: 'file', url: 'data:text/plain;base64,aGk=', mediaType: 'text/plain', filename: 7 },
+    ];
+    for (const bad of malformed) {
+      const bodies = [
+        [
+          { type: 'steering-message', id: 's', parts: [bad] },
+          { type: 'text', text: 'hi' },
+        ],
+        [bad, { type: 'text', text: 'hi' }],
+      ];
+      for (const parts of bodies) {
+        const label = JSON.stringify(parts);
+        const { res, fetched, t } = await postRecordingFetch({
+          messages: [{ id: 'u', role: 'user', parts }],
+          memory: { thread: 't' },
+        });
+        expect(res.status, label).toBe(400);
+        expect(fetched, label).toEqual([]);
+        expect(t.sm.calls(), label).toHaveLength(0);
+      }
+    }
+  });
+
   it('accepts the nested text and inline file parts a steering message may carry', async () => {
     const { res, fetched } = await postRecordingFetch({
       messages: [

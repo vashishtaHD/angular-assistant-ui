@@ -28,20 +28,34 @@ const PART_TYPES = new Set([
 const isKnownPartType = (type: string) =>
   PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type);
 
+/** AI SDK `TextUIPart` and `FileUIPart` required fields, checked wherever such a part appears. */
+const textPart = z.looseObject({ type: z.literal('text'), text: z.string() });
+const filePart = z.looseObject({
+  type: z.literal('file'),
+  mediaType: z.string(),
+  url: z.string(),
+  filename: z.string().optional(),
+});
+const PART_FIELDS: Partial<Record<string, z.ZodType>> = { text: textPart, file: filePart };
+
 /** What a `steering-message` part may carry: AI SDK's `Array<TextUIPart | FileUIPart>`. */
-const steeringParts = z.array(z.looseObject({ type: z.enum(['text', 'file']) }));
+const steeringParts = z.array(z.discriminatedUnion('type', [textPart, filePart]));
 
 const part = z
   .looseObject({
     type: z.string().refine(isKnownPartType, { message: 'Unsupported message part type' }),
   })
   .superRefine((value, ctx) => {
+    const forward = (issues: readonly z.core.$ZodIssue[], prefix: PropertyKey[] = []) => {
+      for (const issue of issues) {
+        ctx.addIssue({ code: 'custom', message: issue.message, path: [...prefix, ...issue.path] });
+      }
+    };
+    const fields = PART_FIELDS[value.type]?.safeParse(value);
+    if (fields && !fields.success) forward(fields.error.issues);
     if (value.type !== 'steering-message') return;
     const nested = steeringParts.safeParse(value['parts']);
-    if (nested.success) return;
-    for (const issue of nested.error.issues) {
-      ctx.addIssue({ code: 'custom', message: issue.message, path: ['parts', ...issue.path] });
-    }
+    if (!nested.success) forward(nested.error.issues, ['parts']);
   });
 
 /**

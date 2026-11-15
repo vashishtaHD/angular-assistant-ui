@@ -144,17 +144,28 @@ const PART_TYPES = new Set([
 /**
  * The server's part checks: known UI part types only, and `file`/`reasoning-file` parts carry an
  * inline `data:` URL (never a remote URL the server would download) and no provider reference.
+ * Text and file parts need their required fields, and a `steering-message` carries only those.
  */
-const unsafePart = (parts: unknown[]): string | undefined => {
+const unsafePart = (parts: unknown[], nested = false): string | undefined => {
   for (const part of parts) {
     const type = isRecord(part) ? part['type'] : undefined;
     if (
       typeof type !== 'string' ||
-      !(PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type))
+      !(PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type)) ||
+      (nested && type !== 'text' && type !== 'file')
     ) {
       return 'Unsupported message part type';
     }
     const record = part as Record<string, unknown>;
+    // The AI SDK `TextUIPart` / `FileUIPart` required fields, at any depth.
+    if (type === 'text' && typeof record['text'] !== 'string') return 'Text parts need text';
+    if (
+      type === 'file' &&
+      (typeof record['mediaType'] !== 'string' ||
+        (record['filename'] !== undefined && typeof record['filename'] !== 'string'))
+    ) {
+      return 'File parts need a mediaType';
+    }
     if (type === 'file' || type === 'reasoning-file') {
       if (record['providerReference'] !== undefined) {
         return 'File provider references are not accepted';
@@ -164,7 +175,7 @@ const unsafePart = (parts: unknown[]): string | undefined => {
       }
     } else if (type === 'steering-message') {
       const nested = Array.isArray(record['parts'])
-        ? unsafePart(record['parts'])
+        ? unsafePart(record['parts'], true)
         : 'Steering messages need parts';
       if (nested) return nested;
     }

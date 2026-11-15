@@ -176,6 +176,34 @@ describe('createMockMastraServer', () => {
     ).toBe(400);
   });
 
+  it('rejects malformed text, file and steering-message parts like the server', async () => {
+    const { chat } = setup();
+    const send = (parts: unknown[]) =>
+      chat({ messages: [{ id: 'u1', role: 'user', parts }], memory: { thread: 't1' } });
+    const file = 'data:text/plain;base64,aGk=';
+    const malformed: unknown[] = [
+      { type: 'text' },
+      { type: 'text', text: 42 },
+      { type: 'file', url: file },
+      { type: 'file', url: file, mediaType: 42 },
+      { type: 'file', url: file, mediaType: 'text/plain', filename: 7 },
+    ];
+    for (const bad of malformed) {
+      for (const parts of [[bad], [{ type: 'steering-message', id: 's', parts: [bad] }]]) {
+        expect((await send(parts)).status, JSON.stringify(parts)).toBe(400);
+      }
+    }
+    for (const nested of [[null], [{ type: 'reasoning', text: 'x' }]]) {
+      const parts = [{ type: 'steering-message', id: 's', parts: nested }];
+      expect((await send(parts)).status, JSON.stringify(parts)).toBe(400);
+    }
+    const ok = [
+      { type: 'text', text: 'also' },
+      { type: 'file', url: file, mediaType: 'text/plain' },
+    ];
+    expect((await send([{ type: 'steering-message', id: 's', parts: ok }])).status).toBe(200);
+  });
+
   it('rejects an assistant id that belongs to another thread with 409', async () => {
     const { server, chat } = setup();
     server.seedThread({ id: 't1' }, [user('u1'), { id: 'a1', role: 'assistant', parts: [] }]);
