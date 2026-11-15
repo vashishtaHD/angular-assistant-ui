@@ -38,6 +38,13 @@ export interface AuiMenuSetOpenOptions {
  * markup should not exist. Pointer-down outside the trigger and the content
  * closes the menu. Supports `[(open)]` two-way binding.
  *
+ * The menu is always non-modal; there is no `modal` option. Upstream's
+ * Radix-based dropdown defaults to modal (it blocks pointer events and
+ * scrolling outside and hides the rest of the page from assistive technology
+ * while open); this menu leaves the page interactive, does not lock scrolling
+ * and does not trap focus. Add those in the caller (for example an overlay
+ * with a backdrop) when a modal menu is needed.
+ *
  * @example
  * ```html
  * <div auiMenuRoot #menu="auiMenuRoot">

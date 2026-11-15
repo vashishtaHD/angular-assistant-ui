@@ -17,8 +17,10 @@ import { AuiActionButtonHostDirective, injectActionButton } from '../action-butt
 
 /**
  * The root of a branch picker inside a message scope. With
- * `hideWhenSingleBranch` the `hidden` attribute is set unless the message has
- * two or more branches.
+ * `hideWhenSingleBranch` it hides itself unless the message has two or more
+ * branches, with the `hidden` attribute plus a host `display: none` style
+ * binding, so class-based author CSS such as `.flex` cannot show it (it stays
+ * in the DOM, where upstream unmounts it).
  */
 @Directive({
   selector: '[auiBranchPickerRoot]',
