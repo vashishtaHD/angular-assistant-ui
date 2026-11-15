@@ -133,7 +133,12 @@ Authorization is default deny. An authenticated caller reaches only:
 
 For an authenticated caller, everything else, including Mastra's stock `/api/agents/*` execution
 endpoints, tool execution, workflows and raw message writes, answers 403. A request without valid
-credentials answers 401 on every route instead. To expose more, extend `isAllowedRoute` in
+credentials answers 401 instead. Mastra itself keeps a few framework routes public: `GET /health`,
+OAuth/auth discovery (`/.well-known/oauth-protected-resource`, `/api/auth/capabilities`,
+`/api/auth/me`, which answers `null` without a session) and its sign-in, SSO, refresh and logout
+routes, which answer 400/404 because this server configures none of those flows. None runs an
+agent or reads stored data. `security.spec.ts` walks every mounted route and fails on any other
+route that answers without auth. To expose more, extend `isAllowedRoute` in
 `mastra-server/src/mastra/auth.ts` and add a test.
 
 Another user's thread is always refused, but not always with the same status. The chat routes check in

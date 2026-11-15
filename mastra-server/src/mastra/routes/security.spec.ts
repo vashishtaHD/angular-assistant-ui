@@ -85,6 +85,94 @@ describe('stock Mastra endpoints are locked down', () => {
   });
 });
 
+describe('every mounted route', () => {
+  const body = JSON.stringify({ messages: [userMessage('u1', 'hi')], memory: { thread: 'walk' } });
+
+  /** The routes the app may serve to an authenticated caller (see `isAllowedRoute`). */
+  const ALLOWED = new Set([
+    'POST /chat/:agentId',
+    'GET /chat/:agentId/threads/:threadId/messages',
+    'GET /api/memory/threads',
+    'POST /api/memory/threads',
+    'GET /api/memory/threads/:threadId',
+    'PATCH /api/memory/threads/:threadId',
+    'DELETE /api/memory/threads/:threadId',
+  ]);
+
+  /** Every concrete method/path pair the Hono app registered (middleware excluded). */
+  const mountedRoutes = async () => {
+    const t = await createTestServer();
+    const seen = new Set<string>();
+    for (const route of t.app.routes) {
+      if (route.method === 'ALL' || route.path.includes('*')) continue;
+      seen.add(`${route.method} ${route.path}`);
+    }
+    return { t, routes: [...seen].sort() };
+  };
+
+  const concrete = (path: string) =>
+    path.replace(/:([A-Za-z0-9_]+)(\{[^}]*\})?\??/g, (_, name: string) =>
+      name === 'agentId' ? 'chatAgent' : `probe-${name}`,
+    );
+
+  it('mounts many stock routes and every allowed route', async () => {
+    const { routes } = await mountedRoutes();
+    expect(routes.length).toBeGreaterThan(50);
+    for (const allowed of ALLOWED) expect(routes).toContain(allowed);
+  });
+
+  /**
+   * Mastra framework routes that skip auth by design. None runs an agent, a tool or a workflow, or
+   * reads stored data: a health check, auth discovery (`me` answers `null` without a session) and
+   * login/session flows that answer 400/404 because this app configures no credentials, SSO or
+   * sessions. A new public route fails the walks below until it is reviewed and listed here.
+   */
+  const FRAMEWORK_PUBLIC: Record<string, number[]> = {
+    'GET /health': [200],
+    'GET /.well-known/oauth-protected-resource': [200],
+    'GET /.well-known/oauth-protected-resource/api/mcp': [200],
+    'GET /api/auth/capabilities': [200],
+    'GET /api/auth/me': [200],
+    'GET /api/auth/sso/callback': [400],
+    'GET /api/auth/sso/login': [404],
+    'POST /api/auth/credentials/sign-in': [400, 404],
+    'POST /api/auth/credentials/sign-up': [400, 404],
+    'POST /api/auth/logout': [404],
+    'POST /api/auth/refresh': [404],
+  };
+
+  /** Requests every route (but OPTIONS/HEAD) and lists those whose status is not `expected`. */
+  const walk = async (headers: Record<string, string>, expected: number, skipAllowed: boolean) => {
+    const { t, routes } = await mountedRoutes();
+    const unexpected: string[] = [];
+    for (const route of routes) {
+      if (skipAllowed && ALLOWED.has(route)) continue;
+      const [method, path] = route.split(' ') as [string, string];
+      if (method === 'OPTIONS' || method === 'HEAD') continue;
+      const res = await t.request(concrete(path), {
+        method,
+        headers: { ...json, ...headers },
+        ...(method !== 'GET' && method !== 'DELETE' && { body }),
+      });
+      const accepted = FRAMEWORK_PUBLIC[route] ?? [expected];
+      if (!accepted.includes(res.status)) unexpected.push(`${route} -> ${res.status}`);
+    }
+    return { t, unexpected };
+  };
+
+  it('answers 403 to an authenticated caller on every route outside the allow-list', async () => {
+    const { t, unexpected } = await walk(A, 403, true);
+    expect(unexpected).toEqual([]);
+    expect(t.sm.calls()).toHaveLength(0);
+  }, 60000);
+
+  it('answers 401 without credentials on every route, including the allowed ones', async () => {
+    const { t, unexpected } = await walk({}, 401, false);
+    expect(unexpected).toEqual([]);
+    expect(t.sm.calls()).toHaveLength(0);
+  }, 60000);
+});
+
 describe('client message ids cannot touch another user', () => {
   it('a user message id reused by another user does not overwrite the original', async () => {
     const t = await createTestServer();
