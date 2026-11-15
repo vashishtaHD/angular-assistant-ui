@@ -21,7 +21,8 @@ const doc = (rows, header = '| React export | Vue has it | Angular status | Task
     '### Thread',
     '',
     header,
-    '| --- | --- | --- | --- |',
+    // The delimiter row has one column per header cell, as GFM requires.
+    `|${' --- |'.repeat(header.split('|').length - 2)}`,
     ...rows,
     '',
     '## Porting the next primitive',
@@ -82,6 +83,87 @@ test('ignores tables outside the parity section', () => {
 test('fails when the parity table has no rows', () => {
   const result = checkParity('# Porting notes\n\n## Parity table\n\nNothing here.\n');
   assert.equal(result.errors.length, 1);
+});
+
+test('an escaped pipe does not shift the status column', () => {
+  const result = checkParity(
+    doc(['| Good | yes | ported | 1 |', '| Foo | yes \\| ported | planned | 20 |']),
+  );
+  assert.equal(result.rows, 2);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /Foo/);
+  assert.match(result.errors[0], /planned/);
+});
+
+test('a row without a leading pipe is still a row of the table', () => {
+  const result = checkParity(doc(['| Good | yes | ported | 1 |', 'Foo | yes | planned | 20']));
+  assert.equal(result.rows, 2);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /Foo/);
+});
+
+test('a table written entirely without outer pipes is checked', () => {
+  const markdown = [
+    '## Parity table',
+    '',
+    'React export | Vue has it | Angular status | Task',
+    '--- | --- | --- | ---',
+    'Foo | yes | planned (Task 2) | Task 2',
+    '',
+  ].join('\n');
+  const result = checkParity(markdown);
+  assert.equal(result.rows, 1);
+  assert.equal(result.errors.length, 1);
+});
+
+test('n/a needs a non-blank reason', () => {
+  const result = checkParity(
+    doc(['| A | no | n/a ( ) |  |', '| B | no | n/a () |  |', '| C | no | n/a (voice) |  |']),
+  );
+  assert.equal(result.errors.length, 2);
+  assert.match(result.errors[0], /"A"/);
+  assert.match(result.errors[1], /"B"/);
+});
+
+test('a row with a missing status cell fails', () => {
+  const result = checkParity(doc(['| A | yes |']));
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /no status/);
+});
+
+test('an HTML table in the parity section is rejected as unsupported', () => {
+  const markdown = [
+    '## Parity table',
+    '',
+    '<table><tr><td>Foo</td><td>planned</td></tr></table>',
+    '',
+    '| React export | Vue has it | Angular status | Task |',
+    '| --- | --- | --- | --- |',
+    '| A | yes | ported |  |',
+    '',
+  ].join('\n');
+  const result = checkParity(markdown);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /HTML/);
+});
+
+test('pipe rows that do not parse as a table are rejected', () => {
+  const markdown = [
+    '## Parity table',
+    '',
+    '| React export | Vue has it | Angular status | Task |',
+    '| --- | --- |',
+    '| Foo | yes | planned | 20 |',
+    '',
+  ].join('\n');
+  const result = checkParity(markdown);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /not a valid table/);
+});
+
+test('a planned status hidden in inline markup is still found', () => {
+  const result = checkParity(doc(['| A | yes | **planned** |  |', '| B | yes | `ported` |  |']));
+  assert.equal(result.errors.length, 2);
 });
 
 test('the CLI exits non-zero on a planned row and zero on a clean file', () => {

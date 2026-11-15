@@ -1,0 +1,248 @@
+import { AISDKChat } from '@assistant-ui/ai-sdk';
+import { AuiConfig, type AssistantClient } from '@assistant-ui/store/client';
+import {
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type ChatInit,
+  type UIMessage,
+} from 'ai';
+import { afterEach, describe, expect, it } from 'vitest';
+import { mountAui, type MountedAui } from '../../src/testing-internal/mastra-host';
+import { createScriptedChatTransport, type ScriptedTurn } from './scripted-chat-transport';
+import {
+  askUserAnswerOf,
+  findToolPart,
+  scriptedApprovalTurn,
+  scriptedAskUserTurn,
+  scriptedTextTurn,
+  scriptedToolOutputTurn,
+  toolApprovalOf,
+} from './scripted-scenarios';
+
+let mounted: MountedAui | undefined;
+afterEach(() => {
+  mounted?.destroy();
+  mounted = undefined;
+});
+
+const chunksOf = (turn: ScriptedTurn) => ('chunks' in turn ? turn.chunks : []);
+
+const lastText = (aui: AssistantClient): string => {
+  const messages = aui.thread().getState().messages;
+  return (messages.at(-1)?.content ?? [])
+    .map((part) => (part.type === 'text' ? part.text : ''))
+    .join('');
+};
+
+async function mountChat(
+  script: (messages: UIMessage[]) => ScriptedTurn,
+  sendAutomaticallyWhen?: ChatInit<UIMessage>['sendAutomaticallyWhen'],
+) {
+  const sends: UIMessage[][] = [];
+  const transport = createScriptedChatTransport((messages) => {
+    sends.push(structuredClone(messages));
+    return script(messages);
+  });
+  mounted = await mountAui(() =>
+    AuiConfig({
+      threads: AISDKChat({ transport, ...(sendAutomaticallyWhen && { sendAutomaticallyWhen }) }),
+    }),
+  );
+  return { aui: mounted.aui, mounted, sends };
+}
+
+describe('scriptedTextTurn', () => {
+  it('streams the deltas as one text part between start and finish', () => {
+    expect(chunksOf(scriptedTextTurn('Hi ', 'there!'))).toEqual([
+      { type: 'start' },
+      { type: 'start-step' },
+      { type: 'text-start', id: 'text-1' },
+      { type: 'text-delta', id: 'text-1', delta: 'Hi ' },
+      { type: 'text-delta', id: 'text-1', delta: 'there!' },
+      { type: 'text-end', id: 'text-1' },
+      { type: 'finish-step' },
+      { type: 'finish' },
+    ]);
+  });
+
+  it('takes a delay from the options object form', () => {
+    const turn = scriptedTextTurn({ text: 'slow', delayMs: 25 });
+    expect(turn).toMatchObject({ delayMs: 25 });
+    expect(chunksOf(turn)).toContainEqual({ type: 'text-delta', id: 'text-1', delta: 'slow' });
+  });
+});
+
+describe('scriptedApprovalTurn and toolApprovalOf', () => {
+  it('emits the tool input and an approval request for it', () => {
+    const turn = scriptedApprovalTurn({
+      toolCallId: 'call-1',
+      toolName: 'bookMeeting',
+      input: { title: 'Sync' },
+    });
+    expect(chunksOf(turn)).toEqual([
+      { type: 'start' },
+      { type: 'start-step' },
+      {
+        type: 'tool-input-available',
+        toolCallId: 'call-1',
+        toolName: 'bookMeeting',
+        input: { title: 'Sync' },
+      },
+      { type: 'tool-approval-request', approvalId: 'approval-call-1', toolCallId: 'call-1' },
+      { type: 'finish-step' },
+      { type: 'finish', finishReason: 'tool-calls' },
+    ]);
+  });
+
+  it('drives a full approve, resubmit and continuation through AISDKChat', async () => {
+    const { aui, mounted, sends } = await mountChat((messages) => {
+      const approval = toolApprovalOf(messages, 'call-1');
+      if (!approval) {
+        return scriptedApprovalTurn({
+          toolCallId: 'call-1',
+          toolName: 'bookMeeting',
+          input: { title: 'Sync', when: 'Monday' },
+        });
+      }
+      return approval.approved
+        ? scriptedToolOutputTurn({
+            toolCallId: 'call-1',
+            output: { confirmed: true },
+            text: 'Booked.',
+          })
+        : scriptedTextTurn('Not booked.');
+    }, lastAssistantMessageIsCompleteWithApprovalResponses);
+
+    aui.thread().composer().setText('Book a sync');
+    aui.thread().composer().send();
+    const part = () => aui.thread().message({ index: 1 }).part({ toolCallId: 'call-1' });
+    await mounted.waitFor(() =>
+      expect(part().getState()).toMatchObject({ type: 'tool-call', toolName: 'bookMeeting' }),
+    );
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    expect(toolApprovalOf(sends[0]!, 'call-1')).toBeUndefined();
+
+    await part().respondToToolApproval({ approved: true, reason: 'fine' });
+
+    await mounted.waitFor(() => expect(sends).toHaveLength(2));
+    expect(toolApprovalOf(sends[1]!, 'call-1')).toEqual({ approved: true, reason: 'fine' });
+    expect(findToolPart(sends[1]!, 'call-1')).toMatchObject({ state: 'approval-responded' });
+    await mounted.waitFor(() => expect(lastText(aui)).toContain('Booked.'));
+    await mounted.waitFor(() =>
+      expect(part().getState()).toMatchObject({ result: { confirmed: true } }),
+    );
+  });
+
+  it('reports a denial with its reason', async () => {
+    const { aui, mounted, sends } = await mountChat(
+      (messages) =>
+        toolApprovalOf(messages, 'call-2')
+          ? scriptedTextTurn('Not booked.')
+          : scriptedApprovalTurn({ toolCallId: 'call-2', toolName: 'bookMeeting', input: {} }),
+      lastAssistantMessageIsCompleteWithApprovalResponses,
+    );
+    aui.thread().composer().setText('Book');
+    aui.thread().composer().send();
+    const part = () => aui.thread().message({ index: 1 }).part({ toolCallId: 'call-2' });
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    await mounted.waitFor(() => expect(part().getState()).toMatchObject({ type: 'tool-call' }));
+
+    await part().respondToToolApproval({ approved: false, reason: 'busy' });
+
+    await mounted.waitFor(() => expect(sends).toHaveLength(2));
+    expect(toolApprovalOf(sends[1]!, 'call-2')).toEqual({ approved: false, reason: 'busy' });
+  });
+});
+
+describe('scriptedAskUserTurn and askUserAnswerOf', () => {
+  it('emits an askUser call without output', () => {
+    expect(
+      chunksOf(scriptedAskUserTurn({ question: 'Colour?', options: ['Blue', 'Red'] })),
+    ).toEqual([
+      { type: 'start' },
+      { type: 'start-step' },
+      {
+        type: 'tool-input-available',
+        toolCallId: 'ask-1',
+        toolName: 'askUser',
+        input: { question: 'Colour?', options: ['Blue', 'Red'] },
+      },
+      { type: 'finish-step' },
+      { type: 'finish', finishReason: 'tool-calls' },
+    ]);
+  });
+
+  it('passes multiple, a custom tool name and call id through', () => {
+    const [, , call] = chunksOf(
+      scriptedAskUserTurn({
+        toolCallId: 'q-9',
+        toolName: 'clarify',
+        question: 'Which?',
+        options: ['a', 'b'],
+        multiple: true,
+      }),
+    );
+    expect(call).toEqual({
+      type: 'tool-input-available',
+      toolCallId: 'q-9',
+      toolName: 'clarify',
+      input: { question: 'Which?', options: ['a', 'b'], multiple: true },
+    });
+  });
+
+  it('round-trips the answer through addToolResult and the resubmit', async () => {
+    const { aui, mounted, sends } = await mountChat((messages) => {
+      const answer = askUserAnswerOf(messages, 'ask-1');
+      return answer === undefined
+        ? scriptedAskUserTurn({ question: 'Colour?', options: ['Blue', 'Red'] })
+        : scriptedTextTurn(`You chose ${JSON.stringify(answer)}.`);
+    }, lastAssistantMessageIsCompleteWithToolCalls);
+
+    aui.thread().composer().setText('Ask me');
+    aui.thread().composer().send();
+    const part = () => aui.thread().message({ index: 1 }).part({ toolCallId: 'ask-1' });
+    await mounted.waitFor(() =>
+      expect(part().getState()).toMatchObject({
+        toolName: 'askUser',
+        args: { question: 'Colour?', options: ['Blue', 'Red'] },
+      }),
+    );
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    expect(askUserAnswerOf(sends[0]!, 'ask-1')).toBeUndefined();
+
+    part().addToolResult('Blue');
+
+    await mounted.waitFor(() => expect(sends).toHaveLength(2));
+    expect(askUserAnswerOf(sends[1]!, 'ask-1')).toBe('Blue');
+    await mounted.waitFor(() => expect(lastText(aui)).toContain('You chose "Blue".'));
+  });
+});
+
+describe('findToolPart', () => {
+  it('finds static and dynamic tool parts by call id, latest message first', () => {
+    const messages = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [{ type: 'tool-x', toolCallId: 'c1', state: 'input-available', input: {} }],
+      },
+      {
+        id: 'a2',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'y',
+            toolCallId: 'c2',
+            state: 'output-available',
+            input: {},
+            output: 1,
+          },
+        ],
+      },
+    ] as unknown as UIMessage[];
+    expect(findToolPart(messages, 'c1')).toMatchObject({ type: 'tool-x' });
+    expect(findToolPart(messages, 'c2')).toMatchObject({ type: 'dynamic-tool', output: 1 });
+    expect(findToolPart(messages, 'nope')).toBeUndefined();
+  });
+});

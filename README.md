@@ -55,8 +55,9 @@ Ask "What's the weather in Paris?" to see the `getWeather` tool call rendered by
 demo's weather card, followed by the streamed answer. This flow has been verified end to
 end with Angular 18.2 and Zone.js, the Mastra `chatRoute` (v7) and an OpenRouter model.
 
-The demo reads the chat endpoint from `projects/demo/public/config.json`
-(`mastraChatUrl`, default `http://localhost:4111/chat/chatAgent`) at startup. Its
+The demo reads its server from `projects/demo/public/config.json` at startup: `mastraUrl`
+(default `http://localhost:4111`), `agentId` (default `chatAgent`) and an optional `authToken`
+for the server's `jwt` mode (see [docs/deployment.md](docs/deployment.md)). Its
 initial bundle is about 771 kB because `@assistant-ui/ai-sdk` brings in React and the AI
 SDK; the build budgets are set accordingly.
 

@@ -34,9 +34,9 @@ tools: `getWeather` (runs on the server), `bookMeeting` (`requireApproval: true`
 ## Wiring the Angular app
 
 ```ts
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { AuiConfig, AuiProviderDirective } from 'angular-assistant-ui';
 import {
-  MASTRA_AUTH,
   MastraThreads,
   createMastraTransport,
   mastraThreadListAdapter,
@@ -49,9 +49,10 @@ const api = 'http://localhost:4111';
   selector: 'app-chat',
   standalone: true,
   imports: [AuiProviderDirective, AuiThreadListComponent, AuiThreadComponent],
-  template: `<div [auiProvider]="config" class="chat">
-    <aui-thread-list />
-    <aui-thread />
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<div [auiProvider]="config" style="display: flex; height: 100dvh">
+    <aui-thread-list style="width: 260px" />
+    <aui-thread style="flex: 1; min-width: 0" />
   </div>`,
 })
 export class ChatComponent {
@@ -101,16 +102,20 @@ history and thread list), so it can return a fresh token; `credentials` sets the
 for cookie-based auth across origins.
 
 ```ts
-providers: [
-  {
-    provide: MASTRA_AUTH,
-    useFactory: () => {
-      const session = inject(SessionService);
-      return { getHeaders: async () => ({ Authorization: `Bearer ${await session.token()}` }) };
-    },
+import { inject, type Provider } from '@angular/core';
+import { MASTRA_AUTH, type MastraAuth } from 'angular-assistant-ui/mastra';
+import { SessionService } from './session.service'; // your app's sign-in state
+
+export const mastraAuthProvider: Provider = {
+  provide: MASTRA_AUTH,
+  useFactory: (): MastraAuth => {
+    const session = inject(SessionService);
+    return { getHeaders: async () => ({ Authorization: `Bearer ${await session.token()}` }) };
   },
-];
+};
 ```
+
+Add `mastraAuthProvider` to the application's (or the chat component's) `providers`.
 
 `createMastraTransport` and `mastraThreadListAdapter` also take an explicit `auth` option. Never put
 provider keys or signing secrets in the Angular app; it is public.
@@ -155,20 +160,51 @@ thread, or the request gets 409.
 
 ## Branches
 
-Mastra memory is a linear log, and the server persists only the branch that was last sent:
+Mastra memory is a linear log, and the server persists only the branch that was last sent. The client
+keeps a per-page record of the message ids the server stores for each thread: the history load seeds
+it, creating a thread records it as empty, and each run that completes updates it (a run that errors or
+is stopped leaves it as it was).
 
-- Each normal send carries `messageIds`, the whole active branch. The server keeps the longest stored
-  prefix that matches it (a run of assistant messages counts as one unit) and deletes the stored messages
-  after it, so editing a message or regenerating replaces the stored tail. The client sends only the
-  messages after that prefix.
-- Switching branches with the branch picker changes nothing on the server; it takes effect on the next
-  send. Other branches live in the browser for the session only, and reopening a thread restores the
-  last branch that was sent, not the last one viewed.
-- Resubmits (an approval answer, a tool result or `resumeData`) never reconcile, so an approval answered
-  on an old branch after an edit was sent is appended to the stored branch.
-- When the client does not know what the server stores (the history load failed or has not finished),
-  it omits `messageIds` and sends the whole branch; the server then deletes nothing. The record is per
-  page; `clearMastraStoredIds()` resets it (for example on sign-out).
+- **Normal sends.** Each send carries `messageIds`, the whole active branch. The server keeps the
+  longest stored prefix that matches it (a run of assistant messages counts as one unit) and deletes the
+  stored messages after it, so editing a message or regenerating replaces the stored tail. The client
+  sends only the messages after that prefix.
+- **Switching branches.** The branch picker changes nothing on the server; the choice takes effect on
+  the next send. Other branches live in the browser for the session only. A fresh history load (a page
+  reload, or a thread opened for the first time in the page) restores the last branch that was sent,
+  not the last one viewed. Switching to another thread and back does not reload history: visited threads
+  stay mounted with their branches.
+- **Resubmits** (an approval answer, a tool result or `resumeData`) never reconcile, so an approval
+  answered on an old branch after an edit was sent is appended to the stored branch.
+- **Unknown stored state.** While the record for a thread is missing (its history load is in flight or
+  failed, or the thread was deleted), sends omit `messageIds` and carry the whole active branch; the
+  server de-duplicates what it already stores by id and deletes nothing. A history load that finishes
+  during such a send still seeds the record, and later sends reconcile again.
+
+### When the history load fails
+
+The thread shows empty, and its stored state stays unknown until the page reloads: each thread's
+history loads once, the thread stays mounted, and a successful send does not repair the record. Until
+then:
+
+- every send re-sends the turns made since the failure (the server de-duplicates them by id);
+- edits and regenerates do not reconcile, so an edited-away branch stays stored and in the model's
+  context, and a regenerated reply is stored next to the old one (on the next load the two show as one
+  assistant message).
+
+This is not healed automatically, because the page does not hold the server's history and reconciling
+would delete it. **Recovery:** reload the page to load the history again before editing or regenerating
+in that thread.
+
+### Several tabs or devices
+
+Each page keeps its own record. If tab B adds messages to a thread after tab A loaded it, a send from
+tab A reconciles against tab A's branch: the server keeps the prefix both share and deletes tab B's
+newer messages, and the model never sees them. **Recovery:** reload the page before continuing a thread
+that another tab or device may have changed. `clearMastraStoredIds()` makes later sends unreconciled, so
+nothing is deleted, but it does not load the other tab's messages, and edits and regenerates then stop
+reconciling too (as after a failed load). Call it on sign-out, or when you know another tab may have
+changed a thread.
 
 ## Attachments and size limits
 

@@ -24,7 +24,7 @@ though React renders nothing (see below). Each secondary entry adds its own opti
 | `angular-assistant-ui/markdown` | Streaming markdown (`aui-markdown-text`) | `markdown-it` (and `@angular/platform-browser`) |
 | `angular-assistant-ui/shiki` | `provideShikiHighlighter()` for code blocks | `shiki` |
 | `angular-assistant-ui/mastra` | `MastraThreads`, transport, thread list, history, `MASTRA_AUTH` | `ai @ai-sdk/react @assistant-ui/ai-sdk@0.0.18 assistant-stream` |
-| `angular-assistant-ui/testing` | `createScriptedChatTransport`, `createMockMastraServer` | `ai` |
+| `angular-assistant-ui/testing` | `createScriptedChatTransport` and scripted turn, attachment and thread-list helpers, `createMockMastraServer` | `ai` |
 | `angular-assistant-ui/react-interop` | `Tools`, `Interactables` and `unstable_Interactables` scope resources | nothing more (`react`, with `react/jsx-runtime` covered by any alias) |
 
 `@assistant-ui/ai-sdk` is pinned to `0.0.18` because the mastra entry vendors code from it.
@@ -264,10 +264,53 @@ From `angular-assistant-ui`:
 From `angular-assistant-ui/testing` (needs the `ai` package):
 
 - `createScriptedChatTransport(script)` and `ScriptedTurn`: an AI SDK `ChatTransport`
-  that answers sends from a script, for tests and offline demos. The compat apps
-  (`compat/ng*/src/app/app.ts`) script text, markdown, tool calls and a tool approval with it.
+  that answers sends from a script, for tests and offline demos.
+- Turn builders for the script: `scriptedTextTurn`, `scriptedApprovalTurn` (a tool call waiting
+  for approval), `scriptedToolOutputTurn` (the continuation after an answer) and
+  `scriptedAskUserTurn` (an `askUser` client tool call). `toolApprovalOf`, `askUserAnswerOf` and
+  `findToolPart` read the user's answer from the messages a resubmit sends.
+- `createScriptedAttachmentAdapter(options)` and `scriptedFile(name, content)`: an offline
+  attachment adapter (deterministic ids, scripted rejections, upload progress and failed sends) and
+  test files.
+- `createScriptedThreadListAdapter(options)`: a seeded in-memory thread-list adapter with scripted
+  titles, a call log and one-shot failures.
 - `createMockMastraServer(options)`: an in-memory fake of the Mastra server contract
   (chat, history and memory thread routes) behind `fetch`, for testing the `mastra` entry.
+
+```ts
+import { AISDKChat } from '@assistant-ui/ai-sdk';
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
+import { AuiConfig } from 'angular-assistant-ui';
+import {
+  createScriptedAttachmentAdapter,
+  createScriptedChatTransport,
+  scriptedApprovalTurn,
+  scriptedTextTurn,
+  scriptedToolOutputTurn,
+  toolApprovalOf,
+} from 'angular-assistant-ui/testing';
+
+const transport = createScriptedChatTransport((messages) => {
+  const approval = toolApprovalOf(messages, 'call-1');
+  if (!approval) {
+    return scriptedApprovalTurn({ toolCallId: 'call-1', toolName: 'bookMeeting', input: {} });
+  }
+  return approval.approved
+    ? scriptedToolOutputTurn({ toolCallId: 'call-1', output: { confirmed: true }, text: 'Booked.' })
+    : scriptedTextTurn('Not booked.');
+});
+
+export const config = AuiConfig({
+  threads: AISDKChat({
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    adapters: { attachments: createScriptedAttachmentAdapter() },
+  }),
+});
+```
+
+The compat apps (`compat/ng*/src/app/app.ts`) use these helpers for text, markdown, approval,
+ask-user and attachment scenarios.
 
 See [docs/porting.md](../../docs/porting.md) for the upstream parity table.
 

@@ -166,6 +166,15 @@ test('an attachment chip appears after choosing a file', async ({ page }) => {
   const chip = page.locator('.aui-composer-attachments [data-slot="aui_attachment-root"]');
   await expect(chip).toHaveCount(1, { timeout: 5_000 });
 
+  // The scripted attachment adapter completes it on send; the user message shows it.
+  await send(page, 'hello');
+  await expect(userMessages(page).last().locator('[data-slot="aui_attachment-root"]')).toHaveCount(
+    1,
+    { timeout: 5_000 },
+  );
+  await expect(chip).toHaveCount(0);
+  await expect(assistantMessages(page)).toContainText('Hi there!', { timeout: 5_000 });
+
   expect(errors).toEqual([]);
 });
 
@@ -181,6 +190,27 @@ test('approving a tool call renders the receipt', async ({ page }) => {
   const receipt = page.locator('[data-slot="aui_tool-fallback-approval-receipt"]');
   await expect(receipt).toHaveAttribute('data-outcome', 'allowed', { timeout: 5_000 });
   await expect(receipt).toContainText('Approved');
+  // The answer resubmits automatically and the scripted continuation arrives.
+  await expect(assistantMessages(page).last()).toContainText('Booked.', { timeout: 5_000 });
+  await expect(receipt).toHaveAttribute('data-outcome', 'allowed');
+
+  expect(errors).toEqual([]);
+});
+
+test('answering an ask-user question resubmits the choice', async ({ page }) => {
+  const errors = await open(page);
+
+  await send(page, 'ask');
+
+  const form = page.locator('[data-slot="aui_tool-fallback-ask-user"]');
+  await expect(form).toContainText('Which city?', { timeout: 10_000 });
+  await form.getByRole('radio', { name: 'Paris' }).check();
+  await form.getByRole('button', { name: 'Submit' }).click();
+
+  await expect(assistantMessages(page).last()).toContainText('You picked Paris.', {
+    timeout: 5_000,
+  });
+  await expect(form).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });
