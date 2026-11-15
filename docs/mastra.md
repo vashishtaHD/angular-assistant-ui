@@ -131,9 +131,21 @@ Authorization is default deny. An authenticated caller reaches only:
 | `GET`, `POST /api/memory/threads` | List and create threads (`agentId` query) |
 | `GET`, `PATCH`, `DELETE /api/memory/threads/:threadId` | Read, rename, archive (metadata) and delete a thread |
 
-Everything else, including Mastra's stock `/api/agents/*` execution endpoints, tool execution, workflows
-and raw message writes, answers 403. A thread owned by another user answers 403 on both chat routes. To
-expose more, extend `isAllowedRoute` in `mastra-server/src/mastra/auth.ts` and add a test.
+For an authenticated caller, everything else, including Mastra's stock `/api/agents/*` execution
+endpoints, tool execution, workflows and raw message writes, answers 403. A request without valid
+credentials answers 401 on every route instead. To expose more, extend `isAllowedRoute` in
+`mastra-server/src/mastra/auth.ts` and add a test.
+
+Another user's thread is always refused, but not always with the same status. The chat routes check in
+this order, and the first failing check decides the answer:
+
+| Route | Order of checks |
+| --- | --- |
+| `POST /chat/:agentId` | 413 body too large, 401 unauthenticated, 400 invalid body (including a remote file URL), 404 unknown agent, 409 an echoed assistant message id that belongs to another thread or user, 403 a thread owned by another user |
+| `GET /chat/:agentId/threads/:threadId/messages` | 401 unauthenticated, 404 unknown agent or thread, 403 a thread owned by another user |
+
+So a POST to another user's thread that also echoes an assistant id stored elsewhere answers 409, not
+403. Treat 403, 404 and 409 alike as "not yours"; none of them reveals message contents.
 
 The chat route reads only `messages`, `messageIds`, `memory.thread`, `trigger`, `messageId`,
 `resumeData`, `runId` and `tools`; every other key (`system`, `instructions`, `toolsets`, `maxSteps`,

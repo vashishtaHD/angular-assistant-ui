@@ -63,7 +63,7 @@
   5. Tasks 19 and 20.
   6. Task 21.
 - **Concurrent edits** touch `public-api.ts` and `docs/porting.md`. Each task appends its own delimited block and edits only its own rows. Resolve merge conflicts by keeping both sides.
-- **Reviewers:** per-task and final reviews go to a Codex `gpt-6.1-sol` agent via `delegate_task`, per the user's request. Implementers are Claude subagents.
+- **Reviewers:** per-task and final reviews go to a Codex `gpt-6.1-sol` agent via `delegate_task`, per the user's request. Implementers are subagents.
 - **Worktrees:** create them at short paths (e.g. `C:/w/aui-tN`) to avoid Windows long-path failures on cleanup.
 
 ---
@@ -671,7 +671,7 @@ _Added during execution by ledger ruling R7 (Task 1 review). It runs in wave 3._
 ### Task 21: Final review, fix wave, live smoke (controller)
 
 - [ ] **Step 1: Whole-branch review** of `main..phase-2` on Codex `gpt-6.1-sol` (reasoningEffort `high`), using the requesting-code-review `code-reviewer.md` template, the spec, this plan and the ledger.
-- [ ] **Step 2: One fix wave** (Claude implementer) with all findings, then one scoped re-review on `gpt-6.1-sol`.
+- [ ] **Step 2: One fix wave** with all findings, then one scoped re-review on `gpt-6.1-sol`.
 - [ ] **Step 3: Live smoke** (the controller only, with the OpenRouter key copied into the git-ignored `mastra-server/.env`, then deleted). Run the server with `MASTRA_AUTH_MODE=dev MASTRA_DEV_AUTH=1` and the demo. Verify:
   - a thread is created and titled
   - markdown and code highlight

@@ -96,10 +96,20 @@ from inside your network (see "Attachments and size limits" in [mastra.md](mastr
 
 ## Branches and the stored log
 
-Mastra memory is a linear log. The server stores only the branch that was last sent: on
-each send the frontend lists the active branch's message ids, and the server deletes the
+Mastra memory is a linear log. The server stores only the branch that was last sent: on a
+normal send the frontend lists the active branch's message ids, and the server deletes the
 stored messages that are not on it. Other branches live in the browser for the session only.
-Reopening a thread restores the last branch that was sent, not the last one viewed.
+
+- Visited threads stay mounted: switching to another thread and back keeps the branch you
+  were viewing, unsent, without reloading history. Only a fresh history load (a page reload,
+  or a thread first opened in this page) shows the last branch that was sent.
+- Not every send reconciles. Resubmits (an approval answer, a tool result, `resumeData`)
+  never delete anything, and while the frontend does not know a thread's stored history
+  (its load is in flight or failed, or the thread was deleted) sends carry the whole branch
+  and the server only de-duplicates by id.
+- Several tabs or devices on one thread can delete each other's newer messages.
+
+The full rules, the failure modes and their recovery are in [mastra.md, "Branches"](mastra.md#branches).
 
 ## Exposed routes
 

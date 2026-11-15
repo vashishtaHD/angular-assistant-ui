@@ -22,7 +22,7 @@ though React renders nothing (see below). Each secondary entry adds its own opti
 | `angular-assistant-ui` | Headless primitives, `[auiProvider]`, runtimes, tool UIs | `@assistant-ui/ai-sdk ai` for the AI SDK runtime (`AISDKChat`, `AISDKThreads`) |
 | `angular-assistant-ui/ui` | Styled kit: `aui-thread`, `aui-thread-list`, `aui-thread-list-sidebar`, `aui-assistant-modal`, the tool fallback, attachments; `ui/styles.css` | `@angular/cdk markdown-it` (and `@angular/platform-browser`, usually present) |
 | `angular-assistant-ui/markdown` | Streaming markdown (`aui-markdown-text`) | `markdown-it` (and `@angular/platform-browser`) |
-| `angular-assistant-ui/shiki` | `provideShikiHighlighter()` for code blocks | `shiki` |
+| `angular-assistant-ui/shiki` | `provideShikiHighlighter()` for code blocks | `shiki`, plus the markdown entry's `markdown-it` (and `@angular/platform-browser`): it imports `AUI_SYNTAX_HIGHLIGHTER` from `angular-assistant-ui/markdown` |
 | `angular-assistant-ui/mastra` | `MastraThreads`, transport, thread list, history, `MASTRA_AUTH` | `ai @ai-sdk/react @assistant-ui/ai-sdk@0.0.18 assistant-stream` |
 | `angular-assistant-ui/testing` | `createScriptedChatTransport` and scripted turn, attachment and thread-list helpers, `createMockMastraServer` | `ai` |
 | `angular-assistant-ui/react-interop` | `Tools`, `Interactables` and `unstable_Interactables` scope resources | nothing more (`react`, with `react/jsx-runtime` covered by any alias) |
@@ -56,7 +56,8 @@ projects).
 ## Usage
 
 Wrap the chat in `[auiProvider]` with a config, then compose the primitives. This is the
-demo's template, trimmed; the library ships no styles.
+demo's template, trimmed. The headless entries ship no styles; the styled kit
+(`angular-assistant-ui/ui`) ships `ui/styles.css`.
 
 ```ts
 import { ChangeDetectionStrategy, Component } from '@angular/core';
