@@ -8,6 +8,7 @@ import {
   type AuiConfig,
   type Unsubscribe,
 } from '@assistant-ui/store/client';
+import { untracked } from '@angular/core';
 import type { AuiContext } from './aui-context';
 
 /** Options for {@link createAuiContext}. */
@@ -26,7 +27,10 @@ export interface CreateAuiContextOptions {
 
 /** Result of {@link createAuiContext}. */
 export interface CreatedAuiContext {
-  /** Context whose `source` is the real `handle`. */
+  /**
+   * Context whose `source` reads the real `handle` outside the reactive context
+   * (see {@link untrackedClientSource}).
+   */
   context: AuiContext;
   /** The store handle; pass it (or `context.source`) as a child's `parent`. */
   handle: AssistantClientHandle;
@@ -60,6 +64,32 @@ export function resolveParentSource<T extends AssistantClient | AssistantClientS
 }
 
 /**
+ * Wraps `handle` so `getClient()` runs in `untracked`.
+ *
+ * `getClient()` is a pull that may synchronize the store: when the parent's
+ * snapshot moved on before this client re-rendered (for example a message
+ * scope whose thread just replaced the optimistic message after a send with
+ * an attachment), it re-renders the root synchronously and publishes, which
+ * runs every subscriber, and `injectAuiState`'s subscribers write signals.
+ * Bindings call `getClient()` from computeds and templates, where Angular
+ * forbids signal writes (NG0600). Store synchronization is not a reactive
+ * read of the caller, so it runs untracked: the writes are allowed, the
+ * subscribers' signals change at once (Angular re-checks the views that read
+ * them in the same change detection run, so nothing reads a stale slice),
+ * and the caller's own dependencies are unchanged because the store reads no
+ * Angular signals. The wrapper is registered as a forwarding source, so a
+ * child still extends the real handle.
+ */
+export function untrackedClientSource(handle: AssistantClientHandle): AssistantClientSource {
+  const source: AssistantClientSource = {
+    getClient: () => untracked(() => handle.getClient()),
+    subscribe: (listener) => handle.subscribe(listener),
+  };
+  registerForwardingSource(source, () => handle);
+  return source;
+}
+
+/**
  * Creates an `AssistantClient` over a live config and holds the lifetime
  * subscription that keeps it mounted until `release` is called.
  */
@@ -70,8 +100,9 @@ export function createAuiContext(options: CreateAuiContextOptions): CreatedAuiCo
   // The provider holds the lifetime subscription that keeps the client
   // mounted while descendants come and go.
   const release = handle.subscribe(() => undefined);
+  const source = untrackedClientSource(handle);
   return {
-    context: { source: handle, aui: createClientFacade(handle) },
+    context: { source, aui: createClientFacade(source) },
     handle,
     release,
   };

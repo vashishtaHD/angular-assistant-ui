@@ -1,3 +1,4 @@
+// Original spec for the demo's frontend tool registration (no upstream test exists).
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { AISDKChat } from '@assistant-ui/ai-sdk';
@@ -33,7 +34,7 @@ let aui: AssistantClient;
 const execute = vi.fn(async ({ city }: { city: string }) => ({ forecast: `sunny in ${city}` }));
 
 @Component({
-  selector: 'app-tool-registrar',
+  selector: 'aui-demo-tool-registrar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: '',
@@ -55,7 +56,7 @@ class ToolRegistrarComponent {
   standalone: true,
   imports: [AuiProviderDirective, ToolRegistrarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<ng-container [auiProvider]="config"><app-tool-registrar /></ng-container>`,
+  template: `<ng-container [auiProvider]="config"><aui-demo-tool-registrar /></ng-container>`,
 })
 class HostComponent {
   readonly config = AuiConfig({

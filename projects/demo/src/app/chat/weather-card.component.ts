@@ -1,12 +1,10 @@
+// Original angular-assistant-ui demo tool UI (no code copied). Its non-result states render the kit port of
+// packages/ui/src/components/react/assistant-ui/elements/tool-fallback.aui.tsx @ 7d74276.
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { injectAuiState, type ToolUIComponent, type ToolUIProps } from 'angular-assistant-ui';
+import type { ToolUIComponent, ToolUIProps } from 'angular-assistant-ui';
+import { AuiToolFallbackComponent } from 'angular-assistant-ui/ui';
 
-/** The `getWeather` tool input (see mastra-server/src/mastra/tools). */
-interface WeatherInput {
-  city?: string;
-}
-
-/** The `getWeather` tool output. */
+/** The `getWeather` tool output (see mastra-server/src/mastra/tools). */
 interface WeatherOutput {
   city: string;
   temperatureC: number;
@@ -18,76 +16,40 @@ const isWeatherOutput = (value: unknown): value is WeatherOutput =>
   value !== null &&
   typeof (value as WeatherOutput).temperatureC === 'number';
 
-/** What the card shows: a spinner while waiting, the result, or why there is none. */
-type WeatherCardState = 'loading' | 'done' | 'error' | 'cancelled';
-
-/** Renders a `getWeather` tool call; registered with `registerToolUI`. */
+/**
+ * Renders a `getWeather` tool call; registered with `registerToolUI`. Once the result arrives it
+ * shows a weather card. Until then (running, failed or cancelled) it shows the kit's tool
+ * fallback, which already renders those states.
+ */
 @Component({
-  selector: 'app-weather-card',
+  selector: 'aui-demo-weather-card',
   standalone: true,
+  imports: [AuiToolFallbackComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div
-      data-testid="weather-card"
-      [attr.data-state]="state()"
-      class="my-2 flex w-64 items-center gap-4 rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white px-4 py-3 text-slate-800 shadow-sm"
-    >
-      @if (weather(); as w) {
+    @if (weather(); as w) {
+      <div
+        data-testid="weather-card"
+        class="my-2 flex w-64 items-center gap-4 rounded-xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white px-4 py-3 text-slate-800 shadow-sm dark:border-sky-900 dark:from-sky-950 dark:to-zinc-900 dark:text-zinc-100"
+      >
         <div class="text-3xl font-semibold tabular-nums">{{ w.temperatureC }}°C</div>
         <div class="min-w-0">
           <div class="truncate font-medium">{{ w.city }}</div>
-          <div class="text-sm capitalize text-slate-500">{{ w.condition }}</div>
+          <div class="text-sm capitalize text-slate-500 dark:text-zinc-400">{{ w.condition }}</div>
         </div>
-      } @else if (state() === 'error') {
-        <div class="text-sm text-red-600">
-          The weather lookup for <span class="font-medium">{{ city() }}</span> failed.
-        </div>
-      } @else if (state() === 'cancelled') {
-        <div class="text-sm text-slate-500">
-          Weather lookup for <span class="font-medium">{{ city() }}</span> was cancelled.
-        </div>
-      } @else {
-        <div
-          class="size-6 animate-spin rounded-full border-2 border-sky-300 border-t-transparent"
-          aria-hidden="true"
-        ></div>
-        <div class="text-sm text-slate-500">
-          Checking the weather in <span class="font-medium text-slate-700">{{ city() }}</span>…
-        </div>
-      }
-    </div>
+      </div>
+    } @else {
+      <aui-tool-fallback />
+    }
   `,
 })
 export class WeatherCardComponent implements ToolUIComponent {
   /** The tool-call part and its callbacks. */
   readonly tool = input.required<ToolUIProps>();
 
-  /** The requested city (known before the result arrives). */
-  protected readonly city = computed(
-    () => (this.tool().part.args as WeatherInput | undefined)?.city ?? '…',
-  );
-
   /** The tool result, once available. */
   protected readonly weather = computed(() => {
     const result = this.tool().part.result;
-    return isWeatherOutput(result) ? result : null;
-  });
-
-  private readonly threadRunning = injectAuiState((s) => s.thread.isRunning);
-
-  /**
-   * The card state. A tool error (`isError`, or an incomplete part that was not
-   * cancelled) stops the spinner, and so does the run ending (for example the
-   * Stop button) before a result arrived.
-   */
-  protected readonly state = computed<WeatherCardState>(() => {
-    const part = this.tool().part;
-    if (this.weather()) return 'done';
-    if (part.isError) return 'error';
-    const status = part.status;
-    if (status?.type === 'incomplete') {
-      return status.reason === 'cancelled' ? 'cancelled' : 'error';
-    }
-    return this.threadRunning() ? 'loading' : 'cancelled';
+    return isWeatherOutput(result) && !this.tool().part.isError ? result : null;
   });
 }
