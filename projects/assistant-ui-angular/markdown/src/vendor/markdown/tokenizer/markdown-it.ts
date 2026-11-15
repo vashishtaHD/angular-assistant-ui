@@ -1,0 +1,377 @@
+// Ported from packages/markdown/src/tokenizer/markdown-it.ts @ 7d74276
+// Copyright (c) 2026 AgentbaseAI Inc. MIT License; see NOTICE.
+import markdownIt, { type Env, type MarkdownIt, type Token } from "markdown-it";
+import type {
+  BlockNode,
+  CodeBlockNode,
+  HeadingNode,
+  ImageNode,
+  InlineNode,
+  LineRange,
+  LinkNode,
+  ListItemNode,
+  ListNode,
+  TableAlign,
+  TableNode,
+  TableRowNode,
+} from "../ast";
+import { plainText } from "../plain-text";
+import { createText, sliceText } from "../text-node";
+import { mathPlugin } from "./math";
+import type { Tokenizer } from "./types";
+
+type MarkdownItTokenizerOptions = {
+  /** Enables tables, strikethrough, task lists, autolinks, and math. */
+  extensions: boolean;
+};
+
+type Context = {
+  md: MarkdownIt;
+  extensions: boolean;
+};
+
+const TASK_MARKER = /^\[([ xX])\](?:[ \t]+|(?=\n|$))/;
+const URL_SCHEME = /^[a-z][a-z\d+.-]*:/i;
+const WWW_PREFIX = /^www\./i;
+const TEXT_ALIGN = /text-align:\s*(left|center|right)/;
+
+const linesOf = (token: Token): LineRange => {
+  const [start, end] = token.map ?? [0, 0];
+  return { start, end };
+};
+
+const closeIndexOf = (tokens: Token[], open: number): number => {
+  if (tokens[open]!.nesting !== 1) return open;
+  let depth = 0;
+  for (let index = open; index < tokens.length; index++) {
+    depth += tokens[index]!.nesting;
+    if (depth === 0) return index;
+  }
+  return tokens.length - 1;
+};
+
+type TextRun = {
+  siblings: InlineNode[];
+  index: number;
+  value: string;
+  syntax: string;
+};
+
+const appendText = (runs: TextRun[], siblings: InlineNode[], token: Token) => {
+  if (!token.content) return;
+  const syntax =
+    token.type === "text_special"
+      ? "\0".repeat(token.content.length)
+      : token.content;
+  const run = runs.at(-1);
+  if (run?.siblings === siblings && run.index === siblings.length - 1) {
+    run.value += token.content;
+    run.syntax += syntax;
+    return;
+  }
+  runs.push({ siblings, index: siblings.length, value: token.content, syntax });
+  siblings.push({ type: "text", value: "" });
+};
+
+const withTitle = <T extends LinkNode | ImageNode>(
+  node: T,
+  token: Token,
+): T => {
+  const title = token.attrGet("title");
+  if (title) node.title = String(title);
+  return node;
+};
+
+// The linkify rule also links bare domains such as `example.com`; only links
+// that spell out a scheme, start with `www.`, or are email addresses are kept.
+const isAutolinkKept = (token: Token, text: string): boolean =>
+  URL_SCHEME.test(text) ||
+  WWW_PREFIX.test(text) ||
+  String(token.attrGet("href")).startsWith("mailto:");
+
+const convertInline = (tokens: Token[]): InlineNode[] => {
+  const root: InlineNode[] = [];
+  const stack: InlineNode[][] = [root];
+  const runs: TextRun[] = [];
+
+  tokens.forEach((token, index) => {
+    const siblings = stack.at(-1)!;
+    const open = (node: InlineNode & { children: InlineNode[] }) => {
+      siblings.push(node);
+      stack.push(node.children);
+    };
+
+    switch (token.type) {
+      case "text":
+      case "text_special":
+        appendText(runs, siblings, token);
+        break;
+      case "softbreak":
+        siblings.push({ type: "softBreak" });
+        break;
+      case "hardbreak":
+        siblings.push({ type: "hardBreak" });
+        break;
+      case "code_inline":
+        siblings.push({ type: "codeSpan", value: token.content });
+        break;
+      case "html_inline":
+        siblings.push({ type: "htmlInline", value: token.content });
+        break;
+      case "math_inline":
+        siblings.push({
+          type: "mathInline",
+          value: token.content,
+          display: token.markup === "$$" || token.markup === "\\[",
+        });
+        break;
+      case "image":
+        siblings.push(
+          withTitle(
+            {
+              type: "image",
+              url: String(token.attrGet("src") ?? ""),
+              alt: plainText(convertInline(token.children ?? [])),
+            },
+            token,
+          ),
+        );
+        break;
+      case "em_open":
+        open({ type: "emphasis", children: [] });
+        break;
+      case "strong_open":
+        open({ type: "strong", children: [] });
+        break;
+      case "s_open":
+        open({ type: "strikethrough", children: [] });
+        break;
+      case "link_open":
+        if (
+          token.markup === "linkify" &&
+          !isAutolinkKept(token, tokens[index + 1]?.content ?? "")
+        ) {
+          stack.push(siblings);
+        } else {
+          open(
+            withTitle(
+              {
+                type: "link",
+                url: String(token.attrGet("href") ?? ""),
+                children: [],
+              },
+              token,
+            ),
+          );
+        }
+        break;
+      case "em_close":
+      case "strong_close":
+      case "s_close":
+      case "link_close":
+        stack.pop();
+        break;
+    }
+  });
+
+  for (const { siblings, index, value, syntax } of runs) {
+    siblings[index] = createText(value, syntax);
+  }
+  return root;
+};
+
+const convertListItem = (
+  token: Token,
+  tokens: Token[],
+  context: Context,
+): ListItemNode => {
+  const children = convertBlocks(tokens, context);
+  const item: ListItemNode = {
+    type: "listItem",
+    children,
+    lines: linesOf(token),
+  };
+  const first = children[0];
+  if (!context.extensions || first?.type !== "paragraph") return item;
+  const text = first.children[0];
+  if (text?.type !== "text") return item;
+  const marker = TASK_MARKER.exec(tokens[1]?.content ?? "");
+  const next = first.children[1];
+  if (!marker) return item;
+
+  item.checked = marker[1] !== " ";
+  const remaining = sliceText(text, marker[0].length);
+  first.children[0] = remaining;
+  if (!remaining.value) {
+    first.children.shift();
+    if (next?.type === "softBreak" || next?.type === "hardBreak") {
+      first.children.shift();
+    }
+  }
+  return item;
+};
+
+const convertList = (
+  tokens: Token[],
+  open: number,
+  close: number,
+  context: Context,
+): ListNode => {
+  const token = tokens[open]!;
+  const children: ListItemNode[] = [];
+  let tight = true;
+
+  for (let index = open + 1; index < close;) {
+    const itemClose = closeIndexOf(tokens, index);
+    const itemToken = tokens[index]!;
+    const inner = tokens.slice(index + 1, itemClose);
+    if (
+      inner.some(
+        (t) =>
+          t.type === "paragraph_open" &&
+          t.level === itemToken.level + 1 &&
+          !t.hidden,
+      )
+    ) {
+      tight = false;
+    }
+    children.push(convertListItem(itemToken, inner, context));
+    index = itemClose + 1;
+  }
+
+  const list: ListNode = {
+    type: "list",
+    ordered: token.type === "ordered_list_open",
+    tight,
+    children,
+    lines: linesOf(token),
+  };
+  if (list.ordered) list.start = Number(token.attrGet("start") ?? 1);
+  return list;
+};
+
+const alignOf = (token: Token): TableAlign => {
+  const align = TEXT_ALIGN.exec(String(token.attrGet("style") ?? ""))?.[1];
+  return align === "left" || align === "center" || align === "right"
+    ? align
+    : null;
+};
+
+const convertTable = (
+  tokens: Token[],
+  open: number,
+  close: number,
+): TableNode => {
+  const children: TableRowNode[] = [];
+  const align: TableAlign[] = [];
+
+  for (let index = open + 1; index < close; index++) {
+    const token = tokens[index]!;
+    if (token.type === "tr_open") {
+      children.push({ type: "tableRow", children: [], lines: linesOf(token) });
+    } else if (token.type === "th_open" || token.type === "td_open") {
+      if (children.length === 1) align.push(alignOf(token));
+      children.at(-1)?.children.push({
+        type: "tableCell",
+        children: convertInline(tokens[index + 1]?.children ?? []),
+      });
+    }
+  }
+
+  return { type: "table", align, children, lines: linesOf(tokens[open]!) };
+};
+
+const convertCodeBlock = (token: Token, { md }: Context): CodeBlockNode => {
+  const node: CodeBlockNode = {
+    type: "codeBlock",
+    value: token.content,
+    lines: linesOf(token),
+  };
+  const info = md.utils.unescapeAll(token.info).trim();
+  if (!info) return node;
+
+  const space = info.search(/\s/);
+  node.lang = space === -1 ? info : info.slice(0, space);
+  const meta = space === -1 ? "" : info.slice(space).trim();
+  if (meta) node.meta = meta;
+  return node;
+};
+
+const convertBlock = (
+  tokens: Token[],
+  open: number,
+  close: number,
+  context: Context,
+): BlockNode | undefined => {
+  const token = tokens[open]!;
+  switch (token.type) {
+    case "paragraph_open":
+      return {
+        type: "paragraph",
+        children: convertInline(tokens[open + 1]?.children ?? []),
+        lines: linesOf(token),
+      };
+    case "heading_open":
+      return {
+        type: "heading",
+        depth: Number(token.tag.slice(1)) as HeadingNode["depth"],
+        children: convertInline(tokens[open + 1]?.children ?? []),
+        lines: linesOf(token),
+      };
+    case "hr":
+      return { type: "thematicBreak", lines: linesOf(token) };
+    case "blockquote_open":
+      return {
+        type: "blockquote",
+        children: convertBlocks(tokens.slice(open + 1, close), context),
+        lines: linesOf(token),
+      };
+    case "bullet_list_open":
+    case "ordered_list_open":
+      return convertList(tokens, open, close, context);
+    case "math_block":
+      return { type: "mathBlock", value: token.content, lines: linesOf(token) };
+    case "fence":
+    case "code_block":
+      return convertCodeBlock(token, context);
+    case "html_block":
+      return { type: "htmlBlock", value: token.content, lines: linesOf(token) };
+    case "table_open":
+      return convertTable(tokens, open, close);
+    default:
+      return undefined;
+  }
+};
+
+const convertBlocks = (tokens: Token[], context: Context): BlockNode[] => {
+  const blocks: BlockNode[] = [];
+  for (let index = 0; index < tokens.length;) {
+    const close = closeIndexOf(tokens, index);
+    const block = convertBlock(tokens, index, close, context);
+    if (block) blocks.push(block);
+    index = close + 1;
+  }
+  return blocks;
+};
+
+export const createMarkdownItTokenizer = ({
+  extensions,
+}: MarkdownItTokenizerOptions): Tokenizer => {
+  const md = markdownIt("commonmark");
+  // Conversion joins text after recording the literal text_special tokens.
+  md.core.ruler.disable("text_join");
+  if (extensions) {
+    md.set({ linkify: true });
+    md.linkify.set({ fuzzyLink: true });
+    md.enable(["table", "strikethrough", "linkify"]);
+    md.use(mathPlugin);
+  }
+  const context: Context = { md, extensions };
+  return {
+    parse: (source) => {
+      const env: Env = {};
+      const blocks = convertBlocks(md.parse(source, env), context);
+      return { blocks, hasReferenceDefinitions: env.references !== undefined };
+    },
+  };
+};

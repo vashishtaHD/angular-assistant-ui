@@ -2,11 +2,23 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "../../out-tsc/spec",
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "paths": {
+      "angular-assistant-ui": ["./src/public-api.ts"],
+      "angular-assistant-ui/testing": ["./testing/src/public-api.ts"],
+      "angular-assistant-ui/ui": ["./ui/src/public-api.ts"],
+      "angular-assistant-ui/markdown": ["./markdown/src/public-api.ts"],
+      "angular-assistant-ui/shiki": ["./shiki/src/public-api.ts"]
+    }
   },
   "include": [
     "src/**/*.spec.ts",
     "testing/**/*.spec.ts",
+    "ui/**/*.spec.ts",
+    "mastra/**/*.spec.ts",
+    "markdown/**/*.spec.ts",
+    "shiki/**/*.spec.ts",
+    "markdown/src/vendor/**/*.ts",
     "src/**/*.d.ts",
     "src/test-setup.*.ts",
     "src/testing-internal/**/*.ts"

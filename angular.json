@@ -40,7 +40,7 @@
       "schematics": {},
       "root": "projects/demo",
       "sourceRoot": "projects/demo/src",
-      "prefix": "app",
+      "prefix": "aui",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:application",
@@ -56,7 +56,7 @@
                 "input": "projects/demo/public"
               }
             ],
-            "styles": ["projects/demo/src/styles.css"],
+            "styles": ["dist/assistant-ui-angular/ui/styles.css", "projects/demo/src/styles.css"],
             "scripts": [],
             "allowedCommonJsDependencies": [
               "react",

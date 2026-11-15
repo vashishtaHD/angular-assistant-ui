@@ -1,0 +1,78 @@
+name: Bug report
+description: Something in angular-assistant-ui does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. For a security issue, do not open an issue: follow SECURITY.md
+        (GitHub private vulnerability reporting) instead.
+  - type: input
+    id: package-version
+    attributes:
+      label: Package version
+      description: The installed `angular-assistant-ui` version (`npm ls angular-assistant-ui`).
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: angular-version
+    attributes:
+      label: Angular version
+      description: The `@angular/core` version (`npm ls @angular/core`).
+      placeholder: 18.2.14
+    validations:
+      required: true
+  - type: dropdown
+    id: change-detection
+    attributes:
+      label: Change detection
+      options:
+        - Zone.js
+        - Zoneless
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Which runtime the app uses.
+      options:
+        - AI SDK (AISDKChat / AISDKThreads)
+        - Mastra (angular-assistant-ui/mastra)
+        - Custom (local, external store or assistant transport runtime)
+        - Scripted (angular-assistant-ui/testing)
+    validations:
+      required: true
+  - type: input
+    id: entries
+    attributes:
+      label: Entry points involved
+      description: For example `angular-assistant-ui/ui` or `angular-assistant-ui/markdown`.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: |
+        A minimal reproduction: a repository or StackBlitz link, or the component, config and steps.
+        The scripted transport in `angular-assistant-ui/testing` reproduces most bugs without a backend.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead, with any console errors.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, Node version, Angular builder, and anything else relevant.

@@ -5,6 +5,8 @@ const { join } = require('node:path');
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [join(__dirname, 'src/**/*.{html,ts}')],
+  // The demo's dark toggle sets the kit's `.aui-dark` class on <html>.
+  darkMode: ['selector', '.aui-dark'],
   theme: {
     extend: {},
   },

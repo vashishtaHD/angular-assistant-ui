@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the demo get-weather tool.
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 

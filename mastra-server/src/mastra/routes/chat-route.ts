@@ -1,0 +1,333 @@
+// Original (no upstream counterpart): the authenticated chat and thread routes of the Mastra server.
+import { registerApiRoute } from '@mastra/core/server';
+import { handleChatStream } from '@mastra/ai-sdk';
+import { toAISdkMessages } from '@mastra/ai-sdk/ui';
+import { createUIMessageStreamResponse, jsonSchema } from 'ai';
+import { bodyLimit } from 'hono/body-limit';
+import { z } from 'zod';
+import { scopeMessageId, unscopeMessageId } from '../message-ids';
+import { groupAssistantRuns, reconcileThread } from '../reconcile';
+
+const RESOURCE_ID_KEY = 'mastra__resourceId';
+const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
+const MAX_FRONTEND_TOOLS = 64;
+
+/** AI SDK v7 UI message part types the route accepts. Anything else is a 400. */
+const PART_TYPES = new Set([
+  'text',
+  'reasoning',
+  'step-start',
+  'source-url',
+  'source-document',
+  'file',
+  'reasoning-file',
+  'dynamic-tool',
+  'custom',
+  'steering-message',
+]);
+const isKnownPartType = (type: string) =>
+  PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type);
+
+/** AI SDK `TextUIPart` and `FileUIPart` required fields, checked wherever such a part appears. */
+const textPart = z.looseObject({ type: z.literal('text'), text: z.string() });
+const filePart = z.looseObject({
+  type: z.literal('file'),
+  mediaType: z.string(),
+  url: z.string(),
+  filename: z.string().optional(),
+});
+const PART_FIELDS: Partial<Record<string, z.ZodType>> = { text: textPart, file: filePart };
+
+/** What a `steering-message` part may carry: AI SDK's `Array<TextUIPart | FileUIPart>`. */
+const steeringParts = z.array(z.discriminatedUnion('type', [textPart, filePart]));
+
+const part = z
+  .looseObject({
+    type: z.string().refine(isKnownPartType, { message: 'Unsupported message part type' }),
+  })
+  .superRefine((value, ctx) => {
+    const forward = (issues: readonly z.core.$ZodIssue[], prefix: PropertyKey[] = []) => {
+      for (const issue of issues) {
+        ctx.addIssue({ code: 'custom', message: issue.message, path: [...prefix, ...issue.path] });
+      }
+    };
+    const fields = PART_FIELDS[value.type]?.safeParse(value);
+    if (fields && !fields.success) forward(fields.error.issues);
+    if (value.type !== 'steering-message') return;
+    const nested = steeringParts.safeParse(value['parts']);
+    if (!nested.success) forward(nested.error.issues, ['parts']);
+  });
+
+/**
+ * The only fields the chat route reads. Zod strips every other key, so an agent option such as
+ * `system`, `instructions`, `toolsets`, `requireToolApproval`, `maxSteps` or `hooks` never
+ * reaches the agent call. `memory.resource` is stripped too: identity comes from the server.
+ * Messages keep only `id`, `role`, `parts` and `metadata`: legacy fields such as
+ * `experimental_attachments` or `content` would otherwise make the model pipeline fetch URLs.
+ */
+export const chatBodySchema = z.object({
+  messages: z.array(
+    z.object({
+      id: z.string().min(1),
+      role: z.enum(['user', 'assistant']),
+      parts: z.array(part),
+      metadata: z.unknown().optional(),
+    }),
+  ),
+  messageIds: z.array(z.string()).optional(),
+  memory: z.object({ thread: z.string().min(1) }),
+  trigger: z.enum(['submit-message', 'regenerate-message']).optional(),
+  messageId: z.string().optional(),
+  resumeData: z.record(z.string(), z.unknown()).optional(),
+  runId: z.string().optional(),
+  tools: z
+    .record(
+      z.string(),
+      z.looseObject({
+        description: z.string().optional(),
+        parameters: z.record(z.string(), z.unknown()),
+      }),
+    )
+    .optional(),
+});
+
+export type ChatBody = z.infer<typeof chatBodySchema>;
+
+/**
+ * Finds the first part that would make the server (or the model provider) load content it was
+ * not sent inline, and returns why it is refused; `undefined` when every part is safe.
+ *
+ * `file` and `reasoning-file` parts must carry a `data:` URL (the body limit bounds their size)
+ * unless `isTrustedFileUrl` accepts the URL. A `providerReference` (a file already uploaded to
+ * the provider account) is always refused. `steering-message` parts are checked recursively.
+ */
+export function findUnsafePart(
+  messages: ChatBody['messages'],
+  isTrustedFileUrl: (url: string) => boolean = () => false,
+): string | undefined {
+  const check = (parts: readonly Record<string, unknown>[]): string | undefined => {
+    for (const p of parts) {
+      if (p['type'] === 'file' || p['type'] === 'reasoning-file') {
+        if (p['providerReference'] !== undefined)
+          return 'File provider references are not accepted';
+        const url = p['url'];
+        if (typeof url !== 'string') return 'File parts need a url';
+        if (!/^data:/i.test(url) && !isTrustedFileUrl(url)) {
+          return 'File parts must be inline data: URLs';
+        }
+      } else if (p['type'] === 'steering-message') {
+        if (!Array.isArray(p['parts'])) return 'Steering messages need parts';
+        const nested = check(p['parts'] as Record<string, unknown>[]);
+        if (nested) return nested;
+      }
+    }
+    return undefined;
+  };
+  for (const message of messages) {
+    const problem = check(message.parts);
+    if (problem) return problem;
+  }
+  return undefined;
+}
+
+/** Maps frontend tool JSON schemas to Mastra `clientTools` (tools without `execute`). */
+export function toClientTools(
+  tools: NonNullable<ChatBody['tools']> | undefined,
+  reserved: ReadonlySet<string> = new Set(),
+) {
+  const clientTools: Record<
+    string,
+    { description?: string; inputSchema: ReturnType<typeof jsonSchema> }
+  > = {};
+  for (const [name, tool] of Object.entries(tools ?? {}).slice(0, MAX_FRONTEND_TOOLS)) {
+    // A frontend tool must never shadow a server tool (that would bypass requireApproval).
+    if (!TOOL_NAME.test(name) || reserved.has(name)) continue;
+    clientTools[name] = {
+      ...(tool.description !== undefined && { description: tool.description }),
+      inputSchema: jsonSchema(tool.parameters as Parameters<typeof jsonSchema>[0]),
+    };
+  }
+  return clientTools;
+}
+
+/** Merges runs of consecutive assistant UI messages into one message keyed by the first id. */
+export function mergeAssistantRuns<T extends { id: string; role: string; parts: unknown[] }>(
+  messages: T[],
+): T[] {
+  return groupAssistantRuns(messages).map((group) => ({
+    ...group[0],
+    parts: group.flatMap((message) => message.parts),
+  }));
+}
+
+export interface ChatRouteOptions {
+  /** Path of the POST route. Default `/chat/:agentId`. */
+  path?: string;
+  /** Largest accepted POST body in bytes. Larger bodies get 413. Default 10 MiB. */
+  maxBodyBytes?: number;
+  /**
+   * Accepts a non-`data:` file URL (for example the host's own upload bucket). The model
+   * pipeline downloads accepted URLs from the server, so only return `true` for locations that
+   * are safe to fetch and bounded in size. Default: every remote URL is refused with 400.
+   */
+  isTrustedFileUrl?: (url: string) => boolean;
+}
+
+type MemoryLike = {
+  getThreadById(args: { threadId: string }): Promise<{ resourceId?: string } | null>;
+  recall(args: Record<string, unknown>): Promise<{ messages: any[] }>;
+  deleteMessages(ids: string[]): Promise<void>;
+};
+
+/**
+ * Builds the chat routes:
+ * - `POST <path>` streams one chat turn after reconciling the stored thread with the active branch
+ * - `GET <path>/threads/:threadId/messages` returns the thread as v7 UI messages
+ *
+ * Both require authentication and use the server-derived resource id.
+ */
+export function createChatRoutes(options: ChatRouteOptions = {}) {
+  const path = options.path ?? '/chat/:agentId';
+
+  const post = registerApiRoute(path, {
+    method: 'POST',
+    requiresAuth: true,
+    middleware: bodyLimit({
+      maxSize: options.maxBodyBytes ?? 10 * 1024 * 1024,
+      onError: (c) => c.json({ error: 'Request body too large' }, 413),
+    }),
+    handler: async (c) => {
+      const mastra = c.get('mastra');
+      const requestContext = c.get('requestContext');
+      const resourceId = requestContext.get(RESOURCE_ID_KEY) as string | undefined;
+      if (!resourceId) return c.json({ error: 'Unauthenticated' }, 401);
+
+      let raw: unknown;
+      try {
+        raw = await c.req.json();
+      } catch {
+        return c.json({ error: 'Body must be JSON' }, 400);
+      }
+      const parsed = chatBodySchema.safeParse(raw);
+      if (!parsed.success) {
+        return c.json(
+          { error: 'Invalid request body', issues: parsed.error.issues.map((i) => i.message) },
+          400,
+        );
+      }
+      const body = parsed.data;
+      const unsafe = findUnsafePart(body.messages, options.isTrustedFileUrl);
+      if (unsafe) return c.json({ error: 'Invalid request body', issues: [unsafe] }, 400);
+      if (body.resumeData && !body.runId)
+        return c.json({ error: 'runId is required with resumeData' }, 400);
+
+      const agentId = c.req.param('agentId') ?? '';
+      let agent;
+      try {
+        agent = mastra.getAgentById(agentId);
+      } catch {
+        return c.json({ error: `Agent ${agentId} not found` }, 404);
+      }
+
+      const memory = (await agent.getMemory()) as unknown as MemoryLike | undefined;
+      const threadId = body.memory.thread;
+
+      // Assistant ids come back from the client on resubmits; they must not address another
+      // user's (or another thread's) stored message.
+      const assistantIds = body.messages.filter((m) => m.role === 'assistant').map((m) => m.id);
+      if (assistantIds.length > 0) {
+        const store = await mastra.getStorage()?.getStore('memory');
+        const existing = store
+          ? (await store.listMessagesById({ messageIds: assistantIds })).messages
+          : [];
+        if (existing.some((m) => m.threadId !== threadId || m.resourceId !== resourceId)) {
+          return c.json({ error: 'Message id already in use' }, 409);
+        }
+      }
+      if (memory) {
+        const thread = await memory.getThreadById({ threadId });
+        if (thread?.resourceId && thread.resourceId !== resourceId) {
+          return c.json({ error: 'Access denied: thread belongs to a different user' }, 403);
+        }
+        // Resubmits (tool results, approvals, resume) never change the branch.
+        const last = body.messages[body.messages.length - 1];
+        const isResubmit = Boolean(body.resumeData) || last?.role === 'assistant';
+        if (body.messageIds && thread && !isResubmit) {
+          await reconcileThread({
+            memory: memory as never,
+            threadId,
+            resourceId,
+            activeIds: body.messageIds,
+            toClientId: (id) => unscopeMessageId(resourceId, threadId, id),
+          });
+        }
+      }
+
+      const serverTools = new Set(Object.keys(await agent.listTools({ requestContext })));
+      const clientTools = toClientTools(body.tools, serverTools);
+
+      const stream = await handleChatStream({
+        mastra,
+        agentId,
+        version: 'v7',
+        params: {
+          messages: body.messages.map((m) =>
+            m.role === 'user' ? { ...m, id: scopeMessageId(resourceId, threadId, m.id) } : m,
+          ) as never,
+          memory: { thread: threadId, resource: resourceId },
+          requestContext,
+          abortSignal: c.req.raw.signal,
+          ...(body.trigger && { trigger: body.trigger }),
+          ...(body.runId && { runId: body.runId }),
+          ...(body.resumeData && { resumeData: body.resumeData }),
+          ...(Object.keys(clientTools).length > 0 && { clientTools: clientTools as never }),
+        },
+        onError: () => 'The model request failed.',
+      });
+      return createUIMessageStreamResponse({ stream });
+    },
+  });
+
+  const history = registerApiRoute(`${path}/threads/:threadId/messages`, {
+    method: 'GET',
+    requiresAuth: true,
+    handler: async (c) => {
+      const mastra = c.get('mastra');
+      const requestContext = c.get('requestContext');
+      const resourceId = requestContext.get(RESOURCE_ID_KEY) as string | undefined;
+      if (!resourceId) return c.json({ error: 'Unauthenticated' }, 401);
+      const agentId = c.req.param('agentId') ?? '';
+      let agent;
+      try {
+        agent = mastra.getAgentById(agentId);
+      } catch {
+        return c.json({ error: `Agent ${agentId} not found` }, 404);
+      }
+      const memory = (await agent.getMemory()) as unknown as MemoryLike | undefined;
+      const threadId = c.req.param('threadId') ?? '';
+      const thread = await memory?.getThreadById({ threadId });
+      if (!memory || !thread) return c.json({ error: 'Thread not found' }, 404);
+      if (thread.resourceId && thread.resourceId !== resourceId) {
+        return c.json({ error: 'Access denied: thread belongs to a different user' }, 403);
+      }
+      const { messages } = await memory.recall({
+        threadId,
+        resourceId,
+        perPage: false,
+        orderBy: { field: 'createdAt', direction: 'ASC' },
+      });
+      const ui = mergeAssistantRuns(
+        (
+          toAISdkMessages(messages, { version: 'v7' }) as Array<{
+            id: string;
+            role: string;
+            parts: unknown[];
+          }>
+        ).map((m) => ({ ...m, id: unscopeMessageId(resourceId, threadId, m.id) })),
+      );
+      return c.json({ messages: ui, total: ui.length });
+    },
+  });
+
+  return [post, history];
+}

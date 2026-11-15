@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/vashishtaHD/angular-assistant-ui/security/advisories/new
+    about: Report vulnerabilities privately through GitHub private vulnerability reporting.
+  - name: assistant-ui (upstream)
+    url: https://github.com/assistant-ui/assistant-ui
+    about: Issues in @assistant-ui/core, store or tap that also affect React and Vue belong upstream.

@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): a scripted AI SDK chat transport for tests.
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai';
 
 /**

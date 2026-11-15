@@ -1,0 +1,102 @@
+name: Release
+
+# Publishes angular-assistant-ui to npm when a version tag is pushed, for example
+# `git tag v0.1.0 && git push origin v0.1.0`. See CONTRIBUTING.md, "Releases".
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The tag must match the library version and have a CHANGELOG.md section.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      npm-tag: ${{ steps.version.outputs.npm-tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag $TAG is not v<semver>"
+            exit 1
+          fi
+          package_version="$(node -p "require('./projects/assistant-ui-angular/package.json').version")"
+          if [ "$version" != "$package_version" ]; then
+            echo "::error::Tag $TAG does not match projects/assistant-ui-angular/package.json version $package_version"
+            exit 1
+          fi
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "npm-tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "npm-tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: node scripts/release-notes.mjs "$GITHUB_REF_NAME"
+
+  # The same verification as every push: ci.yml's verify and compat jobs.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [version, ci]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build:lib
+      - run: npm run check:package
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          NPM_TAG: ${{ needs.version.outputs.npm-tag }}
+        run: |
+          # A re-run after a successful publish (for example when the GitHub Release step
+          # failed) skips the publish instead of failing on the existing version.
+          if npm view "angular-assistant-ui@$VERSION" version >/dev/null 2>&1; then
+            echo "angular-assistant-ui@$VERSION is already on npm; skipping the publish"
+            exit 0
+          fi
+          npm publish ./dist/assistant-ui-angular --provenance --access public --tag "$NPM_TAG"
+
+  github-release:
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md "${flags[@]}"
