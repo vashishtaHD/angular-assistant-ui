@@ -50,7 +50,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | SuggestionByIndexProvider | yes | ported (via `indexScopeConfig` kind `suggestion`) | Task 7 |
 | MessageAttachmentByIndexProvider, ComposerAttachmentByIndexProvider | yes | ported (via `indexScopeConfig` kind `attachment`) | Task 6 |
 | ThreadListItemByIndexProvider | yes | ported (via `indexScopeConfig` kind `threadListItem`) | Task 8 |
-| ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | ported (the `auiChainOfThought` template of `aui-message-parts` builds the group scope; parts via `indexScopeConfig` kind `chainOfThoughtPart`) | Task 9 |
+| ChainOfThoughtByIndicesProvider, ChainOfThoughtPartByIndexProvider | yes | ported (the `auiChainOfThought` template of `aui-message-parts` builds the group scope; each part in its own scope from `aui-chain-of-thought-parts`; difference: a part row whose index fell past the end keeps its last part until change detection removes it, with no microtask expiry and no stale-scope report, where upstream's Vue provider keeps it for one microtask and then reports) | Task 9 |
 | ThreadListItemRuntimeProvider, MessageProvider, TextMessagePartProvider, ReadonlyThreadProvider | no | ported (as `threadListItemRuntimeScope`, `messageObjectScope`, `textMessagePartScope` and `readonlyThreadScope`, scope configs for `[auiProvider]`) | |
 | useThreadViewport, useThreadViewportStore, ThreadViewportState | no | n/a (replaced by `AUI_VIEWPORT`, `injectAuiViewport` and `AuiViewport`) |  |
 | INTERNAL | no | n/a (upstream-internal namespace, not public API) |  |

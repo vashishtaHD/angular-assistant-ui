@@ -22,12 +22,15 @@ import {
 } from '../part-view.component';
 
 /**
- * The part scope of the chain's part at `index`. It follows the shape of
- * `indexScopeConfig('chainOfThoughtPart')`, but keeps its own last valid part
- * for the row's whole life: a row whose part just left the chain is still
- * evaluated after change detection has not yet removed it, and must neither
- * throw nor show another part. Lookups of a part that never existed still
- * throw (upstream's out-of-bounds error).
+ * The part scope of the chain's part at `index`. Unlike the other by-index
+ * scopes (`indexScopeConfig`) and upstream's provider, it keeps its last valid
+ * part for the row's whole life, with no microtask expiry and no stale report:
+ * a row whose index just fell past the end of the chain is still evaluated
+ * until change detection removes it, and must not throw. That row then shows
+ * its last part; a row whose index is still in range shows the part now at
+ * that index (after `[a, b, c]` shrinks to `[b, c]`, row 0 resolves to `b`
+ * until it is removed), as upstream's index-based providers do. Lookups of a
+ * part that never existed still throw (upstream's out-of-bounds error).
  */
 const chainPartConfig = (index: number): AuiConfig => {
   let last: ReturnType<AssistantClient['chainOfThought']['part']> | undefined;

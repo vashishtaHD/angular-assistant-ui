@@ -1,13 +1,12 @@
 // Ported from packages/vue/src/primitives/AttachmentByIndexProvider.ts @ 7d7427653f6ba47b0b954510eed9c594d64e74d5
-// Also generalises suggestions.ts, threadList.ts and ChainOfThoughtPrimitiveParts.ts in the same directory:
+// Also generalises suggestions.ts and threadList.ts in the same directory:
 // (the ByIndex providers) the same way message-scope.ts / part-scope.ts port MessageById / PartByIndex.
 import { AuiConfig, Derived, type AssistantClient } from '@assistant-ui/store/client';
 import type { MessageState } from '@assistant-ui/core/store';
 import { createLastValidCache, createStaleReporter } from './last-valid-cache';
 
 /** The by-index child scopes {@link indexScopeConfig} can build. */
-export type IndexScopeKind =
-  'attachment' | 'suggestion' | 'threadListItem' | 'queueItem' | 'chainOfThoughtPart';
+export type IndexScopeKind = 'attachment' | 'suggestion' | 'threadListItem' | 'queueItem';
 
 /** Where an `attachment` scope's attachments live. */
 export type AttachmentScopeSource = 'composer' | 'message';
@@ -51,21 +50,20 @@ export function indexScopeCount(
     }
     case 'queueItem':
       return aui.composer.getState().queue.length;
-    case 'chainOfThoughtPart':
-      return aui.chainOfThought.getState().parts.length;
   }
 }
 
 /**
  * The scope config for the child at `index` of the collection `kind` names.
  * Descendants read it through `s.attachment`, `s.suggestion`,
- * `s.threadListItem`, `s.queueItem` or (for `chainOfThoughtPart`) `s.part`.
- * Render it with `AuiScopeOutletComponent`, keyed by a stable id.
+ * `s.threadListItem` or `s.queueItem`. Render it with
+ * `AuiScopeOutletComponent`, keyed by a stable id. (Chain of thought parts
+ * use their own config, `chainPartConfig` in `chain-of-thought/parts.ts`.)
  *
  * `aui` is the parent client that owns the collection: the thread (or any
  * descendant) for suggestions, the composer scope for composer attachments
- * and queue items, the message scope for message attachments, the root for
- * thread list items, and a chain of thought scope for its parts. `isCurrent`
+ * and queue items, the message scope for message attachments, and the root
+ * for thread list items. `isCurrent`
  * reports whether the owner still targets `index`; after the collection
  * shrinks the scope serves the last valid item for one microtask, then
  * reports once if the owner still points past the end.
@@ -153,30 +151,6 @@ export function indexScopeConfig(
             cache.resolve(index < indexScopeCount('queueItem', parent), () =>
               parent.composer.queueItem({ index }),
             ),
-        }),
-      });
-    }
-    case 'chainOfThoughtPart': {
-      const cache = createLastValidCache<ReturnType<AssistantClient['chainOfThought']['part']>>(
-        reporter('ChainOfThoughtPartByIndexProvider'),
-      );
-      return AuiConfig({
-        part: Derived({
-          source: 'chainOfThought',
-          query: { type: 'index', index },
-          // chainOfThought.part() delegates to a userland lookup, so validity
-          // is not decided by parts.length alone; a lookup throw is absorbed
-          // into the stale cache like an out-of-range index.
-          get: (parent) => {
-            const valid = index < indexScopeCount('chainOfThoughtPart', parent);
-            try {
-              return cache.resolve(valid, () => parent.chainOfThought.part({ index }));
-            } catch (error) {
-              return cache.resolve(false, () => {
-                throw error;
-              });
-            }
-          },
         }),
       });
     }
