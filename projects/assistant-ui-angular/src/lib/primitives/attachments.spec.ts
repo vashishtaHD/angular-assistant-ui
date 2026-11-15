@@ -21,7 +21,11 @@ import { AuiAttachmentNameComponent } from './attachment/attachment-name.compone
 import { AuiAttachmentRemoveDirective } from './attachment/attachment-remove.directive';
 import { AuiAttachmentRootDirective } from './attachment/attachment-root.directive';
 import { AuiAttachmentThumbDirective } from './attachment/attachment-thumb.directive';
-import { AuiAttachmentTemplateDirective } from './attachment/attachment-list';
+import {
+  AuiAttachmentTemplateDirective,
+  carryAttachmentKeys,
+  getAttachmentKeys,
+} from './attachment/attachment-list';
 import type { AuiAttachmentError } from './attachment/inject-add-attachments';
 import { AuiComposerAddAttachmentDirective } from './composer-add-attachment.directive';
 import { AuiComposerAttachmentDropzoneDirective } from './composer-attachment-dropzone.directive';
@@ -53,7 +57,10 @@ const defaultAdapter = () =>
  * The thread starts empty: the first send replaces core's in-transit submission
  * row by the host's message row under a different id.
  */
-function createAttachmentRuntime(attachmentAdapter: AttachmentAdapter = defaultAdapter()) {
+function createAttachmentRuntime(
+  attachmentAdapter: AttachmentAdapter = defaultAdapter(),
+  options: { ackAttachmentIds?: boolean } = {},
+) {
   let messages: Msg[] = [];
   let isDisabled = false;
   const make = (): ExternalStoreAdapter<Msg> => ({
@@ -63,13 +70,18 @@ function createAttachmentRuntime(attachmentAdapter: AttachmentAdapter = defaultA
     convertMessage: (m) => m as never,
     adapters: { attachments: attachmentAdapter },
     onNew: async (message) => {
+      // Keeps the submission in flight for a moment, as a network send would.
+      if (options.ackAttachmentIds) await new Promise((resolve) => setTimeout(resolve, 60));
       messages = [
         ...messages,
         {
           id: `m${messages.length}`,
           role: 'user',
           content: message.content as never,
-          attachments: message.attachments,
+          // Like the AI SDK runtime, the acknowledged message can carry new attachment ids.
+          attachments: options.ackAttachmentIds
+            ? message.attachments?.map((a) => ({ ...a, id: `acked-${a.id}` }))
+            : message.attachments,
         },
       ];
       core.setAdapter(make());
@@ -147,8 +159,10 @@ class ProbeComponent {
         <ng-template auiMessage>
           <div auiMessageRoot class="row">
             <aui-message-attachments>
-              <ng-template auiAttachment>
-                <span class="sent" auiAttachmentRoot><aui-attachment-name /></span>
+              <ng-template auiAttachment let-attachment>
+                <span class="sent" auiAttachmentRoot [attr.data-id]="attachment.id"
+                  ><aui-attachment-name
+                /></span>
               </ng-template>
             </aui-message-attachments>
           </div>
@@ -216,6 +230,38 @@ afterEach(() => {
   document.querySelectorAll('input[type="file"]').forEach((node) => node.remove());
 });
 
+describe('carryAttachmentKeys', () => {
+  const state = (ids: string[]) => ({ ids, keys: getAttachmentKeys(ids.map((id) => ({ id }))) });
+
+  it('keeps the key of a kept id, also when it moves', () => {
+    expect(carryAttachmentKeys(['b', 'a'], state(['a', 'b']), false)).toEqual([
+      'attachment:b',
+      'attachment:a',
+    ]);
+  });
+
+  it('hands a replaced id the key at its index only on a handoff', () => {
+    expect(carryAttachmentKeys(['x', 'y'], state(['a', 'b']), true)).toEqual([
+      'attachment:a',
+      'attachment:b',
+    ]);
+    expect(carryAttachmentKeys(['x', 'y'], state(['a', 'b']), false)).toEqual([
+      'attachment:x',
+      'attachment:y',
+    ]);
+  });
+
+  it('never reuses the key of an id that is still in the list, and never repeats a key', () => {
+    // `a` moved to index 1: index 0's new id must not take `a`'s key.
+    expect(carryAttachmentKeys(['x', 'a'], state(['a', 'b']), true)).toEqual([
+      'attachment:x',
+      'attachment:a',
+    ]);
+    const keys = carryAttachmentKeys(['x', 'x'], state(['a', 'b']), true);
+    expect(new Set(keys).size).toBe(2);
+  });
+});
+
 describe('attachment primitives', () => {
   it('adds a File through the hidden input and shows a chip with its name', async () => {
     const t = await setup();
@@ -278,6 +324,48 @@ describe('attachment primitives', () => {
     expect(row!.getAttribute('data-message-id')).toBe('m0');
     // The send must not re-create the whole message list (Angular NG0956).
     expect(warn.mock.calls.filter((call) => String(call[0]).includes('NG0956'))).toEqual([]);
+  });
+
+  it('keeps the attachment rows when the acknowledged message replaces every attachment id', async () => {
+    nextRuntime = createAttachmentRuntime(defaultAdapter(), { ackAttachmentIds: true });
+    const warn = vi.spyOn(console, 'warn');
+    const error = vi.spyOn(console, 'error');
+    const t = await setup();
+    const probe = t.fixture.debugElement.query(By.directive(ProbeComponent))
+      .componentInstance as ProbeComponent;
+    pick(t, [textFile('a.txt'), textFile('b.txt')]);
+    await t.settle();
+    const draftIds = probe.aui
+      .composer()
+      .getState()
+      .attachments.map((a) => a.id);
+    expect(draftIds).toHaveLength(2);
+    t.el.querySelector<HTMLButtonElement>('.send')!.click();
+    let sent: Element[] = [];
+    await vi.waitFor(
+      () => {
+        t.fixture.detectChanges();
+        sent = Array.from(t.el.querySelectorAll('.row .sent'));
+        expect(sent).toHaveLength(2);
+      },
+      { interval: 5 },
+    );
+    // In flight: the submission's attachments.
+    expect(sent.map((node) => node.getAttribute('data-id'))).toEqual(draftIds);
+    await t.settle();
+    await t.settle();
+    const after = Array.from(t.el.querySelectorAll('.row .sent'));
+    // Same DOM nodes (so the same components and scopes) ...
+    expect(after).toHaveLength(2);
+    expect(after[0]).toBe(sent[0]);
+    expect(after[1]).toBe(sent[1]);
+    // ... now showing the acknowledged attachments, in order.
+    expect(after.map((node) => node.getAttribute('data-id'))).toEqual(
+      draftIds.map((id) => `acked-${id}`),
+    );
+    expect(after.map((node) => node.textContent)).toEqual(['a.txt', 'b.txt']);
+    expect(warn.mock.calls.filter((call) => String(call[0]).includes('NG0956'))).toEqual([]);
+    expect(error.mock.calls).toEqual([]);
   });
 
   it('emits attachmentError with the reason for a rejected type', async () => {

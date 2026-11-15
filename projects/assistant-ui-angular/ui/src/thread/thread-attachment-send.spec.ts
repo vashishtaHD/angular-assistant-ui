@@ -50,6 +50,7 @@ class HostComponent {
 
 let fixture: ComponentFixture<HostComponent> | undefined;
 let consoleError: MockInstance<typeof console.error>;
+let consoleWarn: MockInstance<typeof console.warn>;
 
 const waitFor = (assertion: () => void) =>
   vi.waitFor(
@@ -66,8 +67,11 @@ const loggedErrors = () =>
 
 /**
  * The one console error the store may log on this path: its notification manager reporting
- * the transient `useClientLookup` key miss it labels recoverable (a message scope re-resolving
- * a moment before the thread client's lookup holds the message).
+ * the transient `useClientLookup` key miss it labels recoverable: the in-transit submission row's
+ * outgoing scope re-resolves in a store notification after its last-valid cache expired and
+ * before change detection rebinds the row. Keeping that cache alive silences it, but in zoneless
+ * apps the throw is what makes the store re-resolve the row against its new config (without it
+ * a later Edit acts on the stale submission composer), so it is kept.
  */
 const RECOVERABLE_LOOKUP =
   /^NotificationManager: subscriber callback error Error: useClientLookup: key "[^"]+" not found \(ignore if recovered\)$/;
@@ -85,12 +89,14 @@ describe('aui-thread: sending with an attachment over the AI SDK runtime (Mastra
       },
     });
     consoleError = vi.spyOn(console, 'error');
+    consoleWarn = vi.spyOn(console, 'warn');
   });
 
   afterEach(() => {
     fixture?.destroy();
     fixture = undefined;
     consoleError.mockRestore();
+    consoleWarn.mockRestore();
     vi.restoreAllMocks();
   });
 
@@ -123,12 +129,23 @@ describe('aui-thread: sending with an attachment over the AI SDK runtime (Mastra
     });
     send!.click();
 
+    // The sent message shows its attachment at once, from the in-flight submission.
+    const tile = () =>
+      root.querySelector<HTMLElement>(
+        'aui-message-attachments-styled [data-slot="aui_attachment-tile"]',
+      );
+    await waitFor(() => expect(tile()).not.toBeNull());
+    const firstTile = tile()!;
+
     await waitFor(() => expect(root.textContent).toContain('Nice picture.'));
-    expect(
-      root
-        .querySelector('aui-message-attachments-styled [data-slot="aui_attachment-tile"]')
-        ?.getAttribute('aria-label'),
-    ).toContain('photo.png');
+    expect(tile()?.getAttribute('aria-label')).toContain('photo.png');
+    // The acknowledgement replaces the attachment id, but the row (DOM and scope) survives
+    // and shows the acknowledged attachment.
+    expect(tile()).toBe(firstTile);
+    expect(firstTile.isConnected).toBe(true);
+    expect(consoleWarn.mock.calls.map((args) => String(args[0]))).not.toContainEqual(
+      expect.stringContaining('NG0956'),
+    );
     expect(root.querySelector('button[aria-label="Remove photo.png"]')).toBeNull();
     // The thread shows the final state: both messages, an empty composer.
     expect(root.querySelectorAll('[data-role="user"]')).toHaveLength(1);

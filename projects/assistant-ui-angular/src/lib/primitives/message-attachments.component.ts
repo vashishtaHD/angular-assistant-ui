@@ -27,6 +27,8 @@ import { AuiAttachmentListBase, AuiAttachmentViewComponent } from './attachment/
 export class AuiMessageAttachmentsComponent extends AuiAttachmentListBase {
   /** @internal */
   protected readonly source = 'message';
+  /** @internal The send handoff replaces every attachment id but keeps the rows. */
+  protected override readonly handoff = true;
   private readonly items = injectAuiState((s) =>
     s.message.role === 'user'
       ? (s.message.submission?.attachments ?? s.message.attachments)

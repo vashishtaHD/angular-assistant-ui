@@ -111,6 +111,45 @@ export const getAttachmentKeys = (attachments: readonly { readonly id: string }[
   );
 };
 
+/** The ids and keys of an attachment list's previous render. */
+export interface AttachmentKeyState {
+  readonly ids: readonly string[];
+  readonly keys: readonly string[];
+}
+
+/**
+ * Keys for `ids` that carry over from `previous`: a kept id keeps its key, and with `handoff` a
+ * new id keeps the key of the previous attachment at its index when that attachment's id left
+ * the list. That is a message's send handoff, where the host acknowledges the in-flight
+ * submission and replaces every attachment id, so the rows (DOM, components, scopes) are updated
+ * in place instead of re-created (which Angular reports as NG0956 for a whole list). Rows are
+ * index-scoped, so a kept row shows the attachment now at its index.
+ */
+export const carryAttachmentKeys = (
+  ids: readonly string[],
+  previous: AttachmentKeyState,
+  handoff: boolean,
+): string[] => {
+  const fresh = getAttachmentKeys(ids.map((id) => ({ id })));
+  const keys = ids.map((id, index) => {
+    if (!fresh[index]!.startsWith('attachment:')) return fresh[index]!;
+    const kept = previous.ids.indexOf(id);
+    if (kept !== -1 && previous.ids.lastIndexOf(id) === kept) return previous.keys[kept]!;
+    const old = previous.ids[index];
+    if (handoff && old !== undefined && !ids.includes(old)) return previous.keys[index]!;
+    return fresh[index]!;
+  });
+  // Never hand out a key twice; a clash falls back to the id key, then to the index.
+  const used = new Set<string>();
+  return keys.map((key, index) => {
+    const unique =
+      [key, fresh[index]!, `attachment#${index}`].find((candidate) => !used.has(candidate)) ??
+      `attachment#${index}`;
+    used.add(unique);
+    return unique;
+  });
+};
+
 interface Entry {
   index: number;
   config: AuiConfig;
@@ -140,8 +179,19 @@ export abstract class AuiAttachmentListBase {
   protected abstract readonly source: AttachmentScopeSource;
   /** @internal */
   protected abstract readonly attachments: () => readonly { readonly id: string }[];
+  /**
+   * Whether a wholesale id change is a handoff that keeps the rows (see
+   * {@link carryAttachmentKeys}). The message list sets it; the composer list does not.
+   */
+  protected readonly handoff: boolean = false;
+  private previousKeys: AttachmentKeyState = { ids: [], keys: [] };
   /** The attachment keys, stable while they keep the same order. */
-  protected readonly keys = stableKeys(() => getAttachmentKeys(this.attachments()));
+  protected readonly keys = stableKeys(() => {
+    const ids = this.attachments().map((attachment) => attachment.id);
+    const keys = carryAttachmentKeys(ids, this.previousKeys, this.handoff);
+    this.previousKeys = { ids, keys };
+    return keys;
+  });
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
