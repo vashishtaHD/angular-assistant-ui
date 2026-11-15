@@ -213,8 +213,15 @@ changed a thread.
 - The chat route rejects bodies over `MASTRA_MAX_BODY_BYTES` (default 10 MiB) with 413. The whole
   request counts, including earlier messages the client resends, so keep a margin. Put any proxy limit
   (for example nginx `client_max_body_size`) at or above this value.
+- The reference server accepts file parts **only as inline `data:` URLs**. A remote URL (`http`,
+  `https`, `file`, ...) in any message's `file` or `reasoning-file` part, a provider file reference,
+  an unknown part type, or a legacy message field such as `experimental_attachments` would make the
+  model pipeline download content from the server's network position (server-side request
+  forgery), so the route answers 400 for the parts and strips the legacy fields.
 - To avoid large bodies, pass `attachments` to `mastraThreadListAdapter` with an adapter that uploads
-  to your storage and sends `https` URLs instead.
+  to your storage and sends `https` URLs instead, and pass `isTrustedFileUrl` to `createChatRoutes`
+  so the server accepts exactly those URLs (for example `(url) => url.startsWith(UPLOAD_ORIGIN)`).
+  The model pipeline fetches accepted URLs from the server, so trust only your own bounded storage.
 - The model must be multimodal to see image attachments.
 - In the styled kit, `aui-thread` renders the composer's attachment tiles and the add-attachment button
   by default (the `ComposerAttachments` and `ComposerAddAttachment` slots of `AUI_THREAD_COMPONENTS`)

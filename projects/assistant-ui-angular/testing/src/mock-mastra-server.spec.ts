@@ -149,6 +149,33 @@ describe('createMockMastraServer', () => {
     expect((await call('GET', '/chat/chatAgent/threads/none/messages')).status).toBe(404);
   });
 
+  it('accepts data: file parts and rejects remote file URLs and unknown part types like the server', async () => {
+    const { chat } = setup();
+    const withFile = (url: string) => ({
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          parts: [{ type: 'file', url, mediaType: 'image/png', filename: 'a.png' }],
+        },
+      ],
+      memory: { thread: 't1' },
+    });
+    expect((await chat(withFile('data:image/png;base64,AA'))).status).toBe(200);
+    expect(await chat(withFile('http://127.0.0.1:9876/private'))).toMatchObject({
+      status: 400,
+      json: { error: 'Invalid request body', issues: ['File parts must be inline data: URLs'] },
+    });
+    expect(
+      (
+        await chat({
+          messages: [{ id: 'u1', role: 'user', parts: [{ type: 'image', image: 'http://x' }] }],
+          memory: { thread: 't1' },
+        })
+      ).status,
+    ).toBe(400);
+  });
+
   it('rejects an assistant id that belongs to another thread with 409', async () => {
     const { server, chat } = setup();
     server.seedThread({ id: 't1' }, [user('u1'), { id: 'a1', role: 'assistant', parts: [] }]);

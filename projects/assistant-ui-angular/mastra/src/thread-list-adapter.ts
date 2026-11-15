@@ -36,7 +36,8 @@ export interface MastraThreadListAdapterOptions {
   pageSize?: number;
   /**
    * Attachment adapter for every thread (for example one that uploads to the host's storage and
-   * sends https URLs). Default: the AI SDK runtime's data-URL adapter.
+   * sends https URLs). Default: the AI SDK runtime's data-URL adapter. The reference server
+   * accepts remote file URLs only when its `isTrustedFileUrl` option allows them.
    */
   attachments?: AttachmentAdapter;
   /** Title polling for `generateTitle`. Default every 1000 ms for up to 15000 ms. */

@@ -127,6 +127,50 @@ const json = (status: number, body: unknown) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const PART_TYPES = new Set([
+  'text',
+  'reasoning',
+  'step-start',
+  'source-url',
+  'source-document',
+  'file',
+  'reasoning-file',
+  'dynamic-tool',
+  'custom',
+  'steering-message',
+]);
+
+/**
+ * The server's part checks: known UI part types only, and `file`/`reasoning-file` parts carry an
+ * inline `data:` URL (never a remote URL the server would download) and no provider reference.
+ */
+const unsafePart = (parts: unknown[]): string | undefined => {
+  for (const part of parts) {
+    const type = isRecord(part) ? part['type'] : undefined;
+    if (
+      typeof type !== 'string' ||
+      !(PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type))
+    ) {
+      return 'Unsupported message part type';
+    }
+    const record = part as Record<string, unknown>;
+    if (type === 'file' || type === 'reasoning-file') {
+      if (record['providerReference'] !== undefined) {
+        return 'File provider references are not accepted';
+      }
+      if (typeof record['url'] !== 'string' || !/^data:/i.test(record['url'])) {
+        return 'File parts must be inline data: URLs';
+      }
+    } else if (type === 'steering-message') {
+      const nested = Array.isArray(record['parts'])
+        ? unsafePart(record['parts'])
+        : 'Steering messages need parts';
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+};
+
 const textOf = (message: UIMessage | undefined) =>
   (message?.parts ?? [])
     .map((part) => (part.type === 'text' ? part.text : ''))
@@ -150,7 +194,8 @@ const groupKeys = (messages: UIMessage[]) => {
  * implements its HTTP contract through `fetch` interception:
  *
  * - `POST /chat/:agentId`: the whitelisted body (`messages` with `user`/`assistant` roles only,
- *   `memory.thread` required, `resumeData` requires `runId`), branch reconciliation from
+ *   `memory.thread` required, `resumeData` requires `runId`, known UI part types only, file parts
+ *   only as inline `data:` URLs), branch reconciliation from
  *   `messageIds` (skipped on resubmits and when `messageIds` is absent), an SSE stream of AI SDK v7 chunks whose `start` carries
  *   the stored assistant id (a resubmit reuses it), and the errors 400/401/403/404/413, plus 409
  *   when an echoed assistant id belongs to another thread.
@@ -295,6 +340,10 @@ export function createMockMastraServer(options: MockMastraServerOptions = {}): M
         else if (message['role'] !== 'user' && message['role'] !== 'assistant')
           issues.push('Invalid option: expected one of "user"|"assistant"');
         else if (!Array.isArray(message['parts'])) issues.push('Invalid input: message parts');
+        else {
+          const problem = unsafePart(message['parts']);
+          if (problem) issues.push(problem);
+        }
       }
     }
     const memory = record['memory'];

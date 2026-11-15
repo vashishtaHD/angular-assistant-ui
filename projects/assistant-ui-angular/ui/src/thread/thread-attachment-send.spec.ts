@@ -136,6 +136,13 @@ describe('aui-thread: sending with an attachment over the AI SDK runtime (Mastra
       root.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message input"]')!.value,
     ).toBe('');
     expect(loggedErrors().filter((e) => e.includes('NG0600'))).toEqual([]);
+    // The attachment travels inline, the only file form the reference server accepts.
+    const sent = server.requests.find((r) => r.method === 'POST' && r.path.startsWith('/chat/'))!
+      .body as { messages: { parts: Record<string, unknown>[] }[] };
+    expect(sent.messages.at(-1)!.parts.find((p) => p['type'] === 'file')).toMatchObject({
+      url: expect.stringMatching(/^data:image\/png;base64,/),
+      mediaType: 'image/png',
+    });
 
     // The message scope recovered: edit the attachment-bearing message and send again.
     const edit = root.querySelector<HTMLButtonElement>(

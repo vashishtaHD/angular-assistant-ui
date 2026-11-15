@@ -11,19 +11,40 @@ const RESOURCE_ID_KEY = 'mastra__resourceId';
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_FRONTEND_TOOLS = 64;
 
-const part = z.looseObject({ type: z.string() });
+/** AI SDK v7 UI message part types the route accepts. Anything else is a 400. */
+const PART_TYPES = new Set([
+  'text',
+  'reasoning',
+  'step-start',
+  'source-url',
+  'source-document',
+  'file',
+  'reasoning-file',
+  'dynamic-tool',
+  'custom',
+  'steering-message',
+]);
+const isKnownPartType = (type: string) =>
+  PART_TYPES.has(type) || /^tool-./.test(type) || /^data-./.test(type);
+
+const part = z.looseObject({
+  type: z.string().refine(isKnownPartType, { message: 'Unsupported message part type' }),
+});
 
 /**
  * The only fields the chat route reads. Zod strips every other key, so an agent option such as
  * `system`, `instructions`, `toolsets`, `requireToolApproval`, `maxSteps` or `hooks` never
  * reaches the agent call. `memory.resource` is stripped too: identity comes from the server.
+ * Messages keep only `id`, `role`, `parts` and `metadata`: legacy fields such as
+ * `experimental_attachments` or `content` would otherwise make the model pipeline fetch URLs.
  */
 export const chatBodySchema = z.object({
   messages: z.array(
-    z.looseObject({
+    z.object({
       id: z.string().min(1),
       role: z.enum(['user', 'assistant']),
       parts: z.array(part),
+      metadata: z.unknown().optional(),
     }),
   ),
   messageIds: z.array(z.string()).optional(),
@@ -44,6 +65,43 @@ export const chatBodySchema = z.object({
 });
 
 export type ChatBody = z.infer<typeof chatBodySchema>;
+
+/**
+ * Finds the first part that would make the server (or the model provider) load content it was
+ * not sent inline, and returns why it is refused; `undefined` when every part is safe.
+ *
+ * `file` and `reasoning-file` parts must carry a `data:` URL (the body limit bounds their size)
+ * unless `isTrustedFileUrl` accepts the URL. A `providerReference` (a file already uploaded to
+ * the provider account) is always refused. `steering-message` parts are checked recursively.
+ */
+export function findUnsafePart(
+  messages: ChatBody['messages'],
+  isTrustedFileUrl: (url: string) => boolean = () => false,
+): string | undefined {
+  const check = (parts: readonly Record<string, unknown>[]): string | undefined => {
+    for (const p of parts) {
+      if (p['type'] === 'file' || p['type'] === 'reasoning-file') {
+        if (p['providerReference'] !== undefined)
+          return 'File provider references are not accepted';
+        const url = p['url'];
+        if (typeof url !== 'string') return 'File parts need a url';
+        if (!/^data:/i.test(url) && !isTrustedFileUrl(url)) {
+          return 'File parts must be inline data: URLs';
+        }
+      } else if (p['type'] === 'steering-message') {
+        if (!Array.isArray(p['parts'])) return 'Steering messages need parts';
+        const nested = check(p['parts'] as Record<string, unknown>[]);
+        if (nested) return nested;
+      }
+    }
+    return undefined;
+  };
+  for (const message of messages) {
+    const problem = check(message.parts);
+    if (problem) return problem;
+  }
+  return undefined;
+}
 
 /** Maps frontend tool JSON schemas to Mastra `clientTools` (tools without `execute`). */
 export function toClientTools(
@@ -80,6 +138,12 @@ export interface ChatRouteOptions {
   path?: string;
   /** Largest accepted POST body in bytes. Larger bodies get 413. Default 10 MiB. */
   maxBodyBytes?: number;
+  /**
+   * Accepts a non-`data:` file URL (for example the host's own upload bucket). The model
+   * pipeline downloads accepted URLs from the server, so only return `true` for locations that
+   * are safe to fetch and bounded in size. Default: every remote URL is refused with 400.
+   */
+  isTrustedFileUrl?: (url: string) => boolean;
 }
 
 type MemoryLike = {
@@ -125,6 +189,8 @@ export function createChatRoutes(options: ChatRouteOptions = {}) {
         );
       }
       const body = parsed.data;
+      const unsafe = findUnsafePart(body.messages, options.isTrustedFileUrl);
+      if (unsafe) return c.json({ error: 'Invalid request body', issues: [unsafe] }, 400);
       if (body.resumeData && !body.runId)
         return c.json({ error: 'runId is required with resumeData' }, 400);
 

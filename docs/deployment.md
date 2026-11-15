@@ -86,7 +86,9 @@ The chat route accepts bodies up to `MASTRA_MAX_BODY_BYTES` (default 10 MiB) and
 413 above that. Image attachments travel as base64 data URLs in the JSON body, about 33%
 larger than the file, so a 2 MB image needs about 2.7 MB. Put any reverse proxy limit
 (for example nginx `client_max_body_size`) at or above this value. The image model must be
-multimodal for the model to see attachments.
+multimodal for the model to see attachments. File parts must be inline `data:` URLs: the
+route answers 400 for a remote file URL, which the model pipeline would otherwise download
+from inside your network (see "Attachments and size limits" in [mastra.md](mastra.md)).
 
 ## Branches and the stored log
 

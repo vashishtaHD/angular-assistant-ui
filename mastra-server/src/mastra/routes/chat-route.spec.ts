@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { chatBodySchema, mergeAssistantRuns, toClientTools } from './chat-route';
+import { describe, expect, it, vi } from 'vitest';
+import { chatBodySchema, findUnsafePart, mergeAssistantRuns, toClientTools } from './chat-route';
 import { bearer, createTestServer, userMessage } from '../../testing/harness';
 import { textStep, toolCallStep } from '../../testing/mock-model';
 
@@ -568,5 +568,125 @@ describe('history and branch reconciliation', () => {
     expect(prompt).toContain('booked it');
     const ids = (await t.history('t1', A)).body.messages.map((m: any) => m.role);
     expect(ids.slice(0, 3)).toEqual(['user', 'assistant', 'user']);
+  });
+});
+
+describe('remote URLs in message parts (SSRF)', () => {
+  const internal = 'http://127.0.0.1:9876/private';
+
+  /** Runs `body` against a fresh server while recording every outbound fetch. */
+  async function postRecordingFetch(body: unknown) {
+    const t = await createTestServer();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => new Response('PRIVATE_INTERNAL_CONTENT'));
+    try {
+      const res = await t.post(body, A);
+      return { res, fetched: fetchSpy.mock.calls.map((call) => String(call[0])), t };
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  }
+
+  const fileMessage = (url: string, role: 'user' | 'assistant' = 'user') => ({
+    id: role === 'user' ? 'u1' : 'a1',
+    role,
+    parts: [
+      { type: 'text', text: 'look' },
+      { type: 'file', url, mediaType: 'application/pdf', filename: 'x.pdf' },
+    ],
+  });
+
+  it('rejects a user file part with an http URL before any fetch or model call', async () => {
+    const { res, fetched, t } = await postRecordingFetch({
+      messages: [fileMessage(internal)],
+      memory: { thread: 't1' },
+    });
+    expect(res.status).toBe(400);
+    expect(fetched).toEqual([]);
+    expect(t.sm.calls()).toHaveLength(0);
+    expect(res.text).not.toContain('PRIVATE_INTERNAL_CONTENT');
+  });
+
+  it('rejects https, file and protocol-relative URLs, and file parts in assistant messages', async () => {
+    for (const url of ['https://example.com/a.pdf', 'file:///etc/passwd', '//127.0.0.1/x']) {
+      const { res, fetched } = await postRecordingFetch({
+        messages: [fileMessage(url)],
+        memory: { thread: 't1' },
+      });
+      expect(res.status, url).toBe(400);
+      expect(fetched, url).toEqual([]);
+    }
+    const { res, fetched } = await postRecordingFetch({
+      messages: [userMessage('u1', 'hi'), fileMessage(internal, 'assistant')],
+      memory: { thread: 't1' },
+    });
+    expect(res.status).toBe(400);
+    expect(fetched).toEqual([]);
+  });
+
+  it('rejects part types outside the UI message vocabulary (for example a model image part)', async () => {
+    const { res, fetched } = await postRecordingFetch({
+      messages: [
+        { id: 'u1', role: 'user', parts: [{ type: 'image', image: internal, url: internal }] },
+      ],
+      memory: { thread: 't1' },
+    });
+    expect(res.status).toBe(400);
+    expect(fetched).toEqual([]);
+  });
+
+  it('strips message-level attachment and content fields that carry URLs', async () => {
+    const { res, fetched } = await postRecordingFetch({
+      messages: [
+        {
+          ...userMessage('u1', 'hi'),
+          experimental_attachments: [{ url: internal, contentType: 'application/pdf' }],
+          content: [{ type: 'image', image: internal }],
+        },
+      ],
+      memory: { thread: 't1' },
+    });
+    expect(res.status).toBe(200);
+    expect(fetched).toEqual([]);
+  });
+
+  it('findUnsafePart honours isTrustedFileUrl, refuses provider references and nested parts', () => {
+    const trusted = (url: string) => url.startsWith('https://uploads.example.com/');
+    const msg = (parts: any[]) => [{ id: 'u', role: 'user' as const, parts }];
+    const file = (url: string, extra = {}) => ({
+      type: 'file',
+      url,
+      mediaType: 'image/png',
+      ...extra,
+    });
+    expect(
+      findUnsafePart(msg([file('https://uploads.example.com/a.png')]), trusted),
+    ).toBeUndefined();
+    expect(findUnsafePart(msg([file('https://uploads.example.com/a.png')]))).toBeDefined();
+    expect(findUnsafePart(msg([file('https://evil.example.com/a.png')]), trusted)).toBeDefined();
+    expect(
+      findUnsafePart(
+        msg([file('data:image/png;base64,AA', { providerReference: { openai: 'f' } })]),
+      ),
+    ).toBeDefined();
+    expect(
+      findUnsafePart(msg([{ type: 'reasoning-file', url: internal, mediaType: 'image/png' }])),
+    ).toBeDefined();
+    expect(
+      findUnsafePart(msg([{ type: 'steering-message', id: 's', parts: [file(internal)] }])),
+    ).toBeDefined();
+    expect(findUnsafePart(msg([{ type: 'text', text: internal }]))).toBeUndefined();
+  });
+
+  it('accepts an inline data: file part without fetching', async () => {
+    const { res, fetched, t } = await postRecordingFetch({
+      messages: [fileMessage('data:application/pdf;base64,JVBERi0xLjQK')],
+      memory: { thread: 't1' },
+    });
+    expect(res.status).toBe(200);
+    // The AI SDK may decode a data: URL through fetch; that never leaves the process.
+    expect(fetched.filter((url) => !url.startsWith('data:'))).toEqual([]);
+    expect(JSON.stringify(t.sm.calls()[0].prompt)).toContain('application/pdf');
   });
 });
