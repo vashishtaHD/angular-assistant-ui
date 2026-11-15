@@ -1,3 +1,4 @@
+// Original angular-assistant-ui demo code (no upstream counterpart; no code copied).
 import { APP_INITIALIZER, Injectable, InjectionToken, inject, type Provider } from '@angular/core';
 import type { MastraAuth } from 'angular-assistant-ui/mastra';
 

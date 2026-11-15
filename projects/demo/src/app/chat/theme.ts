@@ -1,7 +1,9 @@
+// Original angular-assistant-ui demo code (no upstream counterpart; no code copied).
 import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   Injectable,
   computed,
   inject,
@@ -21,34 +23,50 @@ const readStored = (): Theme | null => {
   }
 };
 
-const prefersDark = (): boolean => {
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+const darkQuery = (): MediaQueryList | null => {
   try {
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+    return typeof window.matchMedia === 'function' ? window.matchMedia(DARK_QUERY) : null;
   } catch {
-    return false;
+    return null;
   }
 };
 
 /**
- * The page theme. It forces the kit's `.aui-dark` or `.aui-light` class on `<html>` (so the
- * overlays the kit opens follow it too) once the user picks one; until then the OS decides.
+ * The page theme, reflected on `<html>` so the kit, the overlays it opens and the demo's own
+ * `dark:` styles all follow it.
+ *
+ * Until the user picks a theme it follows the OS, including later OS changes: dark sets the
+ * kit's `.aui-dark` class (which the demo's Tailwind `dark:` variants key off), light sets no
+ * class (the kit is light then). Once the user toggles, the choice is stored and forced with
+ * `.aui-dark` or `.aui-light`, and OS changes no longer apply.
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private readonly root = inject(DOCUMENT).documentElement;
-  private readonly current = signal<Theme>(readStored() ?? (prefersDark() ? 'dark' : 'light'));
+  private readonly query = darkQuery();
+  private readonly chosen = signal<Theme | null>(readStored());
+  private readonly system = signal<Theme>(this.query?.matches ? 'dark' : 'light');
+  private readonly current = computed<Theme>(() => this.chosen() ?? this.system());
   /** Whether the page is dark. */
   readonly dark = computed(() => this.current() === 'dark');
 
   constructor() {
-    const stored = readStored();
-    if (stored) this.apply(stored);
+    const onChange = (event: MediaQueryListEvent) => {
+      this.system.set(event.matches ? 'dark' : 'light');
+      this.apply();
+    };
+    this.query?.addEventListener?.('change', onChange);
+    inject(DestroyRef).onDestroy(() => this.query?.removeEventListener?.('change', onChange));
+    this.apply();
   }
 
   /** Switches between light and dark and remembers the choice. */
   toggle(): void {
     const next: Theme = this.current() === 'dark' ? 'light' : 'dark';
-    this.apply(next);
+    this.chosen.set(next);
+    this.apply();
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
@@ -56,16 +74,16 @@ export class ThemeService {
     }
   }
 
-  private apply(theme: Theme): void {
-    this.current.set(theme);
-    this.root.classList.toggle('aui-dark', theme === 'dark');
-    this.root.classList.toggle('aui-light', theme === 'light');
+  private apply(): void {
+    this.root.classList.toggle('aui-dark', this.current() === 'dark');
+    // Light is forced only by an explicit choice; an OS-light page needs no class.
+    this.root.classList.toggle('aui-light', this.chosen() === 'light');
   }
 }
 
 /** A button that toggles dark mode. */
 @Component({
-  selector: 'app-theme-toggle',
+  selector: 'aui-demo-theme-toggle',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<button
@@ -99,5 +117,6 @@ export class ThemeService {
   </button>`,
 })
 export class ThemeToggleComponent {
+  /** The page theme the button toggles. */
   protected readonly theme = inject(ThemeService);
 }

@@ -1,3 +1,4 @@
+// Original specs for the demo's full chat app (no upstream test exists).
 import type { UIMessage } from 'ai';
 import type { MockMastraReply } from 'angular-assistant-ui/testing';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -42,6 +43,13 @@ let app: DemoHarness<ChatAppComponent> | undefined;
 let consoleError: MockInstance<typeof console.error>;
 
 const html = () => document.documentElement;
+
+/**
+ * The one console error the store may log when a message with an attachment is sent: its
+ * notification manager reporting the transient `useClientLookup` key miss it labels recoverable.
+ */
+const RECOVERABLE_LOOKUP =
+  /^NotificationManager: subscriber callback error Error: useClientLookup: key "[^"]+" not found \(ignore if recovered\)$/;
 
 describe('ChatAppComponent (the full chat app)', () => {
   beforeEach(() => {
@@ -334,11 +342,42 @@ describe('ChatAppComponent (the full chat app)', () => {
     );
     expect(messageTile?.getAttribute('aria-label')).toContain('photo.png');
     expect(root.querySelector('button[aria-label="Remove photo.png"]')).toBeNull();
-    const errors = consoleError.mock.calls.map((args) => args.map(String).join(' '));
-    expect(errors.filter((e) => e.includes('NG0600'))).toEqual([]);
-    // Only the store's own transient lookup hint, marked "(ignore if recovered)", may remain.
-    expect(errors.filter((e) => !e.includes('(ignore if recovered)'))).toEqual([]);
-  });
+    const errors = () => consoleError.mock.calls.map((args) => args.map(String).join(' '));
+    expect(errors().filter((e) => e.includes('NG0600'))).toEqual([]);
+
+    // The message scope recovered: edit the attachment-bearing message and send again.
+    root.querySelector<HTMLButtonElement>('[data-role="user"] button[aria-label="Edit"]')!.click();
+    let editor: HTMLTextAreaElement | null = null;
+    await waitFor(() => {
+      editor = root.querySelector<HTMLTextAreaElement>('textarea[aria-label="Edit message"]');
+      expect(editor?.value).toBe('what is in this picture?');
+    });
+    editor!.value = 'and in this one?';
+    editor!.dispatchEvent(new Event('input', { bubbles: true }));
+    const update = () =>
+      Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Update');
+    await waitFor(() => expect(update()?.disabled).toBe(false));
+    update()!.click();
+
+    await waitFor(() => expect(root.textContent).toContain('Echo: and in this one?'));
+    expect(chatRequests()).toHaveLength(2);
+    const edited = chatRequests()[1]!.body as { messages: UIMessage[] };
+    expect(edited.messages.at(-1)!.parts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'file', mediaType: 'image/png' }),
+        expect.objectContaining({ type: 'text', text: 'and in this one?' }),
+      ]),
+    );
+    expect(
+      root
+        .querySelector('aui-message-attachments-styled [data-slot="aui_attachment-tile"]')
+        ?.getAttribute('aria-label'),
+    ).toContain('photo.png');
+
+    // At most the one recoverable lookup miss; nothing else, and no NG0600.
+    expect(errors().filter((e) => !RECOVERABLE_LOOKUP.test(e))).toEqual([]);
+    expect(errors().length).toBeLessThanOrEqual(1);
+  }, 30000);
 
   it('groups consecutive tool calls with the kit tool group', async () => {
     const call = (id: string, city: string) =>

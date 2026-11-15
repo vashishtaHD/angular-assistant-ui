@@ -1,3 +1,4 @@
+// Original angular-assistant-ui demo code (no upstream counterpart; no code copied).
 import type { Routes } from '@angular/router';
 import { ChatAppComponent } from './chat-app.component';
 import { ModalPageComponent } from './modal-page.component';

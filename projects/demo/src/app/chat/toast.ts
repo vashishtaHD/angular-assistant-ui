@@ -1,3 +1,4 @@
+// Original angular-assistant-ui demo code (no upstream counterpart; no code copied).
 import {
   ChangeDetectionStrategy,
   Component,
@@ -38,7 +39,7 @@ export class ToastService {
 
 /** Renders the toasts of {@link ToastService}. */
 @Component({
-  selector: 'app-toasts',
+  selector: 'aui-demo-toasts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -60,5 +61,6 @@ export class ToastService {
   }`,
 })
 export class ToastsComponent {
+  /** The toasts to render. */
   protected readonly toasts = inject(ToastService);
 }

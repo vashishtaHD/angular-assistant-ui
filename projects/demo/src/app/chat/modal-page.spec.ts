@@ -1,3 +1,4 @@
+// Original specs for the demo's assistant modal page (no upstream test exists).
 import type { UIMessageChunk } from 'ai';
 import { createScriptedChatTransport } from 'angular-assistant-ui/testing';
 import { afterEach, describe, expect, it } from 'vitest';

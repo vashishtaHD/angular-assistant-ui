@@ -1,3 +1,5 @@
+// Original angular-assistant-ui demo code (no upstream counterpart; no code copied).
+// It wires the Shiki provider (a redesign of packages/ui/src/components/react/assistant-ui/elements/shiki-highlighter.tsx @ 7d74276).
 import { inject, type Provider } from '@angular/core';
 import { MASTRA_AUTH, type MastraAuth } from 'angular-assistant-ui/mastra';
 import { provideShikiHighlighter } from 'angular-assistant-ui/shiki';

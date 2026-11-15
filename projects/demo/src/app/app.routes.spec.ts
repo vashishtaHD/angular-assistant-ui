@@ -1,3 +1,4 @@
+// Original specs for the demo routes (no upstream test exists).
 import type { Route } from '@angular/router';
 import { MASTRA_AUTH } from 'angular-assistant-ui/mastra';
 import { describe, expect, it } from 'vitest';

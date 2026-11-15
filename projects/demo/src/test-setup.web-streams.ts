@@ -1,3 +1,4 @@
+// Original angular-assistant-ui demo code (no upstream counterpart; no code copied).
 import {
   ReadableStream,
   TextDecoderStream,

@@ -1,3 +1,5 @@
+// Original angular-assistant-ui demo code (no code copied): the runtime config of the chat pages.
+// The starter suggestions use the `Suggestions` client of packages/core/src/store @ 7d74276.
 import { inject } from '@angular/core';
 import { AuiConfig, Suggestions, type FeedbackAdapter } from 'angular-assistant-ui';
 import {

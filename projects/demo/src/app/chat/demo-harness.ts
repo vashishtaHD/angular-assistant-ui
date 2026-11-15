@@ -1,4 +1,4 @@
-// Spec helpers for the demo: mounts a page against the mock Mastra server.
+// Original spec helpers for the demo (no code copied): mounts a page against the mock Mastra server.
 import type { Provider, Type } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';

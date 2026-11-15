@@ -64,11 +64,25 @@ const waitFor = (assertion: () => void) =>
 const loggedErrors = () =>
   consoleError.mock.calls.map((args) => args.map((a) => String(a)).join(' '));
 
+/**
+ * The one console error the store may log on this path: its notification manager reporting
+ * the transient `useClientLookup` key miss it labels recoverable (a message scope re-resolving
+ * a moment before the thread client's lookup holds the message).
+ */
+const RECOVERABLE_LOOKUP =
+  /^NotificationManager: subscriber callback error Error: useClientLookup: key "[^"]+" not found \(ignore if recovered\)$/;
+
 describe('aui-thread: sending with an attachment over the AI SDK runtime (MastraThreads)', () => {
   beforeEach(() => {
     server = createMockMastraServer({
       baseUrl: `http://attach-${++servers}.test`,
-      respond: () => ({ chunks: reply('Nice picture.') }),
+      respond: (turn) => {
+        const last = turn.body.messages.at(-1);
+        const text = (last?.parts ?? [])
+          .map((part) => (part.type === 'text' ? part.text : ''))
+          .join('');
+        return { chunks: reply(text === 'what is this?' ? 'Nice picture.' : `Edited: ${text}`) };
+      },
     });
     consoleError = vi.spyOn(console, 'error');
   });
@@ -122,8 +136,40 @@ describe('aui-thread: sending with an attachment over the AI SDK runtime (Mastra
       root.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message input"]')!.value,
     ).toBe('');
     expect(loggedErrors().filter((e) => e.includes('NG0600'))).toEqual([]);
-    // The only other output allowed is the store's own transient lookup hint, which it marks
-    // "(ignore if recovered)": the message scope recovers on the next notification.
-    expect(loggedErrors().filter((e) => !e.includes('(ignore if recovered)'))).toEqual([]);
-  }, 20000);
+
+    // The message scope recovered: edit the attachment-bearing message and send again.
+    const edit = root.querySelector<HTMLButtonElement>(
+      '[data-role="user"] button[aria-label="Edit"]',
+    );
+    expect(edit).not.toBeNull();
+    edit!.click();
+    let editor: HTMLTextAreaElement | null = null;
+    await waitFor(() => {
+      editor = root.querySelector<HTMLTextAreaElement>('textarea[aria-label="Edit message"]');
+      expect(editor?.value).toBe('what is this?');
+    });
+    editor!.value = 'and now?';
+    editor!.dispatchEvent(new Event('input', { bubbles: true }));
+    const update = () =>
+      Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Update');
+    await waitFor(() => expect(update()?.disabled).toBe(false));
+    update()!.click();
+
+    await waitFor(() => expect(root.textContent).toContain('Edited: and now?'));
+    expect(root.querySelector('textarea[aria-label="Edit message"]')).toBeNull();
+    expect(
+      server.requests.filter((r) => r.method === 'POST' && r.path.startsWith('/chat/')),
+    ).toHaveLength(2);
+    // The edit keeps the attachment on the new branch.
+    expect(
+      root
+        .querySelector('aui-message-attachments-styled [data-slot="aui_attachment-tile"]')
+        ?.getAttribute('aria-label'),
+    ).toContain('photo.png');
+
+    // At most the one recoverable lookup miss; nothing else, and no NG0600.
+    const errors = loggedErrors();
+    expect(errors.filter((e) => !RECOVERABLE_LOOKUP.test(e))).toEqual([]);
+    expect(errors.length).toBeLessThanOrEqual(1);
+  }, 30000);
 });

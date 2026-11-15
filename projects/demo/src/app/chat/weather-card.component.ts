@@ -1,3 +1,5 @@
+// Original angular-assistant-ui demo tool UI (no code copied). Its non-result states render the kit port of
+// packages/ui/src/components/react/assistant-ui/elements/tool-fallback.aui.tsx @ 7d74276.
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import type { ToolUIComponent, ToolUIProps } from 'angular-assistant-ui';
 import { AuiToolFallbackComponent } from 'angular-assistant-ui/ui';
@@ -20,7 +22,7 @@ const isWeatherOutput = (value: unknown): value is WeatherOutput =>
  * fallback, which already renders those states.
  */
 @Component({
-  selector: 'app-weather-card',
+  selector: 'aui-demo-weather-card',
   standalone: true,
   imports: [AuiToolFallbackComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,

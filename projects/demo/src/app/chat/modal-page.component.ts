@@ -1,3 +1,5 @@
+// Original angular-assistant-ui demo composition (no code copied) around the kit port of
+// packages/ui/src/components/react/assistant-ui/elements/assistant-modal.aui.tsx @ 7d74276.
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuiProviderDirective } from 'angular-assistant-ui';
@@ -9,7 +11,7 @@ import { ToastsComponent } from './toast';
 
 /** A content page with the floating assistant modal (`/modal`). */
 @Component({
-  selector: 'app-modal-page',
+  selector: 'aui-demo-modal-page',
   standalone: true,
   imports: [
     AuiProviderDirective,
@@ -21,7 +23,7 @@ import { ToastsComponent } from './toast';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-y-auto' },
-  template: `<div [auiProvider]="config" appChatTools class="min-h-full">
+  template: `<div [auiProvider]="config" auiDemoChatTools class="min-h-full">
       <header
         class="flex items-center gap-3 border-b px-6 py-3"
         style="border-color: var(--aui-border)"
@@ -29,7 +31,7 @@ import { ToastsComponent } from './toast';
         <span class="text-sm font-semibold">Assistant modal</span>
         <a routerLink="/" class="text-sm underline underline-offset-2 opacity-70">Full chat app</a>
         <span class="flex-1"></span>
-        <app-theme-toggle />
+        <aui-demo-theme-toggle />
       </header>
       <main class="mx-auto max-w-2xl px-6 py-10">
         <h1 class="text-2xl font-semibold tracking-tight">Your page, with an assistant</h1>
@@ -41,7 +43,7 @@ import { ToastsComponent } from './toast';
       </main>
       <aui-assistant-modal />
     </div>
-    <app-toasts />`,
+    <aui-demo-toasts />`,
 })
 export class ModalPageComponent {
   /** The AUI config: Mastra threads, suggestions and feedback. */

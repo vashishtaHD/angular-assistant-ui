@@ -1,3 +1,6 @@
+// Original angular-assistant-ui demo composition (no code copied). It composes the kit ports of
+// packages/ui/src/components/react/assistant-ui/elements/threadlist-sidebar.aui.tsx and thread.aui.tsx @ 7d74276,
+// a Thread inside a ThreadListSidebar.
 import { ChangeDetectionStrategy, Component, Directive, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuiProviderDirective, injectAuiState, registerToolUI } from 'angular-assistant-ui';
@@ -12,7 +15,7 @@ import { WeatherCardComponent } from './weather-card.component';
  * tool (the `bookMeeting` approval, `askUser`) renders through the kit's tool fallback.
  * Must sit under `[auiProvider]`.
  */
-@Directive({ selector: '[appChatTools]', standalone: true })
+@Directive({ selector: '[auiDemoChatTools]', standalone: true })
 export class ChatToolsDirective {
   constructor() {
     registerToolUI('getWeather', WeatherCardComponent);
@@ -21,13 +24,14 @@ export class ChatToolsDirective {
 
 /** The current thread's title in the header. */
 @Component({
-  selector: 'app-thread-title',
+  selector: 'aui-demo-thread-title',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'min-w-0 truncate text-sm font-medium' },
   template: `{{ title() || 'New Chat' }}`,
 })
 export class ThreadTitleComponent {
+  /** The current thread's title, if it has one. */
   protected readonly title = injectAuiState((s) => s.optional.threadListItem?.title);
 }
 
@@ -37,7 +41,7 @@ export class ThreadTitleComponent {
  * feedback, follow-ups and timing), a dark-mode toggle and toasts.
  */
 @Component({
-  selector: 'app-chat-app',
+  selector: 'aui-demo-chat-app',
   standalone: true,
   imports: [
     AuiProviderDirective,
@@ -51,7 +55,7 @@ export class ThreadTitleComponent {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full' },
-  template: `<div [auiProvider]="config" appChatTools class="h-full">
+  template: `<div [auiProvider]="config" auiDemoChatTools class="h-full">
       <aui-thread-list-sidebar [(collapsed)]="collapsed" class="h-full">
         <div auiSidebarHeader class="flex items-center gap-2 px-2 py-1">
           <span class="size-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
@@ -65,8 +69,8 @@ export class ThreadTitleComponent {
             class="flex items-center gap-2 border-b px-4 py-2"
             style="border-color: var(--aui-border)"
           >
-            <app-thread-title class="flex-1" />
-            <app-theme-toggle />
+            <aui-demo-thread-title class="flex-1" />
+            <aui-demo-theme-toggle />
           </header>
           <aui-thread
             class="min-h-0 flex-1"
@@ -76,7 +80,7 @@ export class ThreadTitleComponent {
         </div>
       </aui-thread-list-sidebar>
     </div>
-    <app-toasts />`,
+    <aui-demo-toasts />`,
 })
 export class ChatAppComponent {
   /** The AUI config: Mastra threads, suggestions and feedback. */

@@ -1,3 +1,4 @@
+// Original spec (Task 14 M9): MastraThreads on real react and @ai-sdk/react (no upstream test exists).
 import { createRequire } from 'node:module';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
@@ -36,7 +37,7 @@ const assistant = (id: string, text: string): UIMessage => ({
 });
 
 @Component({
-  selector: 'app-probe',
+  selector: 'aui-demo-probe',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: '',
@@ -67,7 +68,7 @@ const mount = async () => {
     standalone: true,
     imports: [AuiProviderDirective, ProbeComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    template: `<div [auiProvider]="config"><app-probe /></div>`,
+    template: `<div [auiProvider]="config"><aui-demo-probe /></div>`,
   })
   class HostComponent {
     readonly config = AuiConfig({
