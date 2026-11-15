@@ -8,7 +8,7 @@ import {
   type AssistantClientHandle,
 } from '@assistant-ui/store/client';
 import { flushTapSync } from '@assistant-ui/tap';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { configureTestBed } from '../../../testing-internal/test-bed';
 import { AUI_CONTEXT, type AuiContext } from '../../context/aui-context';
 import { messageScopeConfig } from '../../scope/message-scope';
@@ -167,7 +167,10 @@ describe('AuiActionBarCopyDirective with store-native clients', () => {
     fixture.destroy();
   });
 
-  it('keeps the flag while the same client keeps being bound', async () => {
+  // A re-notification that binds the same client again; a real state update of the bound
+  // client is covered in action-bar.spec.ts ('copy keeps its flag across updates of the same
+  // store-native client').
+  it('keeps the flag when the source re-notifies with the same client', async () => {
     writer = async () => undefined;
     const { first, use } = setup();
     configureTestBed({ imports: [HostComponent] });
@@ -179,7 +182,6 @@ describe('AuiActionBarCopyDirective with store-native clients', () => {
     use(first);
     await settle(fixture);
     expect(copied(first)).toBe(true);
-    vi.useRealTimers();
     fixture.destroy();
   });
 });
