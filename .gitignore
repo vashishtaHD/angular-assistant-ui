@@ -12,3 +12,6 @@ coverage/
 compat/.packs/
 compat/test-results/
 compat/playwright-report/
+
+# local Mastra storage (mastra dev / tests)
+mastra.db*
