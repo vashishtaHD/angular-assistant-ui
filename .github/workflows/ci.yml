@@ -66,8 +66,7 @@ jobs:
             node: 22
           - app: ng20
             node: 22
-          # The Angular 22 CLI needs ^22.22.3 or ^24.15.0. Its lockfile was written by npm 11
-          # (Node 24), which npm 10 `npm ci` rejects over optional @emnapi peers.
+          # The Angular 22 CLI needs ^22.22.3 or ^24.15.0; its lockfile is written by npm 11 (Node 24).
           - app: ng22
             node: 24.15.0
     steps:
