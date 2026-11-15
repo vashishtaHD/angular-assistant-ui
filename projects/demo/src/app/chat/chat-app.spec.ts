@@ -334,6 +334,10 @@ describe('ChatAppComponent (the full chat app)', () => {
     );
     expect(messageTile?.getAttribute('aria-label')).toContain('photo.png');
     expect(root.querySelector('button[aria-label="Remove photo.png"]')).toBeNull();
+    const errors = consoleError.mock.calls.map((args) => args.map(String).join(' '));
+    expect(errors.filter((e) => e.includes('NG0600'))).toEqual([]);
+    // Only the store's own transient lookup hint, marked "(ignore if recovered)", may remain.
+    expect(errors.filter((e) => !e.includes('(ignore if recovered)'))).toEqual([]);
   });
 
   it('groups consecutive tool calls with the kit tool group', async () => {

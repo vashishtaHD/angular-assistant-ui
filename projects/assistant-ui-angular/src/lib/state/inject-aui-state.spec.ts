@@ -237,6 +237,83 @@ describe('injectAuiState', () => {
     release();
   });
 
+  describe('when a read inside a computed makes the store notify (a pull-time sync)', () => {
+    // A context whose `getClient()` notifies every subscriber synchronously the
+    // first time it is called after `arm()`, as the store does when a scope's
+    // parent snapshot moved on before it re-rendered.
+    const syncingContext = () => {
+      const runtime = createTestRuntime();
+      const listeners = new Set<() => void>();
+      let armed = false;
+      const inner = createAuiContext({
+        getConfig: () => runtime.config,
+        subscribe: () => () => undefined,
+      });
+      const context: AuiContext = {
+        aui: inner.context.aui,
+        source: {
+          getClient: () => {
+            if (armed) {
+              armed = false;
+              for (const listener of [...listeners]) listener();
+            }
+            return inner.context.source.getClient();
+          },
+          subscribe: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        },
+      };
+      return {
+        runtime,
+        context,
+        listeners,
+        arm: () => (armed = true),
+        release: inner.release,
+      };
+    };
+
+    @Component({
+      selector: 'aui-two-counts',
+      standalone: true,
+      imports: [CountComponent],
+      changeDetection: ChangeDetectionStrategy.OnPush,
+      template: `<aui-count class="a" /><aui-count class="b" />`,
+    })
+    class TwoCountsComponent {}
+
+    it('allows the notification, and every reader shows the new state in the same pass', () => {
+      const harness = syncingContext();
+      const errorSpy = vi.spyOn(console, 'error');
+      configureTestBed({
+        imports: [TwoCountsComponent],
+        providers: [{ provide: AUI_CONTEXT, useValue: harness.context }],
+      });
+      const fixture = TestBed.createComponent(TwoCountsComponent);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      const counts = () =>
+        [el.querySelector('.a'), el.querySelector('.b')].map((c) => c?.textContent?.trim());
+      expect(counts()).toEqual(['0', '0']);
+
+      // The store changes without telling the context's subscribers; only the
+      // second reader (checked after the first) is told. Its re-read syncs and
+      // notifies everyone, including the first reader, which this pass has
+      // already checked and must refresh again.
+      flushTapSync(() => harness.runtime.append(userMessage('hi')));
+      harness.arm();
+      [...harness.listeners][1]!();
+
+      expect(() => fixture.detectChanges()).not.toThrow();
+      expect(counts()).toEqual(['1', '1']);
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      fixture.destroy();
+      harness.release();
+    });
+  });
+
   it('asserts an injection context', () => {
     expect(() => injectAuiState((s) => fixtureState(s).thread.selected)).toThrow(/NG0203/);
   });

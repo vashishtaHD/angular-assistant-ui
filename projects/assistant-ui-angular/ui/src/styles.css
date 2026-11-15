@@ -2069,10 +2069,17 @@
   transition: background-color 0.15s;
 }
 
+/*
+ * Focus inside the row highlights it and reveals its More button. The rules use
+ * :focus-within rather than a :has() over :focus-visible: critters, which inlines
+ * critical CSS in Angular production builds, cannot parse a :has() whose
+ * argument starts with a pseudo-class and skips such rules ("Empty
+ * sub-selector"). The keyboard ring itself stays on :focus-visible.
+ */
 .aui-thread-list-item:hover,
 .aui-thread-list-item[data-active],
 .aui-thread-list-item[data-menu-open],
-.aui-thread-list-item:has(:focus-visible) {
+.aui-thread-list-item:focus-within {
   background: var(--aui-muted);
 }
 
@@ -2101,7 +2108,7 @@
 .aui-thread-list-item:hover .aui-thread-list-item-trigger,
 .aui-thread-list-item[data-active] .aui-thread-list-item-trigger,
 .aui-thread-list-item[data-menu-open] .aui-thread-list-item-trigger,
-.aui-thread-list-item:has(:focus-visible) .aui-thread-list-item-trigger {
+.aui-thread-list-item:focus-within .aui-thread-list-item-trigger {
   padding-inline-end: 2.25rem;
 }
 
@@ -2138,7 +2145,8 @@
 
 .aui-thread-list-item:hover .aui-thread-list-item-more,
 .aui-thread-list-item[data-active] .aui-thread-list-item-more,
-.aui-thread-list-item:has(:focus-visible) .aui-thread-list-item-more,
+.aui-thread-list-item:focus-within .aui-thread-list-item-more,
+.aui-thread-list-item-more:focus-visible,
 .aui-thread-list-item-more[data-state='open'] {
   opacity: 1;
 }

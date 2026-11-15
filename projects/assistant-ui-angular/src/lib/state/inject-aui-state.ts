@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   signal,
+  untracked,
   type Signal,
 } from '@angular/core';
 import { getProxiedAssistantState, type AssistantState } from '@assistant-ui/store/client';
@@ -26,7 +27,8 @@ import { injectAuiContext } from '../context/aui-context';
  * resolves to `undefined` instead of throwing.
  *
  * Works with Zone.js and zoneless change detection: store updates write a
- * signal, which schedules rendering of the views that read it.
+ * signal, which schedules rendering of the views that read it. A store
+ * notification that a read itself causes (a pull-time sync) is allowed too.
  *
  * @example
  * ```ts
@@ -47,7 +49,13 @@ export function injectAuiState<T>(selector: (state: AssistantState) => T): Signa
   return computed(
     () => {
       version();
-      const state = getProxiedAssistantState(source.getClient());
+      // Reading the client may synchronize the store, which notifies every
+      // subscriber, and theirs write `version` signals. That is store work,
+      // not a reactive read of this computed (the store reads no Angular
+      // signals), so it runs untracked, where Angular allows the writes: the
+      // other readers are marked dirty and re-read in the same change
+      // detection run instead of throwing NG0600.
+      const state = getProxiedAssistantState(untracked(() => source.getClient()));
       const slice = selector(state);
 
       if (
