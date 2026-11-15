@@ -2,7 +2,13 @@ name: CI
 
 on:
   push:
+    # Branches only: a release tag runs this workflow through release.yml (workflow_call).
+    branches: ['**']
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -32,6 +38,11 @@ jobs:
       # Packs it as published; the compat jobs check the tarball's entries,
       # ui/styles.css, LICENSE and NOTICE.
       - run: npm pack ./dist/assistant-ui-angular --dry-run
+      # The packed file list (README, LICENSE, NOTICE, every entry, ui/styles.css, nothing
+      # stray) and a publishable package.json, including a sideEffects that keeps the CSS.
+      - run: npm run check:package
+      # The TypeScript samples of both READMEs type-check against the build.
+      - run: npm run check:readme-samples
       - run: npm run build:demo
       - run: npm run typecheck:mastra
       - uses: actions/upload-artifact@v4

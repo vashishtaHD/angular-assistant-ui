@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a new feature, primitive or upstream parity item.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what is missing or hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The API or behaviour you would like, with a code sample if you can.
+    validations:
+      required: true
+  - type: input
+    id: upstream
+    attributes:
+      label: Upstream counterpart
+      description: >-
+        If assistant-ui (React or Vue) already has it, name the export or link the source, so it can be
+        ported to match.
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Entry point
+      options:
+        - angular-assistant-ui (headless primitives)
+        - angular-assistant-ui/ui (styled kit)
+        - angular-assistant-ui/markdown or /shiki
+        - angular-assistant-ui/mastra
+        - angular-assistant-ui/testing
+        - Other or not sure
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

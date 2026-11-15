@@ -1,0 +1,34 @@
+version: 2
+updates:
+  # The root workspace: the library, the demo and the Mastra server share one lockfile.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    # A dependency joins the first group that matches it.
+    groups:
+      angular:
+        patterns: ['@angular/*', '@angular-devkit/*', 'angular-eslint', 'ng-packagr', 'zone.js']
+      assistant-ui:
+        patterns: ['@assistant-ui/*', 'assistant-stream']
+      ai-sdk:
+        patterns: ['ai', '@ai-sdk/*']
+      mastra:
+        patterns: ['mastra', '@mastra/*']
+      everything-else:
+        patterns: ['*']
+    ignore:
+      # The workspace builds and tests on the Angular 18.2 floor; newer majors are covered by compat/.
+      - dependency-name: '@angular/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@angular-devkit/*'
+        update-types: ['version-update:semver-major']
+      # Pinned exactly: angular-assistant-ui/mastra vendors code from this version, so raising it
+      # means re-vendoring (see docs/porting.md).
+      - dependency-name: '@assistant-ui/ai-sdk'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

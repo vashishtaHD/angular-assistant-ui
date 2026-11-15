@@ -1,7 +1,7 @@
 {
   "name": "angular-assistant-ui",
-  "version": "0.0.0",
-  "description": "Angular (18.2–22) binding for assistant-ui: headless chat primitives over @assistant-ui/core",
+  "version": "0.1.0",
+  "description": "Angular (18.2–22) port of assistant-ui: headless chat primitives, a styled drop-in chat kit and Mastra integration, over @assistant-ui/core",
   "keywords": [
     "angular",
     "assistant-ui",
@@ -16,6 +16,7 @@
   },
   "bugs": "https://github.com/vashishtaHD/angular-assistant-ui/issues",
   "homepage": "https://github.com/vashishtaHD/angular-assistant-ui#readme",
+  "author": "Vashishta Kothamasu",
   "peerDependencies": {
     "@ai-sdk/react": "^4.0.157",
     "@angular/cdk": ">=18.2.0 <23.0.0",
@@ -68,6 +69,13 @@
   "exports": {
     "./ui/styles.css": "./ui/styles.css"
   },
-  "sideEffects": false,
-  "license": "MIT"
+  "sideEffects": [
+    "*.css",
+    "**/*.css"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

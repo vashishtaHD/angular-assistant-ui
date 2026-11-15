@@ -1,9 +1,56 @@
 # angular-assistant-ui
 
-Headless Angular bindings for [assistant-ui](https://github.com/assistant-ui/assistant-ui),
-built over `@assistant-ui/core`, `@assistant-ui/store` and `@assistant-ui/tap`. It is a
-port of upstream's Vue binding: directives and components with no styling, which you
-compose with your own markup and CSS.
+An Angular (18.2 to 22, Zone.js or zoneless) port of
+[assistant-ui](https://github.com/assistant-ui/assistant-ui), built over `@assistant-ui/core`,
+`@assistant-ui/store` and `@assistant-ui/tap`. The main entry is a port of upstream's Vue binding:
+headless directives and components that you compose with your own markup and CSS. The
+`angular-assistant-ui/ui` entry is a styled kit that drops in, and `angular-assistant-ui/mastra`
+connects it to a [Mastra](https://mastra.ai) server.
+
+## Quick start
+
+Install the package and the peers of the styled kit and the AI SDK runtime:
+
+```bash
+npm install angular-assistant-ui \
+  @assistant-ui/core@~0.3.36 @assistant-ui/store@~0.3.23 @assistant-ui/tap@~0.9.26 \
+  @assistant-ui/ai-sdk@0.0.18 ai react @angular/cdk markdown-it
+npm install --save-dev @types/react
+```
+
+Load the stylesheet once, in `angular.json` `styles` or in your global stylesheet:
+
+```css
+@import 'angular-assistant-ui/ui/styles.css';
+```
+
+Drop `aui-thread` into a component, under a provider that has a height:
+
+```ts
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { AISDKChat, AssistantChatTransport } from '@assistant-ui/ai-sdk';
+import { AuiConfig, AuiProviderDirective } from 'angular-assistant-ui';
+import { AuiThreadComponent } from 'angular-assistant-ui/ui';
+
+@Component({
+  selector: 'app-chat',
+  standalone: true,
+  imports: [AuiProviderDirective, AuiThreadComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<div [auiProvider]="config" style="display: flex; height: 100dvh">
+    <aui-thread style="flex: 1; min-width: 0" />
+  </div>`,
+})
+export class ChatComponent {
+  protected readonly config = AuiConfig({
+    threads: AISDKChat({ transport: new AssistantChatTransport({ api: '/api/chat' }) }),
+  });
+}
+```
+
+`/api/chat` is any [AI SDK](https://ai-sdk.dev) chat endpoint
+(`streamText(...).toUIMessageStreamResponse()`). The sections below cover each entry's peers,
+headless usage, tool UIs, the styled kit, Mastra and testing.
 
 ## Install
 
@@ -240,8 +287,8 @@ To replace sections of `aui-thread`, provide `AUI_THREAD_COMPONENTS` with any of
 `ComposerAddAttachment`, plus the optional `TaskGroup` (sub-agent tool calls with a nested
 conversation) and `ComposerExtra` (controls after the attach button). Theming (tokens, `.aui-dark`,
 class overrides, Tailwind) is in
-[docs/styling.md](../../docs/styling.md); the Mastra server and the `mastra` entry are in
-[docs/mastra.md](../../docs/mastra.md).
+[docs/styling.md](https://github.com/vashishtaHD/angular-assistant-ui/blob/main/docs/styling.md); the Mastra server and the `mastra` entry are in
+[docs/mastra.md](https://github.com/vashishtaHD/angular-assistant-ui/blob/main/docs/mastra.md).
 
 ### Provider teardown
 
@@ -322,10 +369,10 @@ export const config = AuiConfig({
 });
 ```
 
-The compat apps (`compat/ng*/src/app/app.ts`) use these helpers for text, markdown, approval,
+The [compat apps](https://github.com/vashishtaHD/angular-assistant-ui/tree/main/compat) (`compat/ng*/src/app/app.ts`) use these helpers for text, markdown, approval,
 ask-user and attachment scenarios.
 
-See [docs/porting.md](../../docs/porting.md) for the upstream parity table.
+See [docs/porting.md](https://github.com/vashishtaHD/angular-assistant-ui/blob/main/docs/porting.md) for the upstream parity table.
 
 ## Supported versions
 
@@ -345,8 +392,9 @@ three apps share one source file (`src/app/app.ts`) and differ only in their boo
 (offline) transport. The smoke test checks that `styles.css` loads (the `--aui-background` token
 resolves), a streamed reply, markdown bold and a code block, a registered tool UI updated in place, Send
 and Stop swapping and cancelling a run, editing a message (branch picker `2 / 2`, then `1 / 2` after
-Previous), an attachment tile after choosing a file, approving a tool call (the receipt renders), and
-creating and switching threads in the thread list. Angular 22's CLI requires Node `^22.22.3`,
+Previous), an attachment tile after choosing a file, the image preview dialog's scroll lock, approving
+a tool call (the receipt renders), answering an ask-user question, and creating and switching threads
+in the thread list. Angular 22's CLI requires Node `^22.22.3`,
 `^24.15.0` or `>=26`.
 
 <!-- compat-table -->
@@ -356,3 +404,14 @@ creating and switching threads in the thread list. Angular 22's CLI requires Nod
 `npm run build:lib` writes to `dist/assistant-ui-angular`. `npm run test:lib` runs the
 specs with [Vitest](https://vitest.dev) in two projects: `zone` (Zone.js change
 detection) and `zoneless` (`provideExperimentalZonelessChangeDetection()`).
+
+Building from source, the scripts and the release process are in
+[CONTRIBUTING.md](https://github.com/vashishtaHD/angular-assistant-ui/blob/main/CONTRIBUTING.md). Changes are in
+[CHANGELOG.md](https://github.com/vashishtaHD/angular-assistant-ui/blob/main/CHANGELOG.md), and vulnerabilities are reported as
+[SECURITY.md](https://github.com/vashishtaHD/angular-assistant-ui/blob/main/SECURITY.md) describes.
+
+## License
+
+MIT. See `LICENSE` and `NOTICE` in the package. Built on
+[assistant-ui](https://github.com/assistant-ui/assistant-ui) (MIT, by the assistant-ui authors); this is
+an independent community port.
