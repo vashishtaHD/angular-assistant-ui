@@ -480,7 +480,7 @@ describe('aui-thread', () => {
       expect(unnamed(root)).toEqual([]);
     });
 
-    it('labels the composer input and tabs from the input to send', async () => {
+    it('labels the composer input and tabs from the input to add-attachment, then send', async () => {
       const { fixture, root } = await mount();
       const input = root.querySelector<HTMLTextAreaElement>('.aui-composer-input')!;
       expect(input.getAttribute('aria-label')).toBe('Message input');
@@ -498,9 +498,11 @@ describe('aui-thread', () => {
           el.getAttribute('tabindex') !== '-1' &&
           !el.closest('[hidden]'),
       );
+      // Upstream's order: the input, the action row's attach button, then send.
       expect(tabbable[0]).toBe(input);
-      expect(tabbable[1]?.classList.contains('aui-composer-send')).toBe(true);
-      expect(tabbable[1]?.getAttribute('aria-label')).toBe('Send message');
+      expect(tabbable[1]?.getAttribute('aria-label')).toBe('Add Attachment');
+      expect(tabbable[2]?.classList.contains('aui-composer-send')).toBe(true);
+      expect(tabbable[2]?.getAttribute('aria-label')).toBe('Send message');
     });
   });
 });

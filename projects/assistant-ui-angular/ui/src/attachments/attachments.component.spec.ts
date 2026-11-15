@@ -229,6 +229,70 @@ describe('aui-composer-attachments-styled', () => {
     );
     fixture.destroy();
   });
+
+  describe('tooltips', () => {
+    const tooltip = () => overlayRoot().querySelector('[role="tooltip"]') as HTMLElement | null;
+
+    it('shows the name as a styled tooltip on hover and keeps the aria-label', async () => {
+      const { fixture, el } = await mount();
+      await addFile(fixture, new File(['report'], 'report.txt', { type: 'text/plain' }));
+      await waitFor(fixture, () =>
+        expect(tile(el, 'Document attachment report.txt')).not.toBeNull(),
+      );
+      const group = tile(el, 'Document attachment report.txt')!;
+      expect(group.hasAttribute('title')).toBe(false);
+      expect(tooltip()).toBeNull();
+      group.dispatchEvent(new MouseEvent('mouseenter'));
+      await settleOverlay();
+      expect(tooltip()?.textContent?.trim()).toBe('report.txt');
+      expect(tooltip()?.getAttribute('data-side')).toBe('top');
+      await settle(fixture);
+      expect(group.getAttribute('aria-describedby')).toBe(tooltip()?.id);
+      expect(group.getAttribute('aria-label')).toBe('Document attachment report.txt');
+      group.dispatchEvent(new MouseEvent('mouseleave'));
+      await settleOverlay();
+      expect(tooltip()).toBeNull();
+      fixture.destroy();
+    });
+
+    it('shows the tooltip on keyboard focus and hides it on blur', async () => {
+      const { fixture, el } = await mount();
+      await addFile(fixture, new File(['report'], 'report.txt', { type: 'text/plain' }));
+      await waitFor(fixture, () =>
+        expect(tile(el, 'Document attachment report.txt')).not.toBeNull(),
+      );
+      const group = tile(el, 'Document attachment report.txt')!;
+      group.focus();
+      await settleOverlay();
+      expect(tooltip()?.textContent?.trim()).toBe('report.txt');
+      group.blur();
+      await settleOverlay();
+      expect(tooltip()).toBeNull();
+      fixture.destroy();
+    });
+
+    it('gives the remove and add buttons styled tooltips instead of native titles', async () => {
+      const { fixture, el } = await mount();
+      await addFile(fixture, new File(['report'], 'report.txt', { type: 'text/plain' }));
+      await waitFor(fixture, () =>
+        expect(el.querySelector('button[aria-label="Remove report.txt"]')).not.toBeNull(),
+      );
+      const remove = el.querySelector('button[aria-label="Remove report.txt"]') as HTMLElement;
+      const add = el.querySelector('aui-composer-add-attachment-styled button') as HTMLElement;
+      expect(remove.hasAttribute('title')).toBe(false);
+      expect(add.hasAttribute('title')).toBe(false);
+      remove.dispatchEvent(new MouseEvent('mouseenter'));
+      await settleOverlay();
+      expect(tooltip()?.textContent?.trim()).toBe('Remove report.txt');
+      remove.dispatchEvent(new MouseEvent('mouseleave'));
+      await settleOverlay();
+      add.dispatchEvent(new MouseEvent('mouseenter'));
+      await settleOverlay();
+      expect(tooltip()?.textContent?.trim()).toBe('Add Attachment');
+      expect(add.getAttribute('aria-label')).toBe('Add Attachment');
+      fixture.destroy();
+    });
+  });
 });
 
 describe('aui-composer-add-attachment-styled', () => {

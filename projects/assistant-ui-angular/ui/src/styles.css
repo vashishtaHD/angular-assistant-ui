@@ -1410,6 +1410,11 @@
   animation: aui-slide-in-bottom 0.15s ease-out;
 }
 
+.aui-user-message-root > .aui-message-attachments {
+  grid-column: 1 / -1;
+  grid-row-start: 1;
+}
+
 .aui-user-message-content-wrapper {
   position: relative;
   grid-column-start: 2;
@@ -1506,31 +1511,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.aui-thread-tool-call {
-  display: flex;
-  align-items: center;
-  gap: var(--aui-space-2);
-  margin: var(--aui-space-2) 0;
-  padding: var(--aui-space-2) var(--aui-space-3);
-  border: 1px solid var(--aui-border);
-  border-radius: var(--aui-radius);
-  color: var(--aui-muted-foreground);
-  font-size: 0.875rem;
-}
-
-.aui-thread-tool-call-name {
-  color: var(--aui-foreground);
-  font-weight: 600;
-}
-
-.aui-thread-reasoning-text {
-  display: block;
-  margin: var(--aui-space-2) 0;
-  color: var(--aui-muted-foreground);
-  font-size: 0.875rem;
-  white-space: pre-wrap;
 }
 
 /* ---- Action bars and branch picker -------------------------------------- */

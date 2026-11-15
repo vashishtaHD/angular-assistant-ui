@@ -21,10 +21,12 @@ import {
   type AssistantState,
 } from 'angular-assistant-ui';
 import { AuiStyledMarkdownText } from '../markdown-text.component';
+import { AuiReasoningComponent } from '../reasoning.component';
 import { AUI_THREAD_COMPONENTS, type AuiThreadComponents } from '../thread-components.token';
+import { AuiToolFallbackComponent } from '../tool-fallback/tool-fallback.component';
 import { AuiThreadAssistantMessageComponent } from './assistant-message.component';
 import { AuiThreadComposerComponent } from './composer.component';
-import { AuiThreadReasoningTextComponent, AuiThreadToolCallComponent } from './default-parts';
+import { AuiThreadToolGroupComponent } from './default-tool-group.component';
 import { AuiThreadEditComposerComponent } from './edit-composer.component';
 import { AuiThreadHistorySkeletonComponent } from './history-skeleton.component';
 import { AuiThreadLoadEarlierComponent } from './load-earlier.component';
@@ -54,9 +56,10 @@ const DEFAULT_COMPONENTS: AuiThreadComponents = {
   EditComposer: AuiThreadEditComposerComponent,
   Composer: AuiThreadComposerComponent,
   Welcome: AuiThreadWelcomeComponent,
-  ToolFallback: AuiThreadToolCallComponent,
+  ToolFallback: AuiToolFallbackComponent,
   Text: AuiStyledMarkdownText,
-  Reasoning: AuiThreadReasoningTextComponent,
+  Reasoning: AuiReasoningComponent,
+  ToolGroup: AuiThreadToolGroupComponent,
 };
 
 /**
@@ -93,10 +96,12 @@ export class AuiThreadMessageComponent {
 /**
  * The styled chat thread: welcome and suggestions while empty, a history
  * skeleton while a thread loads, Load earlier, the messages (user bubbles
- * with an edit action, assistant messages with markdown, an error banner,
+ * with their attachments and an edit action, assistant messages with
+ * markdown, collapsible reasoning and grouped tool calls, an error banner,
  * a branch picker and copy/refresh/feedback/more actions, and an edit
  * composer in place of a message being edited), a scroll-to-bottom button
- * and the composer docked at the bottom.
+ * and the composer docked at the bottom, which takes attachments by picker
+ * or drop.
  *
  * Use it inside `[auiProvider]` and give it a height (it fills its parent).
  * Import `angular-assistant-ui/ui/styles.css` once. Replace sections through

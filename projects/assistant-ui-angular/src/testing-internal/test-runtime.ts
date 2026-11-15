@@ -25,6 +25,8 @@ export interface DemoMessage {
   status?: ThreadMessageLike['status'];
   /** Optional message metadata, e.g. `{ custom: { quote } }`. */
   metadata?: ThreadMessageLike['metadata'];
+  /** Optional attachments, e.g. on a user message. */
+  attachments?: ThreadMessageLike['attachments'];
 }
 
 /** A real assistant runtime over an in-memory external store, for specs. */
@@ -95,6 +97,7 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
     content: message.content,
     ...(message.status ? { status: message.status } : {}),
     ...(message.metadata ? { metadata: message.metadata } : {}),
+    ...(message.attachments ? { attachments: message.attachments } : {}),
   });
   // Core calls this with the active chain after a branch switch or delete.
   // Its presence is what enables `switchToBranch`. In tree mode keep every
@@ -170,6 +173,7 @@ export function createTestRuntime(callbacks: TestRuntimeCallbacks = {}): TestRun
         content: message.content,
         ...(message.status ? { status: message.status } : {}),
         ...(message.metadata ? { metadata: message.metadata } : {}),
+        ...(message.attachments ? { attachments: message.attachments } : {}),
       }),
     };
   };

@@ -8,6 +8,7 @@ import {
   inject,
 } from '@angular/core';
 import {
+  AuiComposerAttachmentDropzoneDirective,
   AuiComposerCancelDirective,
   AuiComposerInputDirective,
   AuiComposerRootDirective,
@@ -16,13 +17,18 @@ import {
   injectAuiState,
   type AssistantState,
 } from 'angular-assistant-ui';
+import {
+  AuiComposerAddAttachmentStyledComponent,
+  AuiComposerAttachmentsStyledComponent,
+} from '../attachments/attachments.component';
 import { AuiButtonDirective } from '../button.directive';
 import { AuiIconComponent } from '../icons/icon.component';
 import { AuiTooltipDirective } from '../tooltip-icon-button.component';
 import { AuiThreadSettings } from './thread-settings';
 
 /**
- * The thread composer (the `Composer` slot): an auto-growing input and a
+ * The thread composer (the `Composer` slot): a file drop zone holding the
+ * pending attachments, an auto-growing input, the add-attachment button and a
  * send button that turns into a stop button while the run can be cancelled.
  * The placeholder is `composerPlaceholder` of `aui-thread`.
  * @internal Part of `aui-thread`.
@@ -33,6 +39,9 @@ import { AuiThreadSettings } from './thread-settings';
   imports: [
     AuiIfDirective,
     AuiComposerRootDirective,
+    AuiComposerAttachmentDropzoneDirective,
+    AuiComposerAttachmentsStyledComponent,
+    AuiComposerAddAttachmentStyledComponent,
     AuiComposerInputDirective,
     AuiComposerSendDirective,
     AuiComposerCancelDirective,
@@ -44,7 +53,8 @@ import { AuiThreadSettings } from './thread-settings';
   encapsulation: ViewEncapsulation.None,
   host: { style: 'display: contents' },
   template: `<form auiComposerRoot class="aui-composer-root">
-    <div class="aui-composer-shell" data-slot="aui_composer-shell">
+    <div auiComposerAttachmentDropzone class="aui-composer-shell" data-slot="aui_composer-shell">
+      <aui-composer-attachments-styled />
       <textarea
         auiComposerInput
         autoFocus
@@ -55,7 +65,7 @@ import { AuiThreadSettings } from './thread-settings';
         [attr.placeholder]="placeholder()"
       ></textarea>
       <div class="aui-composer-action-wrapper">
-        <div class="aui-composer-action-start"></div>
+        <div class="aui-composer-action-start"><aui-composer-add-attachment-styled /></div>
         <div class="aui-composer-action-end">
           <button
             *auiIf="showSend"

@@ -21,6 +21,7 @@ import {
 import { AuiButtonDirective } from '../button.directive';
 import { AuiDialogCloseDirective, AuiDialogService } from '../dialog/dialog';
 import { AuiIconComponent } from '../icons/icon.component';
+import { AuiTooltipDirective } from '../tooltip-icon-button.component';
 import { injectAttachmentSrc } from './attachment-src';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -31,8 +32,9 @@ const TYPE_LABELS: Record<string, string> = {
 
 /**
  * One styled attachment: a square tile with the image thumbnail (or a file
- * icon), an uploading or error overlay, the name as its tooltip and, in the
- * composer, a remove button. An image tile is a button (click, Enter or
+ * icon), an uploading or error overlay, the name (and any upload error) as its
+ * `[auiTooltip]` on hover and keyboard focus and, in the
+ * composer, a remove button with its own tooltip. An image tile is a button (click, Enter or
  * Space) that opens the image in a modal preview dialog; Escape closes it and
  * focus returns to the tile. Other tiles are a focusable group. Render it
  * inside an attachment scope; the styled attachment lists do.
@@ -51,6 +53,7 @@ const TYPE_LABELS: Record<string, string> = {
     AuiButtonDirective,
     AuiDialogCloseDirective,
     AuiIconComponent,
+    AuiTooltipDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
@@ -70,7 +73,8 @@ const TYPE_LABELS: Record<string, string> = {
         tabindex="0"
         [attr.role]="src() ? 'button' : 'group'"
         [attr.aria-label]="ariaLabel()"
-        [attr.title]="title()"
+        [auiTooltip]="tooltip()"
+        auiTooltipSide="top"
         [attr.data-previewable]="src() ? '' : null"
         (click)="openPreview()"
         (keydown)="onKeydown($event)"
@@ -102,7 +106,8 @@ const TYPE_LABELS: Record<string, string> = {
           size="icon"
           class="aui-attachment-remove"
           [attr.aria-label]="'Remove ' + name()"
-          [attr.title]="'Remove ' + name()"
+          [auiTooltip]="'Remove ' + name()"
+          auiTooltipSide="top"
         >
           <aui-icon name="x" />
         </button>
@@ -176,7 +181,7 @@ export class AuiAttachmentTileComponent {
     return `${base}${suffix}`;
   });
   /** @internal */
-  protected readonly title = computed(() => {
+  protected readonly tooltip = computed(() => {
     const error = this.errorMessage();
     return error === undefined ? this.name() : `${this.name()}: ${error}`;
   });

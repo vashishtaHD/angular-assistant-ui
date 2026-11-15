@@ -8,6 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import {
+  AuiComponentOutletDirective,
+  AuiGroupChildrenComponent,
+  AuiGroupTemplateDirective,
   AuiIndicatorTemplateDirective,
   AuiMessageGroupedPartsComponent,
   AuiMessageRootDirective,
@@ -16,9 +19,11 @@ import {
   groupPartByType,
 } from 'angular-assistant-ui';
 import { AuiStyledMarkdownText } from '../markdown-text.component';
+import { AuiReasoningComponent } from '../reasoning.component';
+import { AuiToolFallbackComponent } from '../tool-fallback/tool-fallback.component';
 import { AuiThreadAssistantActionBarComponent } from './action-bars';
 import { AuiThreadBranchPickerComponent } from './branch-picker.component';
-import { AuiThreadReasoningTextComponent, AuiThreadToolCallComponent } from './default-parts';
+import { AuiThreadToolGroupComponent } from './default-tool-group.component';
 import { AuiThreadMessageErrorComponent } from './message-error.component';
 import { AuiThreadSlotComponent } from './slot.component';
 import { AuiThreadSettings } from './thread-settings';
@@ -32,10 +37,15 @@ const MESSAGE_GROUP_BY = groupPartByType({
 
 /**
  * An assistant message (the `AssistantMessage` slot): the optional avatar,
- * the parts (text through the `Text` slot, reasoning through `Reasoning`,
- * tool calls without a registered tool UI through `ToolFallback`), a working
- * indicator while it streams, the error banner, and a footer with the branch
- * picker and the action bar.
+ * the parts, a working indicator while it streams, the error banner, and a
+ * footer with the branch picker and the action bar.
+ *
+ * The parts are grouped as upstream does: adjacent reasoning parts and tool
+ * calls form a chain of thought (`data-slot="aui_chain-of-thought"`), in which
+ * each run of tool calls renders through the `ToolGroup` slot and each
+ * reasoning part through the `Reasoning` slot (the default `aui-reasoning`
+ * collapses the whole run from its first part). Text renders through `Text`,
+ * and a tool call through its registered tool UI, or `ToolFallback` without one.
  * @internal Part of `aui-thread`.
  */
 @Component({
@@ -43,8 +53,11 @@ const MESSAGE_GROUP_BY = groupPartByType({
   standalone: true,
   imports: [
     AuiThreadSlotComponent,
+    AuiComponentOutletDirective,
     AuiMessageRootDirective,
     AuiMessageGroupedPartsComponent,
+    AuiGroupTemplateDirective,
+    AuiGroupChildrenComponent,
     AuiPartTemplateDirective,
     AuiIndicatorTemplateDirective,
     AuiToolUIOutletComponent,
@@ -72,6 +85,19 @@ const MESSAGE_GROUP_BY = groupPartByType({
     <div class="aui-assistant-message-body">
       <div class="aui-assistant-message-content" data-slot="aui_assistant-message-content">
         <aui-message-grouped-parts [groupBy]="groupBy">
+          <ng-template auiGroup="group-chainOfThought" let-group>
+            <div data-slot="aui_chain-of-thought"><aui-group-children [group]="group" /></div>
+          </ng-template>
+          <ng-template auiGroup="group-tool" let-group>
+            <ng-container
+              [auiComponentOutlet]="slots().ToolGroup"
+              [auiComponentOutletInputs]="{ group: group }"
+            />
+          </ng-template>
+          <ng-template auiGroup="group-reasoning" let-group>
+            <!-- The Reasoning slot of the run's first part renders the whole run. -->
+            <aui-group-children [group]="group" />
+          </ng-template>
           <ng-template auiPart="text">
             <aui-thread-slot [component]="slots().Text" />
           </ng-template>
@@ -109,13 +135,14 @@ export class AuiThreadAssistantMessageComponent {
   protected readonly avatar = computed(() => this.settings?.assistantAvatar());
   /** @internal */
   protected readonly imageFailed = signal(false);
-  /** @internal The part slots, with the defaults when used outside `aui-thread`. */
+  /** @internal The part and group slots, with the defaults when used outside `aui-thread`. */
   protected readonly slots = computed(() => {
     const components = this.settings?.components();
     return {
       Text: components?.Text ?? AuiStyledMarkdownText,
-      Reasoning: components?.Reasoning ?? AuiThreadReasoningTextComponent,
-      ToolFallback: components?.ToolFallback ?? AuiThreadToolCallComponent,
+      Reasoning: components?.Reasoning ?? AuiReasoningComponent,
+      ToolFallback: components?.ToolFallback ?? AuiToolFallbackComponent,
+      ToolGroup: components?.ToolGroup ?? AuiThreadToolGroupComponent,
     };
   });
 }

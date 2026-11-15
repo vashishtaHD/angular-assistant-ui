@@ -16,6 +16,14 @@ import { InjectionToken, type Type } from '@angular/core';
  * - `Text`, `Reasoning` and `ToolFallback` render once per part of an
  *   assistant message, in its part scope (`s.part`): text parts, reasoning
  *   parts, and tool calls without a registered tool UI (`registerToolUI`).
+ * - `ToolGroup` renders once per run of consecutive tool calls of an
+ *   assistant message, in its message scope, and is the one slot that takes
+ *   an input (see the key).
+ *
+ * The attachment rows (`aui-message-attachments-styled` in `UserMessage`,
+ * `aui-composer-attachments-styled` and `aui-composer-add-attachment-styled`
+ * in `Composer`) have no keys of their own, as upstream's `ThreadComponents`
+ * has none: replace the `UserMessage` or `Composer` slot to change them.
  */
 export interface AuiThreadComponents {
   /** A user message. */
@@ -28,12 +36,40 @@ export interface AuiThreadComponents {
   Composer: Type<unknown>;
   /** The welcome shown while the thread is empty. */
   Welcome: Type<unknown>;
-  /** A tool call without a registered tool UI. */
+  /**
+   * A tool call without a registered tool UI (default: `aui-tool-fallback`).
+   * A registered tool UI always takes precedence.
+   */
   ToolFallback: Type<unknown>;
   /** A text part of an assistant message (default: `aui-markdown-text-styled`). */
   Text: Type<unknown>;
-  /** A reasoning part of an assistant message. */
+  /**
+   * A reasoning part of an assistant message (default: `aui-reasoning`, which
+   * renders a whole run of consecutive reasoning parts in one collapsible from
+   * the run's first part and nothing for the others).
+   */
   Reasoning: Type<unknown>;
+  /**
+   * A run of consecutive tool calls of an assistant message, upstream's
+   * `group-tool` group (default: a ghost `aui-tool-group`, closed until opened
+   * and open while a call requires action). The component must declare a
+   * required `group` input (`AuiGroupPart`) and renders the calls with
+   * `<aui-group-children [group]="group()" />`.
+   *
+   * @example
+   * ```ts
+   * @Component({
+   *   selector: 'app-tool-group',
+   *   imports: [AuiGroupChildrenComponent],
+   *   template: `<section>{{ group().indices.length }} calls
+   *     <aui-group-children [group]="group()" /></section>`,
+   * })
+   * class ToolGroup {
+   *   readonly group = input.required<AuiGroupPart>();
+   * }
+   * ```
+   */
+  ToolGroup: Type<unknown>;
 }
 
 /**
