@@ -150,6 +150,31 @@ class CustomAddAttachmentComponent {
   protected readonly type = injectAuiState((s) => s.composer.type);
 }
 
+@Component({
+  selector: 'app-custom-task-group',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<section
+    class="custom-task-group"
+    [attr.data-message]="messageId()"
+    [attr.data-indices]="group().indices.join(',')"
+  ></section>`,
+})
+class CustomTaskGroupComponent {
+  readonly group = input.required<AuiGroupPart>();
+  protected readonly messageId = injectAuiState((s) => s.message.id);
+}
+
+@Component({
+  selector: 'app-composer-extra',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<button type="button" class="composer-extra">{{ type() }}</button>`,
+})
+class ComposerExtraComponent {
+  protected readonly type = injectAuiState((s) => s.composer.type);
+}
+
 const settle = async (fixture: ComponentFixture<unknown>) => {
   for (let i = 0; i < 4; i++) {
     await fixture.whenStable();
@@ -369,6 +394,74 @@ describe('aui-thread parts (Task 17 wiring)', () => {
     Object.defineProperty(drag, 'dataTransfer', { value: { types: ['Files'] } });
     shell.dispatchEvent(drag);
     expect(drag.defaultPrevented).toBe(true);
+  });
+});
+
+describe('aui-thread TaskGroup and ComposerExtra slots', () => {
+  /** A tool call that carries a nested conversation (a sub-agent task). */
+  const task = (id: string, toolName: string) => ({
+    ...tool(id, toolName),
+    messages: [{ id: `${id}-m`, role: 'assistant', content: [{ type: 'text', text: 'sub' }] }],
+  });
+  const taskAssistant: DemoMessage = {
+    id: 'a1',
+    role: 'assistant',
+    content: [
+      { type: 'text', text: 'Delegating.' },
+      task('c1', 'research') as never,
+      task('c2', 'summarize') as never,
+      tool('c3', 'search'),
+      task('c4', 'weather') as never,
+    ],
+  };
+
+  it('routes nested-conversation tool calls without a tool UI through TaskGroup', async () => {
+    registerWeather = true;
+    const { root } = await mount({
+      providers: [
+        { provide: AUI_THREAD_COMPONENTS, useValue: { TaskGroup: CustomTaskGroupComponent } },
+      ],
+      setup: (rt) => rt.append(taskAssistant),
+    });
+    const chain = root.querySelector('[data-slot="aui_chain-of-thought"]')!;
+    const groups = Array.from(chain.querySelectorAll('.custom-task-group'));
+    // The two adjacent task calls form one task group, in the message scope.
+    expect(groups.map((g) => g.getAttribute('data-indices'))).toEqual(['1,2']);
+    expect(groups[0]!.getAttribute('data-message')).toBe('a1');
+    // A plain call keeps the tool group; a registered tool UI still wins over TaskGroup.
+    expect(
+      Array.from(chain.querySelectorAll('aui-tool-fallback')).map((el) => el.textContent?.trim()),
+    ).toEqual([expect.stringContaining('search')]);
+    expect(Array.from(root.querySelectorAll('.weather-tool')).map((el) => el.textContent)).toEqual([
+      'weather',
+    ]);
+    expect(root.querySelector('.custom-task-group aui-tool-fallback')).toBeNull();
+  });
+
+  it('renders nested-conversation tool calls like any other tool call without TaskGroup', async () => {
+    const { root } = await mount({ setup: (rt) => rt.append(taskAssistant) });
+    expect(root.querySelector('.custom-task-group')).toBeNull();
+    const fallbacks = Array.from(root.querySelectorAll('aui-tool-group aui-tool-fallback'));
+    expect(fallbacks).toHaveLength(4);
+  });
+
+  it('renders ComposerExtra beside the attach button, in the composer scope', async () => {
+    const { root } = await mount({
+      providers: [
+        { provide: AUI_THREAD_COMPONENTS, useValue: { ComposerExtra: ComposerExtraComponent } },
+      ],
+    });
+    const start = root.querySelector('.aui-composer-action-start')!;
+    const extra = start.querySelector('.composer-extra');
+    expect(extra?.textContent).toBe('thread');
+    // After the attach button, in the same action-start row.
+    const attach = start.querySelector('button[aria-label="Add Attachment"]')!;
+    expect(attach.compareDocumentPosition(extra!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders no ComposerExtra by default', async () => {
+    const { root } = await mount();
+    expect(root.querySelector('.aui-composer-action-start')?.children).toHaveLength(1);
   });
 });
 

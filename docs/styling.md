@@ -113,8 +113,9 @@ and a more specific one wins regardless of order. Prefer the stable hooks:
 
 To replace a whole section rather than restyle it, provide `AUI_THREAD_COMPONENTS` (keys `UserMessage`,
 `AssistantMessage`, `EditComposer`, `Composer`, `Welcome`, `ToolFallback`, `Text`, `Reasoning`,
-`ToolGroup`, `ReasoningGroup`, `UserMessageAttachments`, `ComposerAttachments` and
-`ComposerAddAttachment`). The kit's internals are not public API; class names and slots are.
+`ToolGroup`, `ReasoningGroup`, `UserMessageAttachments`, `ComposerAttachments`,
+`ComposerAddAttachment`, and the optional `TaskGroup` and `ComposerExtra`, which have no default). The
+kit's internals are not public API; class names and slots are.
 
 Overlays (tooltips, menus, dialogs, the assistant modal and the timing popover) render in the CDK overlay
 container at the end of `<body>`, outside your component tree. They read the tokens from `:root`, so a

@@ -236,8 +236,10 @@ export class ChatComponent {
 
 To replace sections of `aui-thread`, provide `AUI_THREAD_COMPONENTS` with any of `UserMessage`,
 `AssistantMessage`, `EditComposer`, `Composer`, `Welcome`, `ToolFallback`, `Text`, `Reasoning`,
-`ToolGroup`, `ReasoningGroup`, `UserMessageAttachments`, `ComposerAttachments` and
-`ComposerAddAttachment`. Theming (tokens, `.aui-dark`, class overrides, Tailwind) is in
+`ToolGroup`, `ReasoningGroup`, `UserMessageAttachments`, `ComposerAttachments`,
+`ComposerAddAttachment`, plus the optional `TaskGroup` (sub-agent tool calls with a nested
+conversation) and `ComposerExtra` (controls after the attach button). Theming (tokens, `.aui-dark`,
+class overrides, Tailwind) is in
 [docs/styling.md](../../docs/styling.md); the Mastra server and the `mastra` entry are in
 [docs/mastra.md](../../docs/mastra.md).
 

@@ -30,7 +30,8 @@ import { AuiThreadSettings } from './thread-settings';
 /**
  * The thread composer (the `Composer` slot): a file drop zone holding the
  * pending attachments (the `ComposerAttachments` slot), an auto-growing input,
- * the add-attachment button (the `ComposerAddAttachment` slot) and a
+ * the add-attachment button (the `ComposerAddAttachment` slot) followed by the
+ * optional `ComposerExtra` slot, and a
  * send button that turns into a stop button while the run can be cancelled.
  * The placeholder is `composerPlaceholder` of `aui-thread`.
  * @internal Part of `aui-thread`.
@@ -68,6 +69,9 @@ import { AuiThreadSettings } from './thread-settings';
       <div class="aui-composer-action-wrapper">
         <div class="aui-composer-action-start">
           <aui-thread-slot [component]="slots().ComposerAddAttachment" />
+          @if (slots().ComposerExtra; as extra) {
+            <aui-thread-slot [component]="extra" />
+          }
         </div>
         <div class="aui-composer-action-end">
           <button
@@ -109,6 +113,7 @@ export class AuiThreadComposerComponent {
       ComposerAttachments: components?.ComposerAttachments ?? AuiComposerAttachmentsStyledComponent,
       ComposerAddAttachment:
         components?.ComposerAddAttachment ?? AuiComposerAddAttachmentStyledComponent,
+      ComposerExtra: components?.ComposerExtra,
     };
   });
   /** @internal The stop control only cancels the send while no run it could stop is going. */

@@ -17,6 +17,7 @@ import {
   AuiPartTemplateDirective,
   AuiToolUIOutletComponent,
   groupPartByType,
+  type AuiGroupBy,
 } from 'angular-assistant-ui';
 import { AuiStyledMarkdownText } from '../markdown-text.component';
 import { AuiToolFallbackComponent } from '../tool-fallback/tool-fallback.component';
@@ -38,6 +39,22 @@ const MESSAGE_GROUP_BY = groupPartByType({
   'standalone-tool-call': [],
 });
 
+const TASK_GROUP_PATH = ['group-chainOfThought', 'group-task'] as const;
+
+/**
+ * Upstream's `taskAwareGroupBy`, used while a `TaskGroup` slot is set: a grouped tool call that
+ * carries a nested conversation and has no registered tool UI becomes a `group-task`.
+ */
+const TASK_AWARE_GROUP_BY: AuiGroupBy = (part, context) => {
+  const path = MESSAGE_GROUP_BY(part, context);
+  return part.type === 'tool-call' &&
+    (part as { messages?: unknown }).messages !== undefined &&
+    path.length > 0 &&
+    !context?.toolUIs?.[part.toolName]?.length
+    ? TASK_GROUP_PATH
+    : path;
+};
+
 /**
  * An assistant message (the `AssistantMessage` slot): the optional avatar,
  * the parts, a working indicator while it streams, the error banner, and a
@@ -48,7 +65,9 @@ const MESSAGE_GROUP_BY = groupPartByType({
  * each run of tool calls renders through the `ToolGroup` slot and each run of
  * reasoning parts through the `ReasoningGroup` slot, with each reasoning part
  * inside it through `Reasoning`. Text renders through `Text`, and a tool call
- * through its registered tool UI, or `ToolFallback` without one.
+ * through its registered tool UI, or `ToolFallback` without one. With a
+ * `TaskGroup` slot, tool calls carrying a nested conversation and no tool UI
+ * render through it instead (upstream's task-aware grouping).
  * @internal Part of `aui-thread`.
  */
 @Component({
@@ -87,9 +106,17 @@ const MESSAGE_GROUP_BY = groupPartByType({
     }
     <div class="aui-assistant-message-body">
       <div class="aui-assistant-message-content" data-slot="aui_assistant-message-content">
-        <aui-message-grouped-parts [groupBy]="groupBy">
+        <aui-message-grouped-parts [groupBy]="groupBy()">
           <ng-template auiGroup="group-chainOfThought" let-group>
             <div data-slot="aui_chain-of-thought"><aui-group-children [group]="group" /></div>
+          </ng-template>
+          <ng-template auiGroup="group-task" let-group>
+            @if (slots().TaskGroup; as taskGroup) {
+              <ng-container
+                [auiComponentOutlet]="taskGroup"
+                [auiComponentOutletInputs]="{ group: group }"
+              />
+            }
           </ng-template>
           <ng-template auiGroup="group-tool" let-group>
             <ng-container
@@ -134,8 +161,10 @@ const MESSAGE_GROUP_BY = groupPartByType({
 })
 export class AuiThreadAssistantMessageComponent {
   private readonly settings = inject(AuiThreadSettings, { optional: true });
-  /** @internal */
-  protected readonly groupBy = MESSAGE_GROUP_BY;
+  /** @internal The task-aware grouping while a `TaskGroup` slot is set, as upstream. */
+  protected readonly groupBy = computed(() =>
+    this.slots().TaskGroup ? TASK_AWARE_GROUP_BY : MESSAGE_GROUP_BY,
+  );
   /** @internal */
   protected readonly avatar = computed(() => this.settings?.assistantAvatar());
   /** @internal */
@@ -149,6 +178,7 @@ export class AuiThreadAssistantMessageComponent {
       ToolFallback: components?.ToolFallback ?? AuiToolFallbackComponent,
       ToolGroup: components?.ToolGroup ?? AuiThreadToolGroupComponent,
       ReasoningGroup: components?.ReasoningGroup ?? AuiThreadReasoningGroupComponent,
+      TaskGroup: components?.TaskGroup,
     };
   });
 }

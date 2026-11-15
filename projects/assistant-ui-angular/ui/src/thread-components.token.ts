@@ -25,6 +25,10 @@ import { InjectionToken, type Type } from '@angular/core';
  *   message scope; `ComposerAttachments` and `ComposerAddAttachment` render
  *   inside the default `Composer`, in the thread composer scope
  *   (`s.composer`).
+ * - `TaskGroup` and `ComposerExtra` are optional and have no default:
+ *   `TaskGroup` (a `group` input, message scope) renders tool calls that carry
+ *   a nested conversation; `ComposerExtra` renders after the attach button, in
+ *   the composer scope.
  */
 export interface AuiThreadComponents {
   /** A user message. */
@@ -94,6 +98,24 @@ export interface AuiThreadComponents {
    * `aui-composer-add-attachment-styled`). Renders in the composer scope.
    */
   ComposerAddAttachment: Type<unknown>;
+  /**
+   * Optional, no default. When set, a tool call that carries a nested
+   * conversation (`part.messages`, for example a sub-agent task) and has no
+   * registered tool UI is grouped as upstream's `group-task` and renders
+   * through this component instead of the tool group; adjacent such calls share
+   * one group. A registered tool UI still takes precedence. Without it, those
+   * calls render like any other tool call. The component must declare a
+   * required `group` input (`AuiGroupPart`) and renders in the message scope;
+   * it renders the calls itself (for example from `s.message.parts` at
+   * `group().indices`).
+   */
+  TaskGroup?: Type<unknown>;
+  /**
+   * Optional, no default. Extra controls in the composer's action row, after
+   * the attach button (upstream's `ComposerExtra`). Renders in the composer
+   * scope.
+   */
+  ComposerExtra?: Type<unknown>;
 }
 
 /**
