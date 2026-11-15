@@ -135,6 +135,49 @@ export const AUI_ICON_SHAPES = {
     { t: 'line', x1: '12', y1: '8', x2: '12', y2: '12' },
     { t: 'line', x1: '12', y1: '16', x2: '12.01', y2: '16' },
   ],
+  // Task 18: thread list, sidebar, modal, quote, trigger popover.
+  search: [
+    { t: 'path', d: 'm21 21-4.34-4.34' },
+    { t: 'circle', cx: '11', cy: '11', r: '8' },
+  ],
+  quote: [
+    {
+      t: 'path',
+      d: 'M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z',
+    },
+    {
+      t: 'path',
+      d: 'M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z',
+    },
+  ],
+  history: [
+    { t: 'path', d: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8' },
+    { t: 'path', d: 'M3 3v5h5' },
+    { t: 'path', d: 'M12 7v5l4 2' },
+  ],
+  bot: [
+    { t: 'path', d: 'M12 8V4H8' },
+    { t: 'rect', x: '4', y: '8', width: '16', height: '12', rx: '2' },
+    { t: 'path', d: 'M2 14h2' },
+    { t: 'path', d: 'M20 14h2' },
+    { t: 'path', d: 'M15 13v2' },
+    { t: 'path', d: 'M9 13v2' },
+  ],
+  sparkles: [
+    {
+      t: 'path',
+      d: 'M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z',
+    },
+    { t: 'path', d: 'M20 3v4' },
+    { t: 'path', d: 'M22 5h-4' },
+    { t: 'path', d: 'M4 17v2' },
+    { t: 'path', d: 'M5 18H3' },
+  ],
+  'panel-left': [
+    { t: 'rect', x: '3', y: '3', width: '18', height: '18', rx: '2' },
+    { t: 'path', d: 'M9 3v18' },
+  ],
+  // end Task 18
 } as const satisfies Record<string, readonly AuiIconShape[]>;
 
 /** Names accepted by `<aui-icon name>`. */

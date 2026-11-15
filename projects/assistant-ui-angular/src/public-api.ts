@@ -495,3 +495,8 @@ export {
   type AssistantTransportRuntime,
   type AssistantTransportRuntimeOptions,
 } from './lib/runtime/assistant-transport';
+
+// Task 18: thread list item by index and message timing.
+export { AuiThreadListItemByIndexComponent } from './lib/primitives/thread-list/thread-list-item-by-index.component';
+export { injectMessageTiming } from './lib/state/inject-message-timing';
+// Task 18 end.

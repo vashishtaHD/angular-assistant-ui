@@ -41,6 +41,7 @@ import {
   AuiThreadWelcomeComponent,
   AuiThreadWelcomeSuggestionsComponent,
 } from './welcome.component';
+import { AuiFollowUpSuggestionsComponent } from '../follow-up-suggestions.component';
 
 export type {
   AuiThreadAvatar,
@@ -95,7 +96,8 @@ export class AuiThreadMessageComponent {
  * skeleton while a thread loads, Load earlier, the messages (user bubbles
  * with an edit action, assistant messages with markdown, an error banner,
  * a branch picker and copy/refresh/feedback/more actions, and an edit
- * composer in place of a message being edited), a scroll-to-bottom button
+ * composer in place of a message being edited), a scroll-to-bottom button,
+ * follow-up suggestions after a completed run (`aui-follow-up-suggestions`)
  * and the composer docked at the bottom.
  *
  * Use it inside `[auiProvider]` and give it a height (it fills its parent).
@@ -128,6 +130,7 @@ export class AuiThreadMessageComponent {
     AuiThreadLoadEarlierComponent,
     AuiThreadScrollToBottomComponent,
     AuiThreadWelcomeSuggestionsComponent,
+    AuiFollowUpSuggestionsComponent,
   ],
   providers: [AuiThreadSettings],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -157,6 +160,7 @@ export class AuiThreadMessageComponent {
           [attr.data-empty]="isEmpty() ? '' : null"
         >
           <aui-thread-scroll-to-bottom />
+          <aui-follow-up-suggestions />
           <aui-thread-slot [component]="components().Composer" />
           <aui-thread-welcome-suggestions *auiIf="showSuggestions" />
         </div>
