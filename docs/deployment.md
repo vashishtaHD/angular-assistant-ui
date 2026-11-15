@@ -1,7 +1,9 @@
 # Deployment
 
 The demo is a static Angular build that talks to a separate Mastra server. Deploy
-them independently.
+them independently. The server's contract (auth modes and custom verifiers, memory,
+branch persistence, attachments, approvals and ask-user) is described in
+[mastra.md](mastra.md); theming the styled kit is in [styling.md](styling.md).
 
 ## Hosting the Mastra server
 
@@ -30,12 +32,22 @@ trailing slash or path).
 
 ## Per-environment `/config.json`
 
-The demo reads `mastraChatUrl` from `/config.json` at startup, so one build fits every
+The demo reads its runtime config from `/config.json` at startup, so one build fits every
 environment. Serve a different file per environment:
 
 ```json
-{ "mastraChatUrl": "https://api.example.com/chat/chatAgent" }
+{ "mastraUrl": "https://api.example.com", "agentId": "chatAgent", "authToken": "" }
 ```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `mastraUrl` | `http://localhost:4111` | The Mastra server origin (and optional path prefix), used for the chat, history and thread routes |
+| `agentId` | `chatAgent` | The agent to chat with; its chat route is `<mastraUrl>/chat/<agentId>` |
+| `authToken` | (none) | Optional bearer token sent as `Authorization: Bearer <token>` for the server's `jwt` mode. Leave it empty in `dev` mode, where no header is sent. `config.json` is public, so use it only for a shared test token; a real app gets a per-user token from its sign-in and provides `MASTRA_AUTH` itself ([mastra.md](mastra.md#auth-modes)). |
+
+Keys the file leaves out keep their defaults. These keys replace the phase 1 `mastraChatUrl`
+(a full chat URL); the demo change lands with Task 19, so a demo checkout from before that
+merge still reads `mastraChatUrl`.
 
 The file is fetched from the absolute path `/config.json` with `cache: 'no-cache'`. If
 you deploy under a `<base href>` sub-path (for example `/app/`), serve the file at the

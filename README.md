@@ -12,13 +12,24 @@ Created in [T3 Code](https://t3.codes).
 
 | Path                            | What                                                            |
 | ------------------------------- | --------------------------------------------------------------- |
-| `projects/assistant-ui-angular` | The library (`angular-assistant-ui`, plus the `/testing` entry) |
+| `projects/assistant-ui-angular` | The library (`angular-assistant-ui` and its secondary entries)  |
 | `projects/demo`                 | Angular demo chat app (Tailwind)                                |
 | `mastra-server`                 | Mastra server exposing the `chatAgent` at `/chat/:agentId`      |
 | `docs/porting.md`               | Upstream parity table and porting guide                         |
 | `docs/deployment.md`            | Hosting, CORS, runtime config, and gating the chat route        |
+| `docs/styling.md`               | Styled kit tokens, dark mode, class overrides and Tailwind      |
+| `docs/mastra.md`                | Mastra server setup, auth, memory, branches, attachments, tools |
+| `compat/`                       | Angular 18.2, 20 and 22 consumer apps and their smoke test      |
 
-Library usage and API: [projects/assistant-ui-angular/README.md](projects/assistant-ui-angular/README.md).
+Library usage, the install for each entry point (`angular-assistant-ui`, `/ui`, `/markdown`, `/shiki`,
+`/mastra`, `/testing`, `/react-interop`) and the supported Angular versions:
+[projects/assistant-ui-angular/README.md](projects/assistant-ui-angular/README.md).
+
+| Angular | Change detection | Compat smoke |
+| ------- | ---------------- | ------------ |
+| 18.2    | Zone.js          | `npm run compat -- ng18` |
+| 20      | Zone.js          | `npm run compat -- ng20` |
+| 22      | Zoneless         | `npm run compat -- ng22` (Node `^22.22.3`, `^24.15.0` or `>=26`) |
 
 ## Setup
 
@@ -44,8 +55,9 @@ Ask "What's the weather in Paris?" to see the `getWeather` tool call rendered by
 demo's weather card, followed by the streamed answer. This flow has been verified end to
 end with Angular 18.2 and Zone.js, the Mastra `chatRoute` (v7) and an OpenRouter model.
 
-The demo reads the chat endpoint from `projects/demo/public/config.json`
-(`mastraChatUrl`, default `http://localhost:4111/chat/chatAgent`) at startup. Its
+The demo reads its server from `projects/demo/public/config.json` at startup: `mastraUrl`
+(default `http://localhost:4111`), `agentId` (default `chatAgent`) and an optional `authToken`
+for the server's `jwt` mode (see [docs/deployment.md](docs/deployment.md)). Its
 initial bundle is about 771 kB because `@assistant-ui/ai-sdk` brings in React and the AI
 SDK; the build budgets are set accordingly.
 
@@ -63,6 +75,10 @@ SDK; the build budgets are set accordingly.
 | `npm run build:demo`       | Build the demo                                      |
 | `npm run typecheck:mastra` | Type-check the Mastra server                        |
 | `npm run format`           | Prettier (`format:check` to verify)                 |
+| `npm run check:ui-styles`  | Check the built `ui/styles.css` asset               |
+| `npm run check:parity`     | Fail on any parity row that is not ported or n/a    |
+| `npm run test:scripts`     | Tests of the repository scripts (parity gate)       |
+| `npm run compat -- ng18`   | Compat smoke for one Angular major (`ng20`, `ng22`) |
 
 ## Contributing and porting
 

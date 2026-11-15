@@ -26,6 +26,11 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const APPS = ['ng18', 'ng20', 'ng22'];
+// Secondary entry points the published package must carry (each with its own fesm bundle).
+const SECONDARY_ENTRIES = ['markdown', 'mastra', 'react-interop', 'shiki', 'testing', 'ui'];
+// Files that must be byte-identical across the apps: only the bootstrap
+// (src/main.ts and src/app/app.config.ts) may differ.
+const SHARED_SOURCES = [join('src', 'app', 'app.ts'), join('src', 'styles.css')];
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const compatDir = join(root, 'compat');
 const libSrc = join(root, 'projects', 'assistant-ui-angular');
@@ -43,6 +48,20 @@ if (!app || !APPS.includes(app)) {
 const appDir = join(compatDir, app);
 
 const log = (message) => console.log(`\n[compat:${app}] ${message}`);
+
+// 0. The apps share their source apart from the bootstrap.
+for (const file of SHARED_SOURCES) {
+  const reference = readFileSync(join(compatDir, APPS[0], file));
+  for (const other of APPS.slice(1)) {
+    if (!readFileSync(join(compatDir, other, file)).equals(reference)) {
+      console.error(
+        `\n[compat:${app}] FAIL: compat/${other}/${file} differs from compat/${APPS[0]}/${file}; ` +
+          'the apps share their source apart from the bootstrap (main.ts, app.config.ts)',
+      );
+      process.exit(1);
+    }
+  }
+}
 
 /** Runs a command, inheriting stdio; exits the script when it fails. */
 function run(command, commandArgs, cwd, env = {}) {
@@ -143,6 +162,30 @@ if (!tarball) {
     }
   }
   console.log('  verified: tarball contains LICENSE and NOTICE (same as the repository root)');
+
+  // Every secondary entry is packed with its bundle, and the ui entry ships its stylesheet.
+  const required = [
+    'package/ui/styles.css',
+    ...SECONDARY_ENTRIES.flatMap((entry) => [
+      `package/${entry}/index.d.ts`,
+      `package/fesm2022/angular-assistant-ui-${entry}.mjs`,
+    ]),
+  ];
+  const missing = required.filter((name) => !entries.includes(name));
+  if (missing.length > 0) {
+    console.error(`\n[compat:${app}] FAIL: ${tarball} is missing ${missing.join(', ')}`);
+    process.exit(1);
+  }
+  const packedCss = readFileSync(join(libDist, 'ui', 'styles.css'), 'utf8');
+  for (const token of ['--aui-background', '.aui-dark']) {
+    if (!packedCss.includes(token)) {
+      console.error(`\n[compat:${app}] FAIL: packed ui/styles.css is missing "${token}"`);
+      process.exit(1);
+    }
+  }
+  console.log(
+    `  verified: tarball contains ui/styles.css and the ${SECONDARY_ENTRIES.join(', ')} entries`,
+  );
 }
 
 // 3. Install the app's locked dependencies, then the tarball (without

@@ -1,35 +1,34 @@
+// Shared compat app source: compat/ng18, ng20 and ng22 carry byte-identical copies of
+// this file (scripts/compat.mjs checks it). Only main.ts and app.config.ts (the
+// bootstrap: Zone.js or zoneless) differ between the apps.
 import { ChangeDetectionStrategy, Component, Directive, computed, input } from '@angular/core';
-import { AISDKChat } from '@assistant-ui/ai-sdk';
-import type { UIMessage, UIMessageChunk } from 'ai';
-import type { AssistantState } from '@assistant-ui/store/client';
+import { AISDKThreads } from '@assistant-ui/ai-sdk';
 import {
-  AuiComposerCancelDirective,
-  AuiComposerInputDirective,
-  AuiComposerRootDirective,
-  AuiComposerSendDirective,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type ChatInit,
+  type UIMessage,
+  type UIMessageChunk,
+} from 'ai';
+import {
   AuiConfig,
-  AuiIfDirective,
-  AuiMessagePartsComponent,
-  AuiMessageRootDirective,
-  AuiMessageTemplateDirective,
-  AuiPartTemplateDirective,
   AuiProviderDirective,
-  AuiThreadMessagesComponent,
-  AuiThreadRootDirective,
-  AuiThreadViewportDirective,
   registerToolUI,
   type ToolUIComponent,
   type ToolUIProps,
 } from 'angular-assistant-ui';
-import { createScriptedChatTransport } from 'angular-assistant-ui/testing';
-
-const textTurn = (...deltas: string[]): UIMessageChunk[] => [
-  { type: 'start' },
-  { type: 'text-start', id: 't1' },
-  ...deltas.map((delta): UIMessageChunk => ({ type: 'text-delta', id: 't1', delta })),
-  { type: 'text-end', id: 't1' },
-  { type: 'finish' },
-];
+import {
+  askUserAnswerOf,
+  createScriptedAttachmentAdapter,
+  createScriptedChatTransport,
+  scriptedApprovalTurn,
+  scriptedAskUserTurn,
+  scriptedTextTurn,
+  scriptedToolOutputTurn,
+  toolApprovalOf,
+  turnToolCallId,
+} from 'angular-assistant-ui/testing';
+import { AuiThreadComponent, AuiThreadListComponent } from 'angular-assistant-ui/ui';
 
 /** A provider-executed `getWeather` call with its result, then a text answer. */
 const weatherTurn = (): UIMessageChunk[] => [
@@ -65,23 +64,65 @@ const lastUserText = (messages: UIMessage[]): string =>
     .join('') ?? '';
 
 /**
- * Scripted (offline) replies, chosen by the last user message:
- * "weather" streams a tool call, "slow" streams slowly (so it can be
- * cancelled), anything else answers "Hi there!".
+ * Scripted (offline) replies, chosen by the last user message, built with the
+ * `angular-assistant-ui/testing` helpers: "weather" streams a tool call, "slow"
+ * streams slowly (so it can be cancelled), "markdown" answers with bold text
+ * and a code block, "book" asks for a tool approval and continues once it is
+ * answered, "ask" asks the user a question and answers the choice, anything
+ * else answers "Hi there!".
  */
 const transport = createScriptedChatTransport((messages) => {
   switch (lastUserText(messages)) {
     case 'weather':
       return { chunks: weatherTurn(), delayMs: 500 };
     case 'slow':
-      return {
-        chunks: textTurn('one ', 'two ', 'three ', 'four ', 'the end'),
+      return scriptedTextTurn({
+        text: ['one ', 'two ', 'three ', 'four ', 'the end'],
         delayMs: 300,
-      };
+      });
+    case 'markdown':
+      return scriptedTextTurn('Some **bold** text.\n\n', '```ts\nconst answer = 42;\n```\n');
+    case 'book': {
+      // A fresh id per turn: the AI SDK resolves answers to the first message with the id.
+      const toolCallId = turnToolCallId(messages, 'call-book');
+      const approval = toolApprovalOf(messages, toolCallId);
+      if (!approval) {
+        return scriptedApprovalTurn({
+          toolCallId,
+          toolName: 'bookMeeting',
+          input: { title: 'Sync', when: 'Monday 10am' },
+        });
+      }
+      return approval.approved
+        ? scriptedToolOutputTurn({
+            toolCallId,
+            output: { confirmed: true },
+            text: 'Booked.',
+          })
+        : scriptedTextTurn('Not booked.');
+    }
+    case 'ask': {
+      const toolCallId = turnToolCallId(messages, 'ask-city');
+      const answer = askUserAnswerOf(messages, toolCallId);
+      return answer === undefined
+        ? scriptedAskUserTurn({
+            toolCallId,
+            question: 'Which city?',
+            options: ['Paris', 'Rome'],
+          })
+        : scriptedTextTurn(`You picked ${String(answer)}.`);
+    }
     default:
-      return { chunks: textTurn('Hi ', 'there!') };
+      return scriptedTextTurn('Hi ', 'there!');
   }
 });
+
+/** Resubmits once an approval is answered or every client tool call has a result. */
+const sendAutomaticallyWhen: NonNullable<ChatInit<UIMessage>['sendAutomaticallyWhen']> = (
+  options,
+) =>
+  lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
+  lastAssistantMessageIsCompleteWithToolCalls(options);
 
 /** Tool UI for `getWeather`: shows the city until the result arrives. */
 @Component({
@@ -118,57 +159,47 @@ export class ToolsDirective {
 }
 
 /**
- * Compat smoke app: a chat over a scripted (offline) transport that covers
- * text streaming, a registered tool UI, `*auiIf` (Send/Stop) and cancel.
+ * Compat smoke app: the styled kit (`aui-thread-list` beside `aui-thread`) over
+ * an in-memory thread list (`AISDKThreads`) and a scripted (offline) transport.
+ * It covers streaming, markdown, a registered tool UI, the tool fallback's
+ * approval and ask-user form, attachments (a scripted attachment adapter),
+ * editing and branches, cancel and thread switching.
  */
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    AuiProviderDirective,
-    AuiThreadRootDirective,
-    AuiThreadViewportDirective,
-    AuiThreadMessagesComponent,
-    AuiMessageTemplateDirective,
-    AuiMessageRootDirective,
-    AuiMessagePartsComponent,
-    AuiPartTemplateDirective,
-    AuiIfDirective,
-    AuiComposerRootDirective,
-    AuiComposerInputDirective,
-    AuiComposerSendDirective,
-    AuiComposerCancelDirective,
-    ToolsDirective,
-  ],
+  imports: [AuiProviderDirective, AuiThreadComponent, AuiThreadListComponent, ToolsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ng-container [auiProvider]="config">
-      <div auiThreadRoot appTools>
-        <div auiThreadViewport style="height: 320px; overflow-y: auto">
-          <aui-thread-messages>
-            <ng-template auiMessage>
-              <div auiMessageRoot>
-                <aui-message-parts>
-                  <ng-template auiPart="text" let-part>
-                    <p>{{ part.type === 'text' ? part.text : '' }}</p>
-                  </ng-template>
-                </aui-message-parts>
-              </div>
-            </ng-template>
-          </aui-thread-messages>
-        </div>
-        <form auiComposerRoot>
-          <textarea auiComposerInput aria-label="Message"></textarea>
-          <button *auiIf="isIdle" auiComposerSend aria-label="Send">Send</button>
-          <button *auiIf="isRunning" auiComposerCancel type="button" aria-label="Stop">Stop</button>
-        </form>
-      </div>
-    </ng-container>
+    <div class="app-shell" [auiProvider]="config">
+      <aside class="app-sidebar"><aui-thread-list /></aside>
+      <main class="app-main" appTools>
+        <aui-thread [welcome]="{ message: 'Compat smoke' }" />
+      </main>
+    </div>
+  `,
+  styles: `
+    .app-shell {
+      display: flex;
+      height: 100dvh;
+    }
+    .app-sidebar {
+      width: 260px;
+      flex: none;
+      overflow-y: auto;
+    }
+    .app-main {
+      flex: 1;
+      min-width: 0;
+    }
   `,
 })
 export class App {
-  protected readonly config = AuiConfig({ threads: AISDKChat({ transport }) });
-
-  protected readonly isRunning = (s: AssistantState) => s.thread.isRunning;
-  protected readonly isIdle = (s: AssistantState) => !s.thread.isRunning;
+  protected readonly config = AuiConfig({
+    threads: AISDKThreads({
+      transport,
+      sendAutomaticallyWhen,
+      adapters: { attachments: createScriptedAttachmentAdapter() },
+    }),
+  });
 }
