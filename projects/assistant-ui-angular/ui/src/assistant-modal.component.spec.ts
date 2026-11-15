@@ -38,6 +38,7 @@ const makeAdapter = (titles: string[]): RemoteThreadListAdapter => ({
 
 let list: ReturnType<ReturnType<typeof createTestRuntime>['withThreadList']>;
 let initialOpen = false;
+let openOnRunStart = true;
 
 @Component({
   selector: 'aui-modal-probe',
@@ -55,12 +56,13 @@ class ProbeComponent {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<div [auiProvider]="config">
     <aui-modal-probe />
-    <aui-assistant-modal [(open)]="open" />
+    <aui-assistant-modal [(open)]="open" [openOnRunStart]="openOnRunStart" />
   </div>`,
 })
 class HostComponent {
   readonly config = list.config;
   readonly open = signal(initialOpen);
+  readonly openOnRunStart = openOnRunStart;
 }
 
 const settle = async (fixture: ComponentFixture<unknown>) => {
@@ -74,9 +76,18 @@ const settle = async (fixture: ComponentFixture<unknown>) => {
 let restoreLayout: () => void;
 let mounted: HTMLElement | undefined;
 
-async function mount(titles: string[] = [], open = false) {
+/** Starts (fires `thread.runStart`) or ends a run on the main thread. */
+async function setMainRunning(fixture: ComponentFixture<unknown>, running: boolean) {
+  const { aui } = fixture.debugElement.query(By.directive(ProbeComponent))
+    .componentInstance as ProbeComponent;
+  list.runtimeFor(aui.threads.getState().mainThreadId).setRunning(running);
+  await settle(fixture);
+}
+
+async function mount(titles: string[] = [], open = false, autoOpen = true) {
   list = createTestRuntime().withThreadList(makeAdapter(titles));
   initialOpen = open;
+  openOnRunStart = autoOpen;
   configureTestBed({ imports: [HostComponent] });
   const fixture = TestBed.createComponent(HostComponent);
   const root = fixture.nativeElement as HTMLElement;
@@ -91,13 +102,8 @@ async function mount(titles: string[] = [], open = false) {
     panel: () => overlayRoot().querySelector<HTMLElement>('.aui-modal-content'),
     part: (name: string) => overlayRoot().querySelector<HTMLElement>(`.aui-modal-${name}`),
     settle: () => settle(fixture),
-    /** Starts a run on the main thread (fires `thread.runStart`). */
-    startRun: async () => {
-      const { aui } = fixture.debugElement.query(By.directive(ProbeComponent))
-        .componentInstance as ProbeComponent;
-      list.runtimeFor(aui.threads.getState().mainThreadId).setRunning(true);
-      await settle(fixture);
-    },
+    startRun: () => setMainRunning(fixture, true),
+    stopRun: () => setMainRunning(fixture, false),
   };
 }
 
@@ -162,6 +168,38 @@ describe('aui-assistant-modal', () => {
     expect(t.part('thread-list')).toBeNull();
     expect(t.part('thread')!.hasAttribute('inert')).toBe(false);
     expect(t.part('title')!.textContent?.trim()).not.toBe('Threads');
+  });
+
+  it('with openOnRunStart=false a run start still switches an open Threads panel to the thread', async () => {
+    const t = await mount(['Alpha', 'Beta'], false, false);
+    await t.startRun();
+    // The option only stops a closed modal from opening.
+    expect(t.panel()).toBeNull();
+    await t.stopRun();
+    t.launcher().click();
+    await t.settle();
+    t.part('threads')!.click();
+    await t.settle();
+    expect(t.part('thread-list')).not.toBeNull();
+
+    await t.startRun();
+    expect(t.part('thread-list')).toBeNull();
+    expect(t.part('thread')!.hasAttribute('inert')).toBe(false);
+  });
+
+  it('a run start that unmounts the focused thread list keeps focus in the dialog', async () => {
+    const t = await mount(['Alpha', 'Beta']);
+    t.launcher().click();
+    await t.settle();
+    t.part('threads')!.click();
+    await t.settle();
+    const search = t.part('thread-list')!.querySelector<HTMLInputElement>('input[type="search"]')!;
+    search.focus();
+    expect(document.activeElement).toBe(search);
+
+    await t.startRun();
+    expect(t.part('thread-list')).toBeNull();
+    expect(document.activeElement).toBe(t.part('title'));
   });
 
   it('the launcher opens and closes the panel, which holds aui-thread', async () => {

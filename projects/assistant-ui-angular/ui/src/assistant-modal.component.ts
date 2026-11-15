@@ -9,6 +9,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  type EmbeddedViewRef,
   TemplateRef,
   ViewContainerRef,
   ViewEncapsulation,
@@ -105,7 +106,8 @@ const isRtl = (element: Element): boolean => getComputedStyle(element).direction
  * bigger steps; Enter, Space or a double click resets), and the size is
  * remembered in `localStorage`.
  *
- * It opens by itself when a run starts unless `openOnRunStart` is false.
+ * It opens by itself when a run starts unless `openOnRunStart` is false, and a
+ * run start always switches an open panel back to the thread.
  * `open` is two-way bindable. Use it inside an `[auiProvider]`.
  *
  * @example
@@ -236,7 +238,7 @@ const isRtl = (element: Element): boolean => getComputedStyle(element).direction
 export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
   /** Whether the panel is open. Two-way bindable. */
   readonly open = model(false);
-  /** Open the panel when a run starts. */
+  /** Open a closed panel when a run starts. An open panel shows the thread on run start regardless. */
   readonly openOnRunStart = input(true, { transform: booleanAttribute });
 
   /** @internal */
@@ -265,6 +267,7 @@ export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
   private readonly content = viewChild<ElementRef<HTMLElement>>('content');
   private readonly titleElement = viewChild<ElementRef<HTMLElement>>('title');
   private overlayRef: OverlayRef | null = null;
+  private panelView: EmbeddedViewRef<unknown> | null = null;
   private drag: ResizeDrag | null = null;
 
   private viewReady = false;
@@ -272,12 +275,10 @@ export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
   constructor() {
     inject(DestroyRef).onDestroy(() => this.detach());
     // Like upstream, every run start brings the running chat into view, also when
-    // the panel is already open on the thread list. (The headless root opens it.)
-    injectAuiEvent('thread.runStart', () => {
-      if (!this.openOnRunStart() || this.view() === 'thread') return;
-      this.view.set('thread');
-      this.cdr.markForCheck();
-    });
+    // the panel is already open on the thread list, whatever `openOnRunStart` says
+    // (that only decides whether the headless root opens a closed modal).
+    // `setView` keeps focus in the dialog when the list that held it unmounts.
+    injectAuiEvent('thread.runStart', () => this.setView('thread'));
   }
 
   /** @internal */
@@ -303,7 +304,10 @@ export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
   protected setView(view: ModalView): void {
     if (this.view() === view) return;
     this.view.set(view);
+    // The panel is an embedded view attached to the overlay, outside this
+    // component's own view: render it now so the old view is gone below.
     this.cdr.detectChanges();
+    this.panelView?.detectChanges();
     // Keep focus in the dialog when the view that held it unmounts.
     const heading = this.titleElement()?.nativeElement;
     const active = document.activeElement;
@@ -422,7 +426,7 @@ export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
       panelClass: 'aui-modal-pane',
     });
     this.overlayRef = ref;
-    ref.attach(new TemplatePortal(this.panel(), this.viewContainerRef));
+    this.panelView = ref.attach(new TemplatePortal(this.panel(), this.viewContainerRef));
     this.cdr.markForCheck();
     ref.updatePosition();
   }
@@ -430,6 +434,7 @@ export class AuiAssistantModalComponent implements OnChanges, AfterViewInit {
   private detach(): void {
     this.overlayRef?.dispose();
     this.overlayRef = null;
+    this.panelView = null;
     this.drag = null;
     this.cdr.markForCheck();
   }

@@ -141,16 +141,22 @@ export class AuiThreadListSidebarComponent implements OnInit, OnChanges {
   /** Whether the wide-screen sidebar is collapsed. Supports `[(collapsed)]`. */
   readonly collapsed = model(false);
   /**
-   * `'offcanvas'` (the default) lets the wide-screen sidebar collapse; `'none'`
-   * keeps it always shown, without the rail or a wide-screen toggle, like
-   * upstream's `collapsible="none"`. The drawer below the breakpoint is unaffected.
+   * `'offcanvas'` (the default) lets the sidebar collapse on wide screens and
+   * become a drawer below the breakpoint; `'none'` keeps it a static, always
+   * shown column at every width, without the rail, toggle or drawer, like
+   * upstream's `collapsible="none"`.
    */
   readonly collapsible = input<AuiSidebarCollapsible>('offcanvas');
 
   /** @internal */
   protected readonly sidebarId = `aui-sidebar-${++nextSidebarId}`;
   /** @internal True below the breakpoint. */
-  protected readonly mobile = signal(false);
+  private readonly narrow = signal(false);
+  /**
+   * @internal True when the sidebar acts as a drawer: below the breakpoint, unless
+   * `collapsible` is `'none'` (upstream renders that static column at every width).
+   */
+  protected readonly mobile = computed(() => this.narrow() && this.collapsible() !== 'none');
   /** @internal Whether the drawer is open (only meaningful below the breakpoint). */
   protected readonly open = signal(false);
   /** @internal */
@@ -241,7 +247,7 @@ export class AuiThreadListSidebarComponent implements OnInit, OnChanges {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const query = window.matchMedia(`(max-width: ${breakpoint - 0.02}px)`);
     const update = (matches: boolean) => {
-      this.mobile.set(matches);
+      this.narrow.set(matches);
       if (!matches) this.open.set(false);
     };
     update(query.matches);

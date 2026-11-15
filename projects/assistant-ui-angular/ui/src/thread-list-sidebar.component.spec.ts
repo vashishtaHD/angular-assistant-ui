@@ -184,6 +184,31 @@ describe('aui-thread-list-sidebar', () => {
     expect(t.host().hasAttribute('data-collapsed')).toBe(false);
   });
 
+  it('collapsible="none" stays a static column below 768px: no drawer, trap or inert', async () => {
+    const restoreLayout = stubLayout();
+    onTestFinished(restoreLayout);
+    const t = await mount(500, FixedHostComponent);
+    t.sidebar().classList.add('flex');
+    t.toggle().classList.add('flex');
+    expect(t.host().hasAttribute('data-mobile')).toBe(false);
+    expect(t.sidebar().hidden).toBe(false);
+    expect(displayOf(t.sidebar())).not.toBe('none');
+    expect(displayOf(t.toggle().parentElement!)).toBe('none');
+    expect(t.sidebar().hasAttribute('role')).toBe(false);
+    expect(t.root.querySelector('.aui-sidebar-main')!.hasAttribute('inert')).toBe(false);
+    expect(t.root.querySelector('[data-slot="aui_sidebar-rail"]')).toBeNull();
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'b', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    await t.settle();
+    expect(t.sidebar().hidden).toBe(false);
+    expect(t.backdrop()).toBeNull();
+    expect(t.root.querySelector('.aui-sidebar-main')!.hasAttribute('inert')).toBe(false);
+    const anchors = Array.from(t.root.querySelectorAll<HTMLElement>('.cdk-focus-trap-anchor'));
+    expect(anchors.every((anchor) => !anchor.hasAttribute('tabindex'))).toBe(true);
+  });
+
   it('the drawer toggles below 768px', async () => {
     const t = await mount(500);
     t.sidebar().classList.add('flex');
