@@ -1,6 +1,7 @@
 // Ported from packages/react/src/primitives/composer/ComposerInput.tsx @ 7d74276
 // (the base text binding and autosize from packages/vue/src/primitives/ComposerPrimitiveInput.ts)
 import {
+  ChangeDetectorRef,
   DestroyRef,
   Directive,
   ElementRef,
@@ -10,6 +11,7 @@ import {
   booleanAttribute,
   inject,
   input,
+  type ViewRef,
 } from '@angular/core';
 import { flushTapSync } from '@assistant-ui/tap';
 import { composerInputDisabled, composerSendDisabled } from '@assistant-ui/core/store/internal';
@@ -134,7 +136,13 @@ export class AuiComposerInputDirective implements OnChanges {
     // measured value (text set elsewhere). The initial value counts as a
     // change. The callback runs after the next render has applied `[value]`.
     this.scheduleResize();
+    // The view of the input: a store update fired by another directive's
+    // teardown in the same view (a message root clearing its hover) reaches
+    // this subscriber after the view is marked destroyed but before its own
+    // cleanup unsubscribes it.
+    const view = inject(ChangeDetectorRef) as ViewRef;
     const unsubscribe = injectAuiContext().source.subscribe(() => {
+      if (view.destroyed) return;
       if (this.text() !== this.lastText) this.scheduleResize();
       this.syncFocus();
     });

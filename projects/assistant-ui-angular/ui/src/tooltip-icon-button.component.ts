@@ -10,12 +10,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  Directive,
   ElementRef,
   ViewEncapsulation,
   inject,
   input,
   signal,
-  viewChild,
 } from '@angular/core';
 import { AuiButtonDirective } from './button.directive';
 
@@ -88,51 +88,38 @@ export class AuiTooltipPanelComponent {
 }
 
 /**
- * Ghost icon button with a tooltip. The tooltip shows on hover and keyboard
- * focus and hides on leave, blur and Escape. Project an `<aui-icon>` as content.
- * Native `click` events from the inner button bubble to the host element.
+ * Adds a tooltip to any element, typically a headless primitive button styled
+ * with `button[auiButton]` (`<button auiButton auiActionBarCopy auiTooltip="Copy">`).
+ * The tooltip shows on hover and keyboard focus, hides on leave, blur and
+ * Escape, and is linked through `aria-describedby` while shown. It does not
+ * show while the element is `disabled`. It does not set an accessible name:
+ * give the element an `aria-label` (or text) of its own.
  */
-@Component({
-  selector: 'aui-tooltip-icon-button',
+@Directive({
+  selector: '[auiTooltip]',
   standalone: true,
-  imports: [AuiButtonDirective],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  encapsulation: ViewEncapsulation.None,
-  host: { class: 'aui-tooltip-icon-button' },
-  template: `<button
-    #button
-    auiButton
-    variant="ghost"
-    size="icon"
-    class="aui-tooltip-icon-button-trigger"
-    [attr.aria-label]="ariaLabel() ?? tooltip()"
-    [attr.aria-describedby]="describedBy()"
-    [disabled]="disabled()"
-    (mouseenter)="hovered = true; show()"
-    (mouseleave)="hovered = false; syncVisibility()"
-    (focus)="focused = true; show()"
-    (blur)="focused = false; syncVisibility()"
-    (keydown.escape)="hide()"
-  >
-    <ng-content />
-  </button>`,
+  host: {
+    '[attr.aria-describedby]': 'describedBy()',
+    '(mouseenter)': 'hovered = true; show()',
+    '(mouseleave)': 'hovered = false; syncVisibility()',
+    '(focus)': 'focused = true; show()',
+    '(blur)': 'focused = false; syncVisibility()',
+    '(keydown.escape)': 'hide()',
+  },
 })
-export class AuiTooltipIconButtonComponent {
+export class AuiTooltipDirective {
   private readonly overlay = inject(Overlay);
-  private readonly button = viewChild.required<ElementRef<HTMLButtonElement>>('button');
+  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
-  /** Tooltip text; also the accessible name unless `ariaLabel` is set. */
-  readonly tooltip = input.required<string>();
-  /** Side of the button the tooltip appears on. */
-  readonly side = input<AuiTooltipSide>('bottom');
-  /** Accessible name override. */
-  readonly ariaLabel = input<string | null>(null);
-  /** Disables the inner button. */
-  readonly disabled = input(false);
+  /** Tooltip text. */
+  readonly text = input.required<string>({ alias: 'auiTooltip' });
+  /** Side of the element the tooltip appears on. */
+  readonly side = input<AuiTooltipSide>('bottom', { alias: 'auiTooltipSide' });
 
   protected hovered = false;
   protected focused = false;
-  protected readonly describedBy = signal<string | null>(null);
+  /** @internal The tooltip id while it is shown. */
+  readonly describedBy = signal<string | null>(null);
 
   private overlayRef: OverlayRef | null = null;
   private readonly id = `aui-tooltip-${nextId++}`;
@@ -143,7 +130,7 @@ export class AuiTooltipIconButtonComponent {
 
   /** Shows the tooltip. */
   protected show(): void {
-    if (this.overlayRef || this.disabled()) return;
+    if (this.overlayRef || (this.element as HTMLButtonElement).disabled === true) return;
     const side = this.side();
     const strategy = this.positionFor(side);
     const ref = this.overlay.create({
@@ -152,7 +139,7 @@ export class AuiTooltipIconButtonComponent {
       panelClass: 'aui-tooltip-pane',
     });
     const panel = ref.attach(new ComponentPortal(AuiTooltipPanelComponent));
-    panel.setInput('text', this.tooltip());
+    panel.setInput('text', this.text());
     panel.setInput('tooltipId', this.id);
     panel.setInput('side', side);
     strategy.positionChanges.subscribe(({ connectionPair }) => {
@@ -198,8 +185,45 @@ export class AuiTooltipIconButtonComponent {
     const opposite = POSITIONS[OPPOSITE[side]];
     return this.overlay
       .position()
-      .flexibleConnectedTo(this.button())
+      .flexibleConnectedTo(this.element)
       .withPositions([POSITIONS[side], opposite])
       .withPush(false);
   }
+}
+
+/**
+ * Ghost icon button with a tooltip. The tooltip shows on hover and keyboard
+ * focus and hides on leave, blur and Escape. Project an `<aui-icon>` as content.
+ * Native `click` events from the inner button bubble to the host element.
+ * To put a tooltip on a headless primitive button, use `[auiTooltip]` instead.
+ */
+@Component({
+  selector: 'aui-tooltip-icon-button',
+  standalone: true,
+  imports: [AuiButtonDirective, AuiTooltipDirective],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
+  host: { class: 'aui-tooltip-icon-button' },
+  template: `<button
+    auiButton
+    variant="ghost"
+    size="icon"
+    class="aui-tooltip-icon-button-trigger"
+    [auiTooltip]="tooltip()"
+    [auiTooltipSide]="side()"
+    [attr.aria-label]="ariaLabel() ?? tooltip()"
+    [disabled]="disabled()"
+  >
+    <ng-content />
+  </button>`,
+})
+export class AuiTooltipIconButtonComponent {
+  /** Tooltip text; also the accessible name unless `ariaLabel` is set. */
+  readonly tooltip = input.required<string>();
+  /** Side of the button the tooltip appears on. */
+  readonly side = input<AuiTooltipSide>('bottom');
+  /** Accessible name override. */
+  readonly ariaLabel = input<string | null>(null);
+  /** Disables the inner button. */
+  readonly disabled = input(false);
 }

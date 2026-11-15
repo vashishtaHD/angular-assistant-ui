@@ -12,12 +12,10 @@ import {
   isDevMode,
   type Type,
 } from '@angular/core';
-import { isMcpAppUri } from '@assistant-ui/core';
-import { resolveToolCallText } from '@assistant-ui/core/store';
 import type { AssistantState } from '@assistant-ui/store/client';
-import { injectAui } from '../state/inject-aui';
 import { injectAuiState } from '../state/inject-aui-state';
-import type { DataUIProps, ToolUIProps } from '../tools/tool-ui';
+import type { DataUIProps } from '../tools/tool-ui';
+import { injectRegisteredToolView } from './tool-call-view';
 
 /** The context of an `ng-template auiPart`: the current part state. */
 export interface AuiPartTemplateContext {
@@ -79,20 +77,11 @@ export class AuiPartViewComponent {
    */
   readonly templatesFirst = input(false);
 
-  private readonly aui = injectAui();
   /** Renders projected templates in this part's scope. */
   protected readonly injector = inject(Injector);
 
   private readonly part = injectAuiState((s) => s.part);
-  private readonly toolUI = injectAuiState((s) => {
-    if (s.part.type !== 'tool-call') return null;
-    return s.optional.tools?.toolUIs[s.part.toolName]?.[0] ?? null;
-  });
-  private readonly mcpAppRender = injectAuiState((s) =>
-    s.part.type === 'tool-call' && isMcpAppUri(s.part.mcp?.app?.resourceUri)
-      ? (s.optional.tools?.mcpApp?.render ?? null)
-      : null,
-  );
+  private readonly registeredTool = injectRegisteredToolView();
   private readonly dataRenderer = injectAuiState((s) => {
     if (s.part.type !== 'data') return null;
     const named = s.optional.dataRenderers?.renderers[s.part.name]?.[0] ?? null;
@@ -114,36 +103,8 @@ export class AuiPartViewComponent {
           : (this.templates().get(part.type) ?? this.templates().get('default'));
       if (first) return { kind: 'template', template: first };
     }
-    if (part.type === 'tool-call') {
-      const registration = this.toolUI();
-      if (registration?.renderText) {
-        const resolved = resolveToolCallText(registration.renderText, part);
-        return typeof resolved === 'string' || typeof resolved === 'number'
-          ? { kind: 'value', value: resolved }
-          : NONE;
-      }
-      const render = registration?.render ?? this.mcpAppRender();
-      if (render) {
-        const aui = this.aui;
-        const tool: ToolUIProps = {
-          part,
-          addResult: aui.part.addToolResult,
-          resume: aui.part.resumeToolCall,
-          respondToApproval: aui.part.respondToToolApproval,
-          ...(aui.part.unstable_recordInteraction && {
-            unstable_recordInteraction: aui.part.unstable_recordInteraction,
-          }),
-        };
-        // The tools scope types renderers as React components; the Angular
-        // face stores Angular component classes there (`registerToolUI`), so
-        // this is the one render-side cast back.
-        return {
-          kind: 'component',
-          component: render as unknown as Type<unknown>,
-          inputs: { tool },
-        };
-      }
-    }
+    const tool = this.registeredTool();
+    if (tool) return tool;
     if (part.type === 'data') {
       const render = this.dataRenderer();
       if (render) {

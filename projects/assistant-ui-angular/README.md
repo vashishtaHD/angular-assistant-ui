@@ -162,6 +162,46 @@ In templates, `*auiIf="selector"` renders its content while the selector is trut
 Do not read store state in a constructor: the client is created when the provider first
 binds its input. Read inside `computed`, templates or handlers.
 
+### Components chosen at run time
+
+Inside a scoped template (`ng-template auiPart`, `ng-template auiEditComposer`, an
+`auiMessage` template), render a component chosen at run time with
+`[auiComponentOutlet]` instead of `*ngComponentOutlet`. A component created by
+`*ngComponentOutlet` there resolves the scope of the template's declaration site (the
+message instead of the part, the thread composer instead of the edit composer).
+
+```html
+<ng-template auiPart="text">
+  <ng-container [auiComponentOutlet]="textRenderer" [auiComponentOutletInputs]="{ dense: true }" />
+</ng-template>
+```
+
+In an `auiPart="tool-call"` template of `aui-message-grouped-parts` (where the template
+wins over registered tool UIs), `<aui-tool-ui-outlet [fallback]="MyToolFallback" />`
+renders the registered tool UI and the fallback only for tools without one.
+
+### Styled thread
+
+The `angular-assistant-ui/ui` entry is a styled kit, and `<aui-thread>` is its full chat
+thread. It needs these optional peers:
+
+```sh
+npm install @angular/cdk markdown-it @angular/platform-browser
+```
+
+`@angular/cdk` is for overlays and focus. `markdown-it` and `@angular/platform-browser`
+are there because the thread renders assistant text through the
+`angular-assistant-ui/markdown` entry. Import the stylesheet once, for example in
+`angular.json` `styles` or with `@import 'angular-assistant-ui/ui/styles.css';`. Then
+place the thread under a provider that has a height:
+
+```html
+<div [auiProvider]="config" style="height: 100dvh"><aui-thread /></div>
+```
+
+To replace sections such as `UserMessage`, `ToolFallback` or `Text`, provide
+`AUI_THREAD_COMPONENTS`.
+
 ### Provider teardown
 
 Destroying an `[auiProvider]` hard-destroys its client, which stops in-flight streams.
@@ -179,7 +219,8 @@ From `angular-assistant-ui`:
 | `AuiThreadMessagesComponent`, `AuiMessageTemplateDirective`, `AuiMessageRootDirective`                              | Messages              |
 | `AuiMessagePartsComponent`, `AuiPartTemplateDirective`, `AuiPartTemplateContext`                                    | Message parts         |
 | `AuiComposerRootDirective`, `AuiComposerInputDirective`, `AuiComposerSendDirective`, `AuiComposerCancelDirective`   | Composer              |
-| `registerToolUI`, `ToolUIComponent`, `ToolUIProps`, `DataUIProps`                                                   | Tool UIs              |
+| `registerToolUI`, `ToolUIComponent`, `ToolUIProps`, `DataUIProps`, `AuiToolUIOutletComponent`                        | Tool UIs              |
+| `AuiComponentOutletDirective` (`[auiComponentOutlet]`)                                                              | Scope-safe rendering  |
 | `AuiConfig`, `Derived`, `createAssistantClient` and the `Assistant*` types and `Unsubscribe`                        | Re-exported store API |
 
 From `angular-assistant-ui/testing` (needs the `ai` package):

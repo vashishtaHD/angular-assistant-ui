@@ -1,7 +1,10 @@
 /*
  * Public API Surface of angular-assistant-ui/ui.
  * The styled kit: components styled by one plain-CSS stylesheet
- * (`angular-assistant-ui/ui/styles.css`). Needs the optional `@angular/cdk` peer.
+ * (`angular-assistant-ui/ui/styles.css`). Needs the optional `@angular/cdk` peer;
+ * `aui-thread` and `aui-markdown-text-styled` render through the
+ * `angular-assistant-ui/markdown` entry, so they also need its optional peers
+ * `markdown-it` and `@angular/platform-browser`.
  */
 export { AUI_ICON_NAMES, AUI_ICON_SHAPES } from './icons/icon-shapes';
 export type { AuiIconName, AuiIconShape } from './icons/icon-shapes';
@@ -11,6 +14,7 @@ export { AuiButtonDirective } from './button.directive';
 export type { AuiButtonSize, AuiButtonVariant } from './button.directive';
 
 export {
+  AuiTooltipDirective,
   AuiTooltipIconButtonComponent,
   AuiTooltipPanelComponent,
 } from './tooltip-icon-button.component';
@@ -68,3 +72,15 @@ export {
   AuiMessageAttachmentsStyledComponent,
 } from './attachments/attachments.component';
 // End Task 17.
+
+// Task 16: styled thread, messages, composer, action bars, branch picker and markdown text.
+export { AuiThreadComponent } from './thread/thread.component';
+export type {
+  AuiThreadAvatar,
+  AuiThreadWelcomeConfig,
+  AuiThreadWelcomeSuggestion,
+} from './thread/thread.component';
+export { AUI_THREAD_COMPONENTS } from './thread-components.token';
+export type { AuiThreadComponents } from './thread-components.token';
+export { AuiStyledCodeHeader, AuiStyledMarkdownText } from './markdown-text.component';
+// Task 16 end.
