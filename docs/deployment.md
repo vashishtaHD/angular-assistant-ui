@@ -46,8 +46,7 @@ environment. Serve a different file per environment:
 | `authToken` | (none) | Optional bearer token sent as `Authorization: Bearer <token>` for the server's `jwt` mode. Leave it empty in `dev` mode, where no header is sent. `config.json` is public, so use it only for a shared test token; a real app gets a per-user token from its sign-in and provides `MASTRA_AUTH` itself ([mastra.md](mastra.md#auth-modes)). |
 
 Keys the file leaves out keep their defaults. These keys replace the phase 1 `mastraChatUrl`
-(a full chat URL); the demo change lands with Task 19, so a demo checkout from before that
-merge still reads `mastraChatUrl`.
+(a full chat URL).
 
 The file is fetched from the absolute path `/config.json` with `cache: 'no-cache'`. If
 you deploy under a `<base href>` sub-path (for example `/app/`), serve the file at the
