@@ -5,7 +5,10 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { flushTapSync } from '@assistant-ui/tap';
 import { describe, expect, it, vi } from 'vitest';
+import type { AssistantClient } from '@assistant-ui/store/client';
 import { AuiProviderDirective } from '../provider/aui-provider.directive';
+import { injectAui } from '../state/inject-aui';
+import { registerToolUI, type DataUIProps, type ToolUIProps } from '../tools/tool-ui';
 import { configureTestBed } from '../../testing-internal/test-bed';
 import { createTestRuntime, type TestRuntime } from '../../testing-internal/test-runtime';
 import { AuiPartTemplateDirective } from './message-parts.component';
@@ -265,6 +268,125 @@ describe('aui-thread-rows enriched leaf', () => {
       approvalId: 'approval-1',
       approved: true,
     });
+  });
+});
+
+@Component({
+  selector: 'aui-test-rows-tool',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<b class="registered-tool">{{ tool().part.toolName }}</b>`,
+})
+class RowsToolComponent {
+  readonly tool = input.required<ToolUIProps>();
+}
+
+@Component({
+  selector: 'aui-test-rows-data',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<b class="registered-data">{{ data().part.name }}</b>`,
+})
+class RowsDataComponent {
+  readonly data = input.required<DataUIProps>();
+}
+
+let rowsAui: AssistantClient | undefined;
+
+@Component({
+  selector: 'aui-test-rows-registrar',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class RowsRegistrarComponent {
+  constructor() {
+    registerToolUI('weather', RowsToolComponent);
+    rowsAui = injectAui();
+  }
+}
+
+@Component({
+  standalone: true,
+  imports: [
+    AuiProviderDirective,
+    AuiThreadRowsComponent,
+    AuiThreadRowTemplateDirective,
+    NgTemplateOutlet,
+    RowsRegistrarComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div [auiProvider]="runtime().config">
+      <aui-test-rows-registrar />
+      <aui-thread-rows>
+        <ng-template auiThreadRow let-info>
+          @if (info.type === 'part' && info.part.type === 'tool-call') {
+            <div class="tool-row" [attr.data-name]="info.part.toolName">
+              @if (info.part.toolUI; as ui) {
+                <ng-container *ngTemplateOutlet="ui" />
+              } @else {
+                <i class="no-ui"></i>
+              }
+            </div>
+          }
+          @if (info.type === 'part' && info.part.type === 'data') {
+            <div class="data-row" [attr.data-name]="info.part.name">
+              @if (info.part.dataRendererUI; as ui) {
+                <ng-container *ngTemplateOutlet="ui" />
+              } @else {
+                <i class="no-ui"></i>
+              }
+            </div>
+          }
+        </ng-template>
+      </aui-thread-rows>
+    </div>
+  `,
+})
+class RegisteredRowsHostComponent {
+  readonly runtime = input.required<TestRuntime>();
+}
+
+describe('aui-thread-rows registered UIs', () => {
+  it('gives tool-call and data leaves the registered UI as toolUI / dataRendererUI', async () => {
+    const test = createTestRuntime();
+    configureTestBed({ imports: [RegisteredRowsHostComponent] });
+    const fixture = TestBed.createComponent(RegisteredRowsHostComponent);
+    fixture.componentRef.setInput('runtime', test);
+    fixture.autoDetectChanges();
+    await fixture.whenStable();
+    flushTapSync(() =>
+      rowsAui!.dataRenderers.setDataUI(
+        'chart',
+        RowsDataComponent as unknown as Parameters<
+          AssistantClient['dataRenderers']['setDataUI']
+        >[1],
+      ),
+    );
+    flushTapSync(() => test.append({ id: 'u1', role: 'user', content: text('hi') }));
+    flushTapSync(() =>
+      test.append({
+        id: 'a1',
+        role: 'assistant',
+        content: [
+          { type: 'tool-call', toolCallId: 'c1', toolName: 'weather', args: {} },
+          { type: 'tool-call', toolCallId: 'c2', toolName: 'unregistered', args: {} },
+          { type: 'data', name: 'chart', data: { a: 1 } },
+          { type: 'data', name: 'table', data: {} },
+        ],
+      }),
+    );
+    const root = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(root.querySelectorAll('.tool-row').length).toBe(2);
+    });
+    const row = (selector: string) => root.querySelector(selector)!;
+    expect(row('.tool-row[data-name=weather] .registered-tool')?.textContent).toBe('weather');
+    expect(row('.tool-row[data-name=unregistered] .no-ui')).not.toBeNull();
+    expect(row('.data-row[data-name=chart] .registered-data')?.textContent).toBe('chart');
+    expect(row('.data-row[data-name=table] .no-ui')).not.toBeNull();
   });
 });
 

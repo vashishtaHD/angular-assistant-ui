@@ -1,5 +1,5 @@
 // Ported from packages/vue/src/primitives/MessagePrimitiveParts.ts @ 7d74276
-// (the tool-call branch of the inner `MessagePartView`)
+// (the tool-call and data branches of the inner `MessagePartView`)
 import { computed, type Signal, type Type } from '@angular/core';
 import { isMcpAppUri } from '@assistant-ui/core';
 import { resolveToolCallText } from '@assistant-ui/core/store';
@@ -57,5 +57,20 @@ export function injectRegisteredToolView(): Signal<RegisteredToolView | null> {
     // stores Angular component classes there (`registerToolUI`), so this is
     // the one render-side cast back.
     return { kind: 'component', component: render as unknown as Type<unknown>, inputs: { tool } };
+  });
+}
+
+/**
+ * Internal: the renderer registered for the data part in scope (the one named
+ * for its `name`, else the first fallback), or `null` when the part is not a
+ * data part or nothing is registered. Shared by the part view and the thread
+ * rows, so both resolve a data part's UI the same way. Call in an injection
+ * context inside a part scope.
+ */
+export function injectRegisteredDataRenderer(): Signal<unknown> {
+  return injectAuiState((s) => {
+    if (s.part.type !== 'data') return null;
+    const named = s.optional.dataRenderers?.renderers[s.part.name]?.[0] ?? null;
+    return named ?? s.optional.dataRenderers?.fallbacks[0] ?? null;
   });
 }

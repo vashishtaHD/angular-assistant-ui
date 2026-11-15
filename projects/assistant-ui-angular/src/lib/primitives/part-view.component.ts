@@ -15,7 +15,7 @@ import {
 import type { AssistantState } from '@assistant-ui/store/client';
 import { injectAuiState } from '../state/inject-aui-state';
 import type { DataUIProps } from '../tools/tool-ui';
-import { injectRegisteredToolView } from './tool-call-view';
+import { injectRegisteredDataRenderer, injectRegisteredToolView } from './tool-call-view';
 
 /** The context of an `ng-template auiPart`: the current part state. */
 export interface AuiPartTemplateContext {
@@ -88,11 +88,7 @@ export class AuiPartViewComponent {
 
   private readonly part = injectAuiState((s) => s.part);
   private readonly registeredTool = injectRegisteredToolView();
-  private readonly dataRenderer = injectAuiState((s) => {
-    if (s.part.type !== 'data') return null;
-    const named = s.optional.dataRenderers?.renderers[s.part.name]?.[0] ?? null;
-    return named ?? s.optional.dataRenderers?.fallbacks[0] ?? null;
-  });
+  private readonly dataRenderer = injectRegisteredDataRenderer();
 
   /** The template context; `NgTemplateOutlet` forwards it without recreating. */
   protected readonly context = computed<AuiPartTemplateContext>(() => {

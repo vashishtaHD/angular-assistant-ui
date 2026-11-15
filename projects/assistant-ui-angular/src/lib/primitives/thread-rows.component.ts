@@ -13,7 +13,6 @@ import {
   inject,
   input,
 } from '@angular/core';
-import { isMcpAppUri } from '@assistant-ui/core';
 import type { PartMethods } from '@assistant-ui/core/store';
 import type { AssistantState, AuiConfig } from '@assistant-ui/store/client';
 import { hasMessage, messageScopeConfig } from '../scope/message-scope';
@@ -36,6 +35,7 @@ import {
   type AuiPartTemplateContext,
   type AuiPartTemplates,
 } from './part-view.component';
+import { injectRegisteredDataRenderer, injectRegisteredToolView } from './tool-call-view';
 
 export { createThreadRowsSelector, type ThreadRow, type ThreadRowsOptions };
 
@@ -191,23 +191,15 @@ export class AuiThreadRowLeafComponent {
 
   private readonly aui = injectAui();
   private readonly part = injectAuiState((s) => s.part);
-  /** Whether a tool or data UI is registered for the current part (as the default view resolves it). */
-  private readonly hasRegisteredUI = injectAuiState((s) => {
-    const part = s.part;
-    if (part.type === 'tool-call') {
-      return (
-        s.optional.tools?.toolUIs[part.toolName]?.[0] !== undefined ||
-        (isMcpAppUri(part.mcp?.app?.resourceUri) && !!s.optional.tools?.mcpApp?.render)
-      );
-    }
-    if (part.type === 'data') {
-      return (
-        s.optional.dataRenderers?.renderers[part.name]?.[0] !== undefined ||
-        s.optional.dataRenderers?.fallbacks[0] !== undefined
-      );
-    }
-    return false;
-  });
+  private readonly registeredTool = injectRegisteredToolView();
+  private readonly registeredData = injectRegisteredDataRenderer();
+  /**
+   * Whether a tool or data UI is registered for the current part, resolved by the same helpers as
+   * the default view (`aui-part-view`), so `toolUI` / `dataRendererUI` match what it renders.
+   */
+  private readonly hasRegisteredUI = computed(
+    () => this.registeredTool() !== null || this.registeredData() !== null,
+  );
 
   /** Builds the template context for the current part. */
   protected context(children: TemplateRef<unknown>): AuiThreadRowTemplateContext {
