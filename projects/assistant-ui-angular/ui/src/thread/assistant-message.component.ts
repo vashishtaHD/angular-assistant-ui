@@ -1,5 +1,4 @@
 // Ported from packages/ui/src/components/react/assistant-ui/elements/thread.aui.tsx (AssistantMessage) @ 7d74276
-import { AuiThreadSlotComponent } from './slot.component';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -13,6 +12,7 @@ import {
   AuiMessageGroupedPartsComponent,
   AuiMessageRootDirective,
   AuiPartTemplateDirective,
+  AuiToolUIOutletComponent,
   groupPartByType,
 } from 'angular-assistant-ui';
 import { AuiStyledMarkdownText } from '../markdown-text.component';
@@ -20,6 +20,7 @@ import { AuiThreadAssistantActionBarComponent } from './action-bars';
 import { AuiThreadBranchPickerComponent } from './branch-picker.component';
 import { AuiThreadReasoningTextComponent, AuiThreadToolCallComponent } from './default-parts';
 import { AuiThreadMessageErrorComponent } from './message-error.component';
+import { AuiThreadSlotComponent } from './slot.component';
 import { AuiThreadSettings } from './thread-settings';
 
 /** Upstream's grouping: reasoning and tool calls form chains of thought. */
@@ -46,6 +47,7 @@ const MESSAGE_GROUP_BY = groupPartByType({
     AuiMessageGroupedPartsComponent,
     AuiPartTemplateDirective,
     AuiIndicatorTemplateDirective,
+    AuiToolUIOutletComponent,
     AuiThreadMessageErrorComponent,
     AuiThreadBranchPickerComponent,
     AuiThreadAssistantActionBarComponent,
@@ -77,7 +79,8 @@ const MESSAGE_GROUP_BY = groupPartByType({
             <aui-thread-slot [component]="slots().Reasoning" />
           </ng-template>
           <ng-template auiPart="tool-call">
-            <aui-thread-slot [component]="slots().ToolFallback" />
+            <!-- A registered tool UI wins; ToolFallback renders only without one. -->
+            <aui-tool-ui-outlet [fallback]="slots().ToolFallback" />
           </ng-template>
           <ng-template auiIndicator>
             <span

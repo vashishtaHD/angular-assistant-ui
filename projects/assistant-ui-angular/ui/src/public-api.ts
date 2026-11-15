@@ -1,7 +1,10 @@
 /*
  * Public API Surface of angular-assistant-ui/ui.
  * The styled kit: components styled by one plain-CSS stylesheet
- * (`angular-assistant-ui/ui/styles.css`). Needs the optional `@angular/cdk` peer.
+ * (`angular-assistant-ui/ui/styles.css`). Needs the optional `@angular/cdk` peer;
+ * `aui-thread` and `aui-markdown-text-styled` render through the
+ * `angular-assistant-ui/markdown` entry, so they also need its optional peers
+ * `markdown-it` and `@angular/platform-browser`.
  */
 export { AUI_ICON_NAMES, AUI_ICON_SHAPES } from './icons/icon-shapes';
 export type { AuiIconName, AuiIconShape } from './icons/icon-shapes';

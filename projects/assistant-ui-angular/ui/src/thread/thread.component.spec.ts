@@ -1,11 +1,21 @@
 // Ported from packages/ui/src/components/vue/assistant-ui/thread.test.ts and
 // packages/ui/src/components/react/assistant-ui/elements/thread.aui.test.tsx @ 7d74276
-import { ChangeDetectionStrategy, Component, type Provider } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, type Provider } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { AUI_CLIPBOARD, AuiProviderDirective, injectAuiState } from 'angular-assistant-ui';
+import {
+  AUI_CLIPBOARD,
+  AuiProviderDirective,
+  injectAuiState,
+  registerToolUI,
+  type ToolUIProps,
+} from 'angular-assistant-ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureTestBed } from '../../../src/testing-internal/test-bed';
-import { createTestRuntime, type TestRuntime } from '../../../src/testing-internal/test-runtime';
+import {
+  createTestRuntime,
+  type TestRuntime,
+  type TestRuntimeCallbacks,
+} from '../../../src/testing-internal/test-runtime';
 import { AUI_ICON_SHAPES } from '../icons/icon-shapes';
 import { AUI_THREAD_COMPONENTS } from '../thread-components.token';
 import {
@@ -19,11 +29,47 @@ let welcome: AuiThreadWelcomeConfig | undefined;
 let avatar: AuiThreadAvatar | undefined;
 
 @Component({
+  selector: 'app-weather-tool',
   standalone: true,
-  imports: [AuiProviderDirective, AuiThreadComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<b class="weather-tool">{{ tool().part.toolName }}</b>`,
+})
+class WeatherToolComponent {
+  readonly tool = input.required<ToolUIProps>();
+}
+
+@Component({
+  selector: 'app-tool-registrar',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class ToolRegistrarComponent {
+  constructor() {
+    registerToolUI('weather', WeatherToolComponent);
+  }
+}
+
+@Component({
+  selector: 'app-custom-fallback',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<i class="custom-fallback">{{ name() }}</i>`,
+})
+class CustomFallbackComponent {
+  protected readonly name = injectAuiState((s) =>
+    s.part.type === 'tool-call' ? s.part.toolName : '?',
+  );
+}
+
+@Component({
+  standalone: true,
+  imports: [AuiProviderDirective, AuiThreadComponent, ToolRegistrarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<div [auiProvider]="config" class="host">
+    <app-tool-registrar />
     <aui-thread [welcome]="welcome" [assistantAvatar]="avatar" />
+    <button class="after-thread">after</button>
   </div>`,
 })
 class HostComponent {
@@ -53,6 +99,8 @@ const settle = async (fixture: ComponentFixture<unknown>) => {
 interface MountOptions {
   setup?: (rt: TestRuntime) => void;
   providers?: Provider[];
+  /** Extra adapter fields (the runtime forwards them, e.g. `hasEarlier`). */
+  callbacks?: object;
   welcome?: AuiThreadWelcomeConfig;
   avatar?: AuiThreadAvatar;
   /** Runs after the view is created and before the first change detection. */
@@ -62,10 +110,12 @@ interface MountOptions {
 let mounted: HTMLElement | undefined;
 
 async function mount(opts: MountOptions = {}) {
-  runtime = createTestRuntime({
-    onEdit: async () => undefined,
-    onReload: async () => undefined,
-  });
+  runtime = createTestRuntime(
+    Object.defineProperties(
+      { onEdit: async () => undefined, onReload: async () => undefined },
+      Object.getOwnPropertyDescriptors(opts.callbacks ?? {}),
+    ) as TestRuntimeCallbacks,
+  );
   opts.setup?.(runtime);
   welcome = opts.welcome;
   avatar = opts.avatar;
@@ -300,6 +350,83 @@ describe('aui-thread', () => {
     vi.advanceTimersByTime(1);
     fixture.detectChanges();
     expect(iconPath(copy)).toBe(shapeD('copy'));
+  });
+
+  it('renders a registered tool UI, and ToolFallback only for unregistered tools', async () => {
+    const { root } = await mount({
+      providers: [
+        { provide: AUI_THREAD_COMPONENTS, useValue: { ToolFallback: CustomFallbackComponent } },
+      ],
+      setup: (rt) => {
+        rt.append({ id: 'u1', role: 'user', content: text('question') });
+        rt.append({
+          id: 'a1',
+          role: 'assistant',
+          content: [
+            { type: 'tool-call', toolCallId: 'c1', toolName: 'weather', args: {} },
+            { type: 'tool-call', toolCallId: 'c2', toolName: 'lookup', args: {} },
+          ],
+        });
+      },
+    });
+    const names = (selector: string) =>
+      Array.from(root.querySelectorAll(selector)).map((el) => el.textContent);
+    expect(names('.weather-tool')).toEqual(['weather']);
+    expect(names('.custom-fallback')).toEqual(['lookup']);
+  });
+
+  describe('load earlier', () => {
+    let hasEarlier = true;
+    const callbacks = {
+      get hasEarlier() {
+        return hasEarlier;
+      },
+      onLoadEarlier: async () => undefined,
+    };
+    const mountEarlier = () => {
+      hasEarlier = true;
+      return mount({
+        callbacks,
+        setup: (rt) => rt.append({ id: 'u1', role: 'user', content: text('question') }),
+      });
+    };
+    /** The last page arrives: the adapter has nothing earlier and the thread re-syncs. */
+    const lastPage = async (fixture: ComponentFixture<unknown>) => {
+      hasEarlier = false;
+      runtime.setRunning(false);
+      await settle(fixture);
+    };
+
+    it('moves focus to the next control when the focused last-page button goes away', async () => {
+      const { fixture, root } = await mountEarlier();
+      const button = root.querySelector<HTMLButtonElement>('.aui-thread-load-earlier')!;
+      expect(button.textContent?.trim()).toBe('Load earlier messages');
+      button.focus();
+      expect(document.activeElement).toBe(button);
+
+      await lastPage(fixture);
+      expect(root.querySelector('.aui-thread-load-earlier')).toBeNull();
+      // The next focusable control after the button: the user message's edit action.
+      expect(document.activeElement).toBe(root.querySelector('.aui-user-action-edit'));
+    });
+
+    it('does not steal focus that is elsewhere when the button goes away', async () => {
+      const { fixture, root } = await mountEarlier();
+      root.querySelector<HTMLButtonElement>('.aui-thread-load-earlier')!.focus();
+      const other = root.querySelector<HTMLButtonElement>('.after-thread')!;
+      other.focus();
+
+      await lastPage(fixture);
+      expect(root.querySelector('.aui-thread-load-earlier')).toBeNull();
+      expect(document.activeElement).toBe(other);
+    });
+
+    it('leaves focus alone when the button was never focused', async () => {
+      const { fixture, root } = await mountEarlier();
+      await lastPage(fixture);
+      expect(root.querySelector('.aui-thread-load-earlier')).toBeNull();
+      expect(document.activeElement).not.toBe(root.querySelector('.aui-user-action-edit'));
+    });
   });
 
   it('replaces UserMessage through AUI_THREAD_COMPONENTS', async () => {

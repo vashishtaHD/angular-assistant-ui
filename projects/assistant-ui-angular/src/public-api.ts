@@ -495,3 +495,7 @@ export {
   type AssistantTransportRuntime,
   type AssistantTransportRuntimeOptions,
 } from './lib/runtime/assistant-transport';
+// Task 16 (fix round 1): scope-safe dynamic rendering and registered tool UI precedence.
+export { AuiComponentOutletDirective } from './lib/scope/component-outlet.directive';
+export { AuiToolUIOutletComponent } from './lib/primitives/tool-ui-outlet.component';
+// Task 16 end.

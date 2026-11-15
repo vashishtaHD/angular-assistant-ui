@@ -1,37 +1,21 @@
-// Angular plumbing for the component slots of packages/ui/src/components/react/assistant-ui/elements/thread.aui.tsx @ 7d74276
-import { NgComponentOutlet } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  Injector,
-  inject,
-  input,
-  type Type,
-} from '@angular/core';
-import { AUI_CONTEXT } from 'angular-assistant-ui';
+// Ported from packages/ui/src/components/react/assistant-ui/elements/thread.aui.tsx (ThreadComponents slots) @ 7d74276
+import { ChangeDetectionStrategy, Component, input, type Type } from '@angular/core';
+import { AuiComponentOutletDirective } from 'angular-assistant-ui';
 
 /**
- * Renders a slot component in the store scope this element sits in. A
- * component created by `*ngComponentOutlet` inside a scoped template (a part
- * template, say) would otherwise resolve the scope of the template's
- * declaration site; this hands it the scope resolved here.
+ * Renders a slot component of `aui-thread` in the store scope this element
+ * sits in, through the main entry's scope-safe `[auiComponentOutlet]`.
  * @internal Part of `aui-thread`.
  */
 @Component({
   selector: 'aui-thread-slot',
   standalone: true,
-  imports: [NgComponentOutlet],
+  imports: [AuiComponentOutletDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
-  template: `<ng-container *ngComponentOutlet="component(); injector: injector" />`,
+  template: `<ng-container [auiComponentOutlet]="component()" />`,
 })
 export class AuiThreadSlotComponent {
   /** The component to render. */
   readonly component = input.required<Type<unknown>>();
-
-  /** @internal */
-  protected readonly injector = Injector.create({
-    providers: [{ provide: AUI_CONTEXT, useValue: inject(AUI_CONTEXT) }],
-    parent: inject(Injector),
-  });
 }
