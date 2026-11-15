@@ -39,20 +39,24 @@ environment. Serve a different file per environment:
 { "mastraUrl": "https://api.example.com", "agentId": "chatAgent", "authToken": "" }
 ```
 
-| Key | Default | Meaning |
+| Key | Development default | Meaning |
 | --- | --- | --- |
 | `mastraUrl` | `http://localhost:4111` | The Mastra server origin (and optional path prefix), used for the chat, history and thread routes |
 | `agentId` | `chatAgent` | The agent to chat with; its chat route is `<mastraUrl>/chat/<agentId>` |
 | `authToken` | (none) | Optional bearer token sent as `Authorization: Bearer <token>` for the server's `jwt` mode. Leave it empty in `dev` mode, where no header is sent. `config.json` is public, so use it only for a shared test token; a real app gets a per-user token from its sign-in and provides `MASTRA_AUTH` itself ([mastra.md](mastra.md#auth-modes)). |
 
-Keys the file leaves out keep their defaults. These keys replace the phase 1 `mastraChatUrl`
-(a full chat URL).
+The file is validated at startup: `mastraUrl` must be an absolute `http(s)` URL, `agentId` a
+name of letters, digits, `-` or `_`, and `authToken` a string. A production build requires
+`mastraUrl` and `agentId`; only a development build (`ng serve`) lets keys the file leaves out
+keep their defaults. These keys replace the phase 1 `mastraChatUrl` (a full chat URL).
 
 The file is fetched from the absolute path `/config.json` with `cache: 'no-cache'`. If
 you deploy under a `<base href>` sub-path (for example `/app/`), serve the file at the
 host root as well, or change the loader (`load(url)` in
-`projects/demo/src/app/runtime-config.ts`) to resolve against the base href. If the file
-is missing, the app logs a warning and falls back to the localhost default.
+`projects/demo/src/app/runtime-config.ts`) to resolve against the base href. An invalid
+file, or in a production build a missing one, stops the app before it renders: the page
+lists every problem and the console logs the `RuntimeConfigError`. A development build with
+no file logs a warning and uses the localhost defaults.
 
 ## Identity and auth modes
 

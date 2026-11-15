@@ -324,10 +324,6 @@ the table covers them.
 
 Found in the phase 1 final review and deliberately not done in phase 1.
 
-- Demo runtime config is not validated, and a missing `mastraUrl` (with `agentId` and the optional
-  `authToken`, which replace phase 1's `mastraChatUrl` in Task 19) silently falls back to
-  localhost in production builds. Validate it as a non-empty absolute URL and `console.error` when
-  falling back in a non-dev build.
 - `docs/deployment.md` has no middleware snippet. Add a `server.middleware` bearer-token check example.
 - No test for an explicit `extends` client that differs from the injected context.
 - No test for `scrollToBottomOnThreadSwitch` or `threads.selectionChanged` (thread lists are phase 2).
@@ -342,5 +338,5 @@ Found in the phase 1 final review and deliberately not done in phase 1.
   three `compat` jobs, and record the run before relying on the compat table.
 - The compat smoke (Task 20) passes locally for Angular 18.2, 20 and 22, the last on Node 24.15.0
   (`npx -y -p node@24.15.0 -- node scripts/compat.mjs ng22`); it still needs its first CI run.
-- Before any npm publish, add `description`, `repository`, `author` and `keywords` to the library
-  `package.json` and pick the final package name.
+- Before any npm publish, add `author` to the library `package.json` (it already has `description`,
+  `repository` and `keywords`) and pick the final package name.
