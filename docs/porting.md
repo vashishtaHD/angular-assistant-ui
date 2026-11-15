@@ -92,7 +92,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | MessagePrimitive.GenerativeUI, GenerativeUIRender, GenerativeUIRenderError, GenerativeUIRenderProps, GenerativeUIComponentRegistry, GenerativeUIMessagePartComponent, GenerativeUIMessagePartProps, GenerativeUIMessagePart, GenerativeUINode, GenerativeUISpec | no | n/a (generative UI out of scope) |  |
 | MessagePrimitive.Unstable_PartsGrouped, MessagePrimitive.Unstable_PartsGroupedByParentId | no | ported (as `aui-message-parts-grouped` with `groupingFunction` and `groupMessagePartsByParentId`; `ng-template auiEmpty` is the `components.Empty` slot (without it the `auiPart="text"` template or the default paragraph renders in a static empty text part scope), unkeyed groups render through the `default` group template) |  |
 | useMessageTiming | no | planned (Task 18) | Task 18 |
-| useToolCallElapsed | no | planned (Task 17) | Task 17 |
+| useToolCallElapsed | no | ported (as `injectToolCallElapsed`) | Task 17 |
 | unstable_useMessageStallDetection, Unstable_MessageStallDetection, Unstable_MessageStallDetectionOptions | no | ported (as `injectMessageStallDetection`, `MessageStallDetection`, `MessageStallDetectionOptions`) |  |
 
 ### Message part (`MessagePartPrimitive`) and tool UI
@@ -110,7 +110,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | EmptyMessagePartComponent, EmptyMessagePartProps, TextMessagePartComponent, TextMessagePartProps, ReasoningMessagePartComponent, ReasoningMessagePartProps, SourceMessagePartComponent, SourceMessagePartProps, ImageMessagePartComponent, ImageMessagePartProps, FileMessagePartComponent, FileMessagePartProps, DataMessagePartComponent, DataMessagePartProps, QuoteMessagePartComponent, QuoteMessagePartProps | yes | ported (as `AuiPartTemplateDirective` and `AuiPartTemplateContext`) |  |
 | Unstable_AudioMessagePartComponent, Unstable_AudioMessagePartProps | no | ported (as `ng-template auiPart="audio"`) |  |
 | ReasoningGroupComponent, ReasoningGroupProps | no | ported (as `ng-template auiGroup` and `AuiGroupTemplateContext`) |  |
-| useToolArgsStatus, ToolArgsStatus | no | planned (Task 17) | Task 17 |
+| useToolArgsStatus, ToolArgsStatus | no | ported (as `injectToolArgsStatus`, `computeToolArgsStatus`, `ToolArgsStatus`; reads assistant-stream's partial-JSON tag without importing the optional peer) | Task 17 |
 | EnrichedPartState, PartState | no | ported (type re-exports) | |
 | ToolExecutionStatus | no | ported (type re-export) | |
 | Unstable_InteractableToolRenderProps | no | ported (the `interactable` input of `unstable_interactableTool` render components) | |
@@ -205,7 +205,7 @@ Angular scope or directive replaces exactly are `n/a`.
 | AttachmentAdapter, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter | no | ported (re-exported from core) | Task 6 |
 | Attachment, PendingAttachment, CompleteAttachment, AttachmentStatus, CreateAttachment, AttachmentRuntime, AttachmentState, AttachmentRuntimeState | no | ported (type re-exports) | Task 6 |
 | CloudFileAttachmentAdapter | no | n/a (Assistant Cloud out of scope) |  |
-| useAttachmentSrc (kit hook) | no | planned (Task 17) | Task 17 |
+| useAttachmentSrc (kit hook) | no | ported (as `injectAttachmentSrc` in `angular-assistant-ui/ui`) | Task 17 |
 
 ### Suggestions (`SuggestionPrimitive`)
 
@@ -295,7 +295,7 @@ here so the table covers them.
 | `angular-assistant-ui/mastra` | `MastraThreads`, `createMastraTransport`, `mastraThreadListAdapter`, `MASTRA_AUTH`, `MastraAuth`, `MastraChatTransport`, `mastraHistoryAdapter`, `mastraSendAutomaticallyWhen`, `MastraHttpError`, `clearMastraStoredIds` (and `createMockMastraServer` in the testing entry). `mastra/src/vendor/` is vendored from `@assistant-ui/ai-sdk@0.0.18`, so that peer is pinned exactly; re-vendor it (and re-check the NOTICE) before raising the pin | ported |
 | `angular-assistant-ui/ui` (foundation) | `styles.css` tokens, `aui-icon`, `button[auiButton]`, `aui-tooltip-icon-button`, collapsible, dialog, dropdown menu | ported (the dropdown menu is built on the main entry's headless menu, `[auiMenuRoot]`/`[auiMenuTrigger]`/`[auiMenuContent]`/`[auiMenuItem]`, Ruling R10, and unmounts its content on close rather than hiding it; limits: Tailwind classes become `aui-*` CSS in `ui/styles.css`) |
 | `angular-assistant-ui/ui` (thread) | `aui-thread`, `AUI_THREAD_COMPONENTS`, `AuiThreadComponents`, `aui-markdown-text-styled` (`AuiStyledMarkdownText`) | planned (Task 16) |
-| `angular-assistant-ui/ui` (tools and media) | `aui-tool-fallback` (approval card, ask-user form), `aui-tool-group`, `aui-reasoning`, `aui-composer-attachments-styled`, `aui-composer-add-attachment-styled`, `aui-message-attachments-styled` | planned (Task 17) |
+| `angular-assistant-ui/ui` (tools and media) | `aui-tool-fallback` (approval card, ask-user form), `aui-tool-group`, `aui-reasoning`, `aui-composer-attachments-styled`, `aui-composer-add-attachment-styled`, `aui-message-attachments-styled` | ported (also `aui-tool-fallback-approval`, `aui-tool-fallback-ask-user`, `aui-attachment-tile` and `AuiToolFallbackToolUIComponent`, the `registerToolUI` adapter; reasoning renders each part through `aui-markdown-text` in its own part scope, as upstream Vue does; attachment tiles use a native `title` until the styled `[auiTooltip]` directive is integrated) |
 | `angular-assistant-ui/ui` (thread list and extras) | `aui-thread-list`, `aui-thread-list-sidebar`, `aui-assistant-modal`, `aui-quote-composer`, `aui-selection-toolbar-styled`, `aui-follow-up-suggestions`, `aui-message-timing`, `aui-composer-trigger-popover-styled` | planned (Task 18) |
 | `angular-assistant-ui/testing` | `createScriptedChatTransport` (no upstream counterpart); approval, ask-user, attachment and thread-list helpers | ported; extensions planned (Tasks 4-9, 14) |
 

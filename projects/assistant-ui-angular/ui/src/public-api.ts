@@ -33,3 +33,38 @@ export {
   AuiDropdownMenuTriggerDirective,
 } from './dropdown-menu/dropdown-menu';
 export type { AuiDropdownMenuAlign } from './dropdown-menu/dropdown-menu';
+
+// Task 17: tool fallback (approval card, approval receipt, ask-user form), tool group,
+// reasoning and styled attachments.
+export {
+  AuiToolFallbackComponent,
+  AuiToolFallbackToolUIComponent,
+} from './tool-fallback/tool-fallback.component';
+export { AuiToolFallbackApprovalComponent } from './tool-fallback/tool-fallback-approval.component';
+export { AuiToolFallbackAskUserComponent } from './tool-fallback/tool-fallback-ask-user.component';
+export {
+  AUI_TOOL_APPROVED_RESULT,
+  AUI_TOOL_DENIED_RESULT,
+  approvalOptionLabel,
+  formatToolDuration,
+  formatUnknownValue,
+  isAskUserArgs,
+  isPendingAskUser,
+  offersInterruptAction,
+} from './tool-fallback/tool-fallback-utils';
+export type {
+  AuiAskUserArgs,
+  AuiToolApproval,
+  AuiToolCallPart,
+} from './tool-fallback/tool-fallback-utils';
+export { AuiToolGroupComponent } from './tool-group.component';
+export type { AuiToolGroupVariant } from './tool-group.component';
+export { AuiReasoningComponent } from './reasoning.component';
+export { injectAttachmentSrc } from './attachments/attachment-src';
+export { AuiAttachmentTileComponent } from './attachments/attachment-tile.component';
+export {
+  AuiComposerAddAttachmentStyledComponent,
+  AuiComposerAttachmentsStyledComponent,
+  AuiMessageAttachmentsStyledComponent,
+} from './attachments/attachments.component';
+// End Task 17.

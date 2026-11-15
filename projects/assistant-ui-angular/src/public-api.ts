@@ -495,3 +495,12 @@ export {
   type AssistantTransportRuntime,
   type AssistantTransportRuntimeOptions,
 } from './lib/runtime/assistant-transport';
+
+// Task 17: tool-call elapsed time and streaming argument status (used by the styled tool fallback).
+export { injectToolCallElapsed } from './lib/tools/tool-call-elapsed';
+export {
+  computeToolArgsStatus,
+  injectToolArgsStatus,
+  type ToolArgsStatus,
+} from './lib/tools/tool-args-status';
+// End Task 17.
