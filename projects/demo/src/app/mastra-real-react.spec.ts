@@ -15,7 +15,13 @@ import {
   createMastraTransport,
   mastraThreadListAdapter,
 } from 'angular-assistant-ui/mastra';
-import { createMockMastraServer, type MockMastraServer } from 'angular-assistant-ui/testing';
+import type { UIMessageChunk } from 'ai';
+import {
+  createMockMastraServer,
+  type MockMastraReply,
+  type MockMastraServer,
+  type MockMastraServerOptions,
+} from 'angular-assistant-ui/testing';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -51,8 +57,31 @@ let restoreFetch: (() => void) | undefined;
 let fixture: ComponentFixture<unknown> | undefined;
 let servers = 0;
 
-const mount = async () => {
-  server = createMockMastraServer({ baseUrl: `http://real-react-${++servers}.test` });
+/** The words of a reply streamed one chunk per `delayMs`. */
+const slowReply = (text: string, delayMs: number): MockMastraReply => ({
+  chunks: [
+    { type: 'start-step' },
+    { type: 'text-start', id: 't1' },
+    ...text.split(' ').map((word, i): UIMessageChunk => ({
+      type: 'text-delta',
+      id: 't1',
+      delta: i === 0 ? word : ` ${word}`,
+    })),
+    { type: 'text-end', id: 't1' },
+    { type: 'finish-step' },
+    { type: 'finish', finishReason: 'stop' },
+  ],
+  delayMs,
+});
+
+/** The abort signal of each chat request, in order. */
+let chatSignals: (AbortSignal | undefined)[] = [];
+
+const mount = async (respond?: MockMastraServerOptions['respond']) => {
+  server = createMockMastraServer({
+    baseUrl: `http://real-react-${++servers}.test`,
+    ...(respond && { respond }),
+  });
   server.seedThread({ id: 't1', title: 'First', updatedAt: '2026-01-01T00:00:00.000Z' }, [
     user('u1', 'hello one'),
     assistant('a1', 'reply one'),
@@ -61,7 +90,20 @@ const mount = async () => {
     user('u2', 'hello two'),
     assistant('a2', 'reply two'),
   ]);
-  restoreFetch = server.install();
+  const restoreServer = server.install();
+  const serverFetch = globalThis.fetch;
+  chatSignals = [];
+  globalThis.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (init?.method === 'POST' && new URL(url).pathname === `/chat/${AGENT}`) {
+      chatSignals.push(init.signal ?? undefined);
+    }
+    return serverFetch(input, init);
+  };
+  restoreFetch = () => {
+    globalThis.fetch = serverFetch;
+    restoreServer();
+  };
   const baseUrl = server.baseUrl;
 
   @Component({
@@ -166,5 +208,53 @@ describe('MastraThreads on real react and @ai-sdk/react (M9)', () => {
     expect(second.messageIds).toEqual(ids(aui).slice(0, 5));
     expect(second.messages.map((m) => m.id)).toEqual([ids(aui)[4]]);
     expect(server.messages('t1').map((m) => m.id)).toEqual(ids(aui));
+  });
+
+  const startSlowRun = async () => {
+    const aui = await mount(() => slowReply('one two three four five six seven eight', 25));
+    aui.threads().switchToThread('t1');
+    await waitFor(() => expect(texts(aui)).toEqual(['hello one', 'reply one']));
+    aui.thread().composer().setText('stream please');
+    aui.thread().composer().send();
+    await waitFor(() => expect(aui.thread().getState().isRunning).toBe(true));
+    expect(chatSignals).toHaveLength(1);
+    return aui;
+  };
+
+  it('keeps streaming a run in its thread while another thread is shown', async () => {
+    const aui = await startSlowRun();
+    aui.threads().switchToThread('t2');
+    await waitFor(() => expect(texts(aui)).toEqual(['hello two', 'reply two']));
+
+    // The t1 run finishes on the server while t2 is shown; t2 stays as it was.
+    await waitFor(() => expect(server.messages('t1')).toHaveLength(4));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(texts(aui)).toEqual(['hello two', 'reply two']);
+    expect(aui.thread().getState().isRunning).toBe(false);
+    expect(chatSignals[0]!.aborted).toBe(false);
+
+    aui.threads().switchToThread('t1');
+    await waitFor(() =>
+      expect(texts(aui)).toEqual([
+        'hello one',
+        'reply one',
+        'stream please',
+        'one two three four five six seven eight',
+      ]),
+    );
+    expect(aui.thread().getState().isRunning).toBe(false);
+  });
+
+  it('aborts the running request when its thread is deleted', async () => {
+    const aui = await startSlowRun();
+    await aui.threads().item({ id: 't1' }).delete();
+    await waitFor(() => expect(chatSignals[0]!.aborted).toBe(true));
+  });
+
+  it('aborts the running request when the provider is destroyed', async () => {
+    await startSlowRun();
+    fixture!.destroy();
+    fixture = undefined;
+    await vi.waitFor(() => expect(chatSignals[0]!.aborted).toBe(true));
   });
 });
