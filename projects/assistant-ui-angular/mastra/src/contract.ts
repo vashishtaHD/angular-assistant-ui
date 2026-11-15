@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the Mastra server HTTP contract.
 /**
  * The Mastra server HTTP contract (mastra-server, Task 13) in one place: route paths, query
  * parameters, request bodies and the client's view of which message ids the server stores.

@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): `MastraThreads`, AISDKThreads wired to a Mastra server.
 import { Injector, inject, runInInjectionContext } from '@angular/core';
 import type { RemoteThreadListAdapter } from '@assistant-ui/core';
 import {

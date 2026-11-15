@@ -1,4 +1,4 @@
-// The documented public surface of the vendored packages/markdown @ 7d74276.
+// Original (no upstream counterpart): the documented public surface of the vendored packages/markdown @ 7d74276.
 import type * as Ast from './vendor/markdown/ast';
 import { parseMarkdown as vendorParseMarkdown } from './vendor/markdown/parse';
 import {

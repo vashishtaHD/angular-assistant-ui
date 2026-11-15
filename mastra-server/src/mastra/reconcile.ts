@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): reconciles stored history with the active branch a client sends.
 /** Minimal shape of a stored message that reconciliation needs. */
 export interface StoredMessageRef {
   id: string;

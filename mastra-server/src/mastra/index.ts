@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the Mastra server instance, its routes and auth.
 import { Mastra } from '@mastra/core';
 import type { Context, Next } from 'hono';
 import { LibSQLStore } from '@mastra/libsql';

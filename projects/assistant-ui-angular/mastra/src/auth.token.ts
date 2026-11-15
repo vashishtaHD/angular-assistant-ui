@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the Mastra auth token (`MASTRA_AUTH`).
 import { InjectionToken, inject } from '@angular/core';
 
 /**

@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): spec helper that configures TestBed for both change detection modes.
 import { provideExperimentalZonelessChangeDetection } from '@angular/core';
 import { TestBed, type TestModuleMetadata } from '@angular/core/testing';
 

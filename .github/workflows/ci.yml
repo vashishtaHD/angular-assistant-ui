@@ -20,6 +20,8 @@ jobs:
       - run: npm run test:scripts
       # docs/porting.md: every parity row is `ported` or `n/a (reason)`, none `planned`.
       - run: npm run check:parity
+      # Every non-spec .ts source names its upstream source or says it is original.
+      - run: npm run check:headers
       - run: npm test
       # Builds the main entry and every secondary entry (ui, markdown, shiki, mastra,
       # testing, react-interop) into dist/assistant-ui-angular.

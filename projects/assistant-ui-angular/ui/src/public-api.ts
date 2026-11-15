@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the public API of the `angular-assistant-ui/ui` entry point.
 /*
  * Public API Surface of angular-assistant-ui/ui.
  * The styled kit: components styled by one plain-CSS stylesheet

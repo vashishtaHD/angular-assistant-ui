@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the demo book-meeting tool (needs approval).
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 

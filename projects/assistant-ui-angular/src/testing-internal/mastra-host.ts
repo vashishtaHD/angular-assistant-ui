@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): spec helper that mounts an `[auiProvider]` host.
 import { ChangeDetectionStrategy, Component, type Provider } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';

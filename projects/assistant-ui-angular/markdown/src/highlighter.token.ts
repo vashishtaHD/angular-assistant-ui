@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the syntax highlighter token of `aui-markdown-text`.
 import { InjectionToken } from '@angular/core';
 
 /**

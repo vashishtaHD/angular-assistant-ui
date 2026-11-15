@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the demo chat agent of the Mastra server.
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { getWeather } from '../tools/get-weather';

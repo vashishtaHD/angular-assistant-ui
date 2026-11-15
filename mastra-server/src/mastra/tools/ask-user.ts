@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the demo ask-user tool.
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 

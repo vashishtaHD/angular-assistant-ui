@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): scripted mock language model for the Mastra server specs.
 import { MockLanguageModelV3 } from 'ai/test';
 import type { LanguageModelV3StreamPart } from '@ai-sdk/provider';
 

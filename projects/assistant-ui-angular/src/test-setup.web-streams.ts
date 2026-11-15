@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): test setup: web streams for the jsdom environment.
 import {
   ReadableStream,
   TextDecoderStream,

@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the public API of the `angular-assistant-ui/mastra` entry point.
 /*
  * Public API Surface of angular-assistant-ui/mastra.
  * A Mastra memory thread list, history, transport and auth for angular-assistant-ui. This entry

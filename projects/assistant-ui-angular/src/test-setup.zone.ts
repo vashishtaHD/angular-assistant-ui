@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): test setup for the Zone.js project.
 import './test-setup.web-streams';
 import '@analogjs/vitest-angular/setup-zone';
 import { getTestBed } from '@angular/core/testing';

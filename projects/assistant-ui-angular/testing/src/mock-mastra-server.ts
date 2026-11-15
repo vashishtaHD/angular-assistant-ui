@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): an in-memory mock of the Mastra server for tests.
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai';
 
 /** A memory thread held by {@link createMockMastraServer}. */

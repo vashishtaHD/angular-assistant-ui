@@ -15,6 +15,7 @@
     "check:ui-styles": "node scripts/check-ui-styles-asset.mjs",
     "check:react-compat": "node scripts/check-react-compat.mjs",
     "check:parity": "node scripts/check-parity.mjs",
+    "check:headers": "node scripts/check-headers.mjs",
     "test:scripts": "node --test scripts/check-parity.test.mjs scripts/check-react-compat.test.mjs",
     "build:demo": "ng build demo",
     "typecheck:mastra": "npm run typecheck -w mastra-server --if-present",

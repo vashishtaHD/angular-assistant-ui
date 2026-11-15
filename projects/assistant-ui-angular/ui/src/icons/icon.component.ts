@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): `aui-icon`, inline lucide SVG icons (see NOTICE).
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { AUI_ICON_SHAPES, type AuiIconName } from './icon-shapes';
 

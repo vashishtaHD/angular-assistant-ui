@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the read-only Mastra history adapter.
 import type {
   GenericThreadHistoryAdapter,
   MessageFormatItem,

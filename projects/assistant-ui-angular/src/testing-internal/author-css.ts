@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): spec helper for author stylesheets.
 import { onTestFinished } from 'vitest';
 
 /**

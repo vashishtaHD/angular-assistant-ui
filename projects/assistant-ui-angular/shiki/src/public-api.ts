@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the public API of the `angular-assistant-ui/shiki` entry point.
 /*
  * Public API of the `angular-assistant-ui/shiki` entry point.
  */

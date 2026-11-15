@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the Mastra thread list adapter.
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- the ambient types must reach the ng-packagr build, which only compiles files reachable from the entry
 /// <reference path="./vendor/tap-react-shim.d.ts" />
 import type {

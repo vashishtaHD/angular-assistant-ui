@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the base of the state-gated structural directives.
 import {
   ChangeDetectorRef,
   DestroyRef,

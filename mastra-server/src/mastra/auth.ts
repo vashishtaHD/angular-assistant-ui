@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): HS256 bearer-token auth for the Mastra server.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { MastraAuthConfig } from '@mastra/core/server';
 

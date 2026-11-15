@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): spec helpers for the styled kit.
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';

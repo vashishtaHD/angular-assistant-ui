@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the public API of the `angular-assistant-ui/testing` entry point.
 /*
  * Public API Surface of angular-assistant-ui/testing.
  * Test helpers for apps built on angular-assistant-ui. This entry point needs

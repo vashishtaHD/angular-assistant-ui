@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): test harness for the Mastra server specs.
 import { createHmac } from 'node:crypto';
 import { createHonoServer } from '@mastra/deployer/server';
 import type { LanguageModelV3StreamPart } from '@ai-sdk/provider';

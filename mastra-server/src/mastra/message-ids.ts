@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): scoping of client message ids in Mastra storage.
 const PREFIX = 'm';
 
 const enc = (value: string) => Buffer.from(value, 'utf8').toString('base64url');

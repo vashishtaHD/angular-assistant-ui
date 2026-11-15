@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the authenticated chat and thread routes of the Mastra server.
 import { registerApiRoute } from '@mastra/core/server';
 import { handleChatStream } from '@mastra/ai-sdk';
 import { toAISdkMessages } from '@mastra/ai-sdk/ui';

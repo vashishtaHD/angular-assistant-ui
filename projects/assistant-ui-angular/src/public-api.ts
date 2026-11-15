@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the public API of the `angular-assistant-ui` entry point.
 /*
  * Public API Surface of angular-assistant-ui.
  * Every export must be re-exported from this file and carry TSDoc.

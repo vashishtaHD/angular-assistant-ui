@@ -1,3 +1,4 @@
+// Original (no upstream counterpart): the AI SDK transport for the Mastra chat route.
 import { AssistantChatTransport } from '@assistant-ui/ai-sdk';
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai';
 import { resolveMastraAuth, type MastraAuth } from './auth.token';
