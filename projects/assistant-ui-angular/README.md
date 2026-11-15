@@ -295,15 +295,18 @@ import {
   scriptedTextTurn,
   scriptedToolOutputTurn,
   toolApprovalOf,
+  turnToolCallId,
 } from 'angular-assistant-ui/testing';
 
 const transport = createScriptedChatTransport((messages) => {
-  const approval = toolApprovalOf(messages, 'call-1');
+  // One id per turn: a second booking gets its own call instead of overwriting the first.
+  const toolCallId = turnToolCallId(messages, 'call-book');
+  const approval = toolApprovalOf(messages, toolCallId);
   if (!approval) {
-    return scriptedApprovalTurn({ toolCallId: 'call-1', toolName: 'bookMeeting', input: {} });
+    return scriptedApprovalTurn({ toolCallId, toolName: 'bookMeeting', input: {} });
   }
   return approval.approved
-    ? scriptedToolOutputTurn({ toolCallId: 'call-1', output: { confirmed: true }, text: 'Booked.' })
+    ? scriptedToolOutputTurn({ toolCallId, output: { confirmed: true }, text: 'Booked.' })
     : scriptedTextTurn('Not booked.');
 });
 
