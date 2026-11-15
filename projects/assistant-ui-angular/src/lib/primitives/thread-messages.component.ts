@@ -84,9 +84,9 @@ export class AuiThreadMessagesComponent {
    * send handoff: core shows a sent message first as an in-transit submission
    * row under a generated id, then the host's message replaces it under its
    * own id. That row keeps its key, so it is updated in place instead of being
-   * re-created (which Angular reports as NG0956 when it is the whole list,
-   * e.g. the first message of a thread). The list changes when a row's id
-   * changes too, so the view rebinds the row's scope to the new message.
+   * re-created with new DOM and component state (for the first message of a
+   * thread, the whole list). The list changes when a row's id changes too, so
+   * the view rebinds the row's scope to the new message.
    */
   protected readonly rows = computed(() => this.computeRows(), { equal: sameRows });
 

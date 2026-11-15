@@ -293,7 +293,6 @@ describe('attachment primitives', () => {
   });
 
   it('sending the first message into an empty thread keeps the row, rebinds it and moves the attachments', async () => {
-    const warn = vi.spyOn(console, 'warn');
     const error = vi.spyOn(console, 'error');
     const t = await setup();
     const probe = t.fixture.debugElement.query(By.directive(ProbeComponent))
@@ -322,8 +321,8 @@ describe('attachment primitives', () => {
     expect(error.mock.calls).toEqual([]);
     expect(t.el.querySelector('.row')).toBe(row);
     expect(row!.getAttribute('data-message-id')).toBe('m0');
-    // The send must not re-create the whole message list (Angular NG0956).
-    expect(warn.mock.calls.filter((call) => String(call[0]).includes('NG0956'))).toEqual([]);
+    // The node-identity checks above guard against re-creating the row: the message list tracks by
+    // `row.key`, for which Angular never reports NG0956, so a console check would prove nothing.
   });
 
   it('keeps the attachment rows when the acknowledged message replaces every attachment id', async () => {
