@@ -24,6 +24,9 @@ updates:
       # majors are covered by compat/; toolchain majors are raised by hand.
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
+      # Angular 18 requires zone.js ~0.14; a 0.x minor is a breaking release.
+      - dependency-name: 'zone.js'
+        update-types: ['version-update:semver-minor']
       # Pinned exactly: angular-assistant-ui/mastra vendors code from this version, so raising it
       # means re-vendoring (see docs/porting.md).
       - dependency-name: '@assistant-ui/ai-sdk'
