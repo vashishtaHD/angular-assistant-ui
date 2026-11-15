@@ -339,6 +339,55 @@ describe('aui-markdown-text', () => {
       ]);
     });
 
+    it('re-creates a block whose type changes at the same position, with the new content', async () => {
+      // `Title` then `===` turns the paragraph into a setext heading.
+      const { host, stream } = await mount({ text: 'intro\n\nTitle', running: true });
+      const intro = host().querySelector('p');
+      const title = host().querySelectorAll('p')[1];
+      expect(title?.textContent).toBe('Title');
+      await stream('intro\n\nTitle\n===');
+      expect(host().querySelector('p')).toBe(intro);
+      expect(title?.isConnected).toBe(false);
+      expect(host().querySelectorAll('p')).toHaveLength(1);
+      expect(host().querySelector('h1')?.textContent).toBe('Title');
+      // A list becoming a different list type is a new block too.
+      await stream('intro\n\nTitle\n===\n\n- a');
+      const bullet = host().querySelector('ul');
+      expect(bullet).not.toBeNull();
+      await stream('intro\n\nTitle\n===\n\n1. a');
+      expect(host().querySelector('ul')).toBeNull();
+      expect(host().querySelector('ol li')?.textContent).toBe('a');
+    });
+
+    it('keeps list items and table rows while the list and table grow', async () => {
+      const { host, stream } = await mount({ text: '- one\n- tw', running: true });
+      const list = host().querySelector('ul');
+      const first = host().querySelector('li');
+      await stream('- one\n- two\n- three');
+      expect(host().querySelector('ul')).toBe(list);
+      expect(host().querySelector('li')).toBe(first);
+      expect(Array.from(host().querySelectorAll('li')).map((li) => li.textContent)).toEqual([
+        'one',
+        'two',
+        'three',
+      ]);
+
+      const table = '| a | b |\n| - | - |\n| 1 | 2 |';
+      await stream(`- one\n- two\n- three\n\n${table}`);
+      const tableEl = host().querySelector('table');
+      const row = host().querySelector('tbody tr');
+      expect(row?.textContent).toBe('12');
+      await stream(`- one\n- two\n- three\n\n${table}\n| 3 | 4 |\n| 5 |`);
+      expect(host().querySelector('table')).toBe(tableEl);
+      expect(host().querySelector('tbody tr')).toBe(row);
+      expect(Array.from(host().querySelectorAll('tbody tr')).map((tr) => tr.textContent)).toEqual([
+        '12',
+        '34',
+        '5',
+      ]);
+      expect(host().querySelector('ul')).toBe(list);
+    });
+
     it('creates an override for a settled block once', async () => {
       const titles: string[] = [];
       @Component({
@@ -566,6 +615,32 @@ describe('aui-markdown-text', () => {
       expect(highlight).toHaveBeenLastCalledWith('const a = 1;\nconst b = 2;\n', 'ts');
       const ng0956 = warn.mock.calls.filter((call) => String(call[0]).includes('NG0956'));
       expect(ng0956).toEqual([]);
+    });
+
+    it('drops the previous highlight when the code is replaced, not appended to', async () => {
+      const pending: { code: string; resolve: (html: string) => void }[] = [];
+      const highlight = vi.fn(
+        (code: string) => new Promise<string>((resolve) => pending.push({ code, resolve })),
+      );
+      const { fixture, host, stream } = await mount({
+        text: '```ts\nconst account = oldAccount\n```',
+        running: true,
+        highlighter: { highlight },
+      });
+      const block = host().querySelector('aui-markdown-code-block');
+      pending.at(-1)!.resolve('<pre class="shiki">const account = oldAccount</pre>');
+      await settle(fixture);
+      expect(host().querySelector('pre.shiki')?.textContent).toBe('const account = oldAccount');
+
+      // Unrelated code at the same block position while its highlight is pending.
+      await stream('```ts\nlet total = 2\n```');
+      expect(host().querySelector('aui-markdown-code-block')).toBe(block);
+      expect(host().querySelector('pre.shiki')).toBeNull();
+      expect(host().querySelector('pre.aui-md-pre code')?.textContent).toBe('let total = 2\n');
+
+      pending.at(-1)!.resolve('<pre class="shiki">let total = 2</pre>');
+      await settle(fixture);
+      expect(host().querySelector('pre.shiki')?.textContent).toBe('let total = 2');
     });
 
     it('keeps a per-language highlighter component while its block streams', async () => {

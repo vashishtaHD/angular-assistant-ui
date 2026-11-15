@@ -122,14 +122,20 @@ export class AuiMarkdownCodeBlockComponent {
     return language ? `language-${language}` : '';
   });
 
-  /** The trusted highlighter markup for the current code, or the last one for its language. */
+  /**
+   * The trusted highlighter markup for the current code. While a newer highlight is pending, the
+   * last markup stays only if the code grew from it (streaming appends) in the same language; a
+   * replacement shows the plain current code instead of the old code's markup.
+   */
   protected readonly highlighted = computed<SafeHtml | null>(() => {
     if (this.highlighterComponent() || !this.highlighter) return null;
     const code = this.code();
     const language = this.language();
     this.request(code, language);
     const latest = this.latest();
-    return latest && latest.language === language ? latest.html : null;
+    return latest && latest.language === language && code.startsWith(latest.code)
+      ? latest.html
+      : null;
   });
 
   /**
