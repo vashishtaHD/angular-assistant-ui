@@ -13,6 +13,8 @@
     "test:demo:watch": "vitest --root projects/demo",
     "build:lib": "ng build assistant-ui-angular",
     "check:ui-styles": "node scripts/check-ui-styles-asset.mjs",
+    "check:parity": "node scripts/check-parity.mjs",
+    "test:scripts": "node --test scripts/check-parity.test.mjs",
     "build:demo": "ng build demo",
     "typecheck:mastra": "npm run typecheck -w mastra-server --if-present",
     "compat": "node scripts/compat.mjs",

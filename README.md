@@ -12,13 +12,24 @@ Created in [T3 Code](https://t3.codes).
 
 | Path                            | What                                                            |
 | ------------------------------- | --------------------------------------------------------------- |
-| `projects/assistant-ui-angular` | The library (`angular-assistant-ui`, plus the `/testing` entry) |
+| `projects/assistant-ui-angular` | The library (`angular-assistant-ui` and its secondary entries)  |
 | `projects/demo`                 | Angular demo chat app (Tailwind)                                |
 | `mastra-server`                 | Mastra server exposing the `chatAgent` at `/chat/:agentId`      |
 | `docs/porting.md`               | Upstream parity table and porting guide                         |
 | `docs/deployment.md`            | Hosting, CORS, runtime config, and gating the chat route        |
+| `docs/styling.md`               | Styled kit tokens, dark mode, class overrides and Tailwind      |
+| `docs/mastra.md`                | Mastra server setup, auth, memory, branches, attachments, tools |
+| `compat/`                       | Angular 18.2, 20 and 22 consumer apps and their smoke test      |
 
-Library usage and API: [projects/assistant-ui-angular/README.md](projects/assistant-ui-angular/README.md).
+Library usage, the install for each entry point (`angular-assistant-ui`, `/ui`, `/markdown`, `/shiki`,
+`/mastra`, `/testing`, `/react-interop`) and the supported Angular versions:
+[projects/assistant-ui-angular/README.md](projects/assistant-ui-angular/README.md).
+
+| Angular | Change detection | Compat smoke |
+| ------- | ---------------- | ------------ |
+| 18.2    | Zone.js          | `npm run compat -- ng18` |
+| 20      | Zone.js          | `npm run compat -- ng20` |
+| 22      | Zoneless         | `npm run compat -- ng22` (Node `^22.22.3`, `^24.15.0` or `>=26`) |
 
 ## Setup
 
@@ -63,6 +74,10 @@ SDK; the build budgets are set accordingly.
 | `npm run build:demo`       | Build the demo                                      |
 | `npm run typecheck:mastra` | Type-check the Mastra server                        |
 | `npm run format`           | Prettier (`format:check` to verify)                 |
+| `npm run check:ui-styles`  | Check the built `ui/styles.css` asset               |
+| `npm run check:parity`     | Fail on any parity row that is not ported or n/a    |
+| `npm run test:scripts`     | Tests of the repository scripts (parity gate)       |
+| `npm run compat -- ng18`   | Compat smoke for one Angular major (`ng20`, `ng22`) |
 
 ## Contributing and porting
 

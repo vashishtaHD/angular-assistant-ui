@@ -7,13 +7,27 @@ compose with your own markup and CSS.
 
 ## Install
 
+The main entry and the store packages:
+
 ```bash
-npm install angular-assistant-ui @assistant-ui/core @assistant-ui/store @assistant-ui/tap @assistant-ui/ai-sdk ai react
+npm install angular-assistant-ui @assistant-ui/core @assistant-ui/store @assistant-ui/tap react
 npm install --save-dev @types/react
 ```
 
-`@types/react` is a required peer (types only), hence the dev install. `@assistant-ui/ai-sdk` is only needed for the AI SDK runtime (`AISDKChat`). `ai` is an
-optional peer dependency (also needed by the `angular-assistant-ui/testing` entry point).
+`@types/react` is a required peer (types only), hence the dev install. `react` is needed at run time even
+though React renders nothing (see below). Each secondary entry adds its own optional peers:
+
+| Entry | What | Also install |
+| --- | --- | --- |
+| `angular-assistant-ui` | Headless primitives, `[auiProvider]`, runtimes, tool UIs | `@assistant-ui/ai-sdk ai` for the AI SDK runtime (`AISDKChat`, `AISDKThreads`) |
+| `angular-assistant-ui/ui` | Styled kit: `aui-thread`, `aui-thread-list`, `aui-thread-list-sidebar`, `aui-assistant-modal`, the tool fallback, attachments; `ui/styles.css` | `@angular/cdk markdown-it` (and `@angular/platform-browser`, usually present) |
+| `angular-assistant-ui/markdown` | Streaming markdown (`aui-markdown-text`) | `markdown-it` (and `@angular/platform-browser`) |
+| `angular-assistant-ui/shiki` | `provideShikiHighlighter()` for code blocks | `shiki` |
+| `angular-assistant-ui/mastra` | `MastraThreads`, transport, thread list, history, `MASTRA_AUTH` | `ai @ai-sdk/react @assistant-ui/ai-sdk@0.0.18 assistant-stream` |
+| `angular-assistant-ui/testing` | `createScriptedChatTransport`, `createMockMastraServer` | `ai` |
+| `angular-assistant-ui/react-interop` | `Tools`, `Interactables` and `unstable_Interactables` scope resources | nothing more (`react`, with `react/jsx-runtime` covered by any alias) |
+
+`@assistant-ui/ai-sdk` is pinned to `0.0.18` because the mastra entry vendors code from it.
 
 ### The `react` requirement
 
@@ -180,27 +194,51 @@ In an `auiPart="tool-call"` template of `aui-message-grouped-parts` (where the t
 wins over registered tool UIs), `<aui-tool-ui-outlet [fallback]="MyToolFallback" />`
 renders the registered tool UI and the fallback only for tools without one.
 
-### Styled thread
+### Styled kit
 
-The `angular-assistant-ui/ui` entry is a styled kit, and `<aui-thread>` is its full chat
-thread. It needs these optional peers:
+The `angular-assistant-ui/ui` entry is a styled kit. `@angular/cdk` is for overlays and focus;
+`markdown-it` and `@angular/platform-browser` are there because the thread renders assistant text
+through the `angular-assistant-ui/markdown` entry. Import the stylesheet once, for example in
+`angular.json` `styles` or with `@import 'angular-assistant-ui/ui/styles.css';`. Then place the
+components under a provider that has a height:
 
-```sh
-npm install @angular/cdk markdown-it @angular/platform-browser
+```ts
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { AISDKThreads } from '@assistant-ui/ai-sdk';
+import { AuiConfig, AuiProviderDirective } from 'angular-assistant-ui';
+import { AuiThreadComponent, AuiThreadListComponent } from 'angular-assistant-ui/ui';
+
+@Component({
+  selector: 'app-chat',
+  standalone: true,
+  imports: [AuiProviderDirective, AuiThreadListComponent, AuiThreadComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<div [auiProvider]="config" style="display: flex; height: 100dvh">
+    <aui-thread-list style="width: 260px" />
+    <aui-thread style="flex: 1; min-width: 0" />
+  </div>`,
+})
+export class ChatComponent {
+  // An in-memory thread list with one AI SDK chat per thread.
+  protected readonly config = AuiConfig({ threads: AISDKThreads() });
+}
 ```
 
-`@angular/cdk` is for overlays and focus. `markdown-it` and `@angular/platform-browser`
-are there because the thread renders assistant text through the
-`angular-assistant-ui/markdown` entry. Import the stylesheet once, for example in
-`angular.json` `styles` or with `@import 'angular-assistant-ui/ui/styles.css';`. Then
-place the thread under a provider that has a height:
+| Component | What |
+| --- | --- |
+| `aui-thread` | The full thread: welcome, messages with markdown, tool groups and the tool fallback, reasoning, attachments, edit and branch picker, action bars, follow-ups, and the composer with attachments |
+| `aui-thread-list` | New Thread, search, threads grouped by date, rename, archive and delete, and an archived section |
+| `aui-thread-list-sidebar` | A collapsible sidebar around the thread list that becomes a drawer on narrow screens |
+| `aui-assistant-modal` | A floating launcher button that opens the thread in a popover panel |
+| `aui-tool-fallback` | The UI for tool calls without a registered one: arguments, result, the approval card and its receipt, and the ask-user answer form |
+| `aui-composer-attachments-styled`, `aui-composer-add-attachment-styled`, `aui-message-attachments-styled` | Attachment tiles and the attach button (`aui-thread` renders them by default) |
 
-```html
-<div [auiProvider]="config" style="height: 100dvh"><aui-thread /></div>
-```
-
-To replace sections such as `UserMessage`, `ToolFallback` or `Text`, provide
-`AUI_THREAD_COMPONENTS`.
+To replace sections of `aui-thread`, provide `AUI_THREAD_COMPONENTS` with any of `UserMessage`,
+`AssistantMessage`, `EditComposer`, `Composer`, `Welcome`, `ToolFallback`, `Text`, `Reasoning`,
+`ToolGroup`, `ReasoningGroup`, `UserMessageAttachments`, `ComposerAttachments` and
+`ComposerAddAttachment`. Theming (tokens, `.aui-dark`, class overrides, Tailwind) is in
+[docs/styling.md](../../docs/styling.md); the Mastra server and the `mastra` entry are in
+[docs/mastra.md](../../docs/mastra.md).
 
 ### Provider teardown
 
@@ -226,9 +264,12 @@ From `angular-assistant-ui`:
 From `angular-assistant-ui/testing` (needs the `ai` package):
 
 - `createScriptedChatTransport(script)` and `ScriptedTurn`: an AI SDK `ChatTransport`
-  that answers sends from a script, for tests and offline demos.
+  that answers sends from a script, for tests and offline demos. The compat apps
+  (`compat/ng*/src/app/app.ts`) script text, markdown, tool calls and a tool approval with it.
+- `createMockMastraServer(options)`: an in-memory fake of the Mastra server contract
+  (chat, history and memory thread routes) behind `fetch`, for testing the `mastra` entry.
 
-See [docs/porting.md](../../docs/porting.md) for what is ported and what is planned.
+See [docs/porting.md](../../docs/porting.md) for the upstream parity table.
 
 ## Supported versions
 
@@ -236,15 +277,21 @@ See [docs/porting.md](../../docs/porting.md) for what is ported and what is plan
 
 | Angular | Change detection | Status |
 | ------- | ---------------- | ------ |
-| 18.2 | Zone.js | Verified: demo app, live end-to-end smoke (Mastra, OpenRouter model, tool call, streamed text), and the compatibility matrix (core 18.2.14) |
-| 20 | Zone.js | Verified by the compatibility matrix (core 20.3.35) |
-| 22 | Zoneless | Verified by the compatibility matrix (core 22.2.6, `provideZonelessChangeDetection()`) |
+| 18.2 | Zone.js | Verified: demo app, live end-to-end smoke (Mastra, OpenRouter model, tool call, streamed text), and the compatibility matrix (core 18.2.14, CDK 18.2) |
+| 20 | Zone.js | Verified by the compatibility matrix (core 20.3.35, CDK 20.2) |
+| 22 | Zoneless | Verified by the compatibility matrix (core 22.2.6, CDK 22.2, `provideZonelessChangeDetection()`, Node 24.15) |
 
-The compatibility matrix (`npm run compat -- <ng18|ng20|ng22>`, and the `compat` CI job) installs the
-packed library into a fresh app per version, builds it, and runs a browser smoke test over a scripted
-(offline) transport: a streamed text reply, a tool call that renders a registered tool UI (and updates
-it in place when the result arrives), `*auiIf` swapping Send and Stop while a run is active, and
-cancelling a running reply. Angular 22's CLI requires Node `^22.22.3` or `^24.15.0`.
+The compatibility matrix (`npm run compat -- <ng18|ng20|ng22>`, and the `compat` CI job) packs the
+library and checks that the tarball carries every secondary entry, `ui/styles.css`, `LICENSE` and
+`NOTICE`, then installs it into a fresh app per version, builds it and runs a browser smoke test. The
+three apps share one source file (`src/app/app.ts`) and differ only in their bootstrap. Each renders
+`aui-thread-list` beside `aui-thread` over an in-memory thread list (`AISDKThreads`) and the scripted
+(offline) transport. The smoke test checks that `styles.css` loads (the `--aui-background` token
+resolves), a streamed reply, markdown bold and a code block, a registered tool UI updated in place, Send
+and Stop swapping and cancelling a run, editing a message (branch picker `2 / 2`, then `1 / 2` after
+Previous), an attachment tile after choosing a file, approving a tool call (the receipt renders), and
+creating and switching threads in the thread list. Angular 22's CLI requires Node `^22.22.3`,
+`^24.15.0` or `>=26`.
 
 <!-- compat-table -->
 

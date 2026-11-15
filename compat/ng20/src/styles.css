@@ -1,1 +1,6 @@
-/* You can add global styles to this file, and also import other style files */
+/* The styled kit's tokens and component styles. */
+@import 'angular-assistant-ui/ui/styles.css';
+
+body {
+  margin: 0;
+}

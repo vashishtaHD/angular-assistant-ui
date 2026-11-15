@@ -1,7 +1,9 @@
 # Deployment
 
 The demo is a static Angular build that talks to a separate Mastra server. Deploy
-them independently.
+them independently. The server's contract (auth modes and custom verifiers, memory,
+branch persistence, attachments, approvals and ask-user) is described in
+[mastra.md](mastra.md); theming the styled kit is in [styling.md](styling.md).
 
 ## Hosting the Mastra server
 

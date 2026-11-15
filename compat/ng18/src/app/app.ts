@@ -1,27 +1,18 @@
+// Shared compat app source: compat/ng18, ng20 and ng22 carry byte-identical copies of
+// this file (scripts/compat.mjs checks it). Only main.ts and app.config.ts (the
+// bootstrap: Zone.js or zoneless) differ between the apps.
 import { ChangeDetectionStrategy, Component, Directive, computed, input } from '@angular/core';
-import { AISDKChat } from '@assistant-ui/ai-sdk';
+import { AISDKThreads } from '@assistant-ui/ai-sdk';
 import type { UIMessage, UIMessageChunk } from 'ai';
-import type { AssistantState } from '@assistant-ui/store/client';
 import {
-  AuiComposerCancelDirective,
-  AuiComposerInputDirective,
-  AuiComposerRootDirective,
-  AuiComposerSendDirective,
   AuiConfig,
-  AuiIfDirective,
-  AuiMessagePartsComponent,
-  AuiMessageRootDirective,
-  AuiMessageTemplateDirective,
-  AuiPartTemplateDirective,
   AuiProviderDirective,
-  AuiThreadMessagesComponent,
-  AuiThreadRootDirective,
-  AuiThreadViewportDirective,
   registerToolUI,
   type ToolUIComponent,
   type ToolUIProps,
 } from 'angular-assistant-ui';
 import { createScriptedChatTransport } from 'angular-assistant-ui/testing';
+import { AuiThreadComponent, AuiThreadListComponent } from 'angular-assistant-ui/ui';
 
 const textTurn = (...deltas: string[]): UIMessageChunk[] => [
   { type: 'start' },
@@ -57,6 +48,21 @@ const weatherTurn = (): UIMessageChunk[] => [
   { type: 'finish' },
 ];
 
+/** A `bookMeeting` call that waits for the user's approval (no registered UI: the tool fallback). */
+const approvalTurn = (): UIMessageChunk[] => [
+  { type: 'start' },
+  { type: 'start-step' },
+  {
+    type: 'tool-input-available',
+    toolCallId: 'call-book',
+    toolName: 'bookMeeting',
+    input: { title: 'Sync', when: 'Monday 10am' },
+  },
+  { type: 'tool-approval-request', approvalId: 'approval-1', toolCallId: 'call-book' },
+  { type: 'finish-step' },
+  { type: 'finish' },
+];
+
 const lastUserText = (messages: UIMessage[]): string =>
   messages
     .filter((message) => message.role === 'user')
@@ -66,8 +72,9 @@ const lastUserText = (messages: UIMessage[]): string =>
 
 /**
  * Scripted (offline) replies, chosen by the last user message:
- * "weather" streams a tool call, "slow" streams slowly (so it can be
- * cancelled), anything else answers "Hi there!".
+ * "weather" streams a tool call, "slow" streams slowly (so it can be cancelled),
+ * "markdown" answers with bold text and a code block, "book" asks for a tool
+ * approval, anything else answers "Hi there!".
  */
 const transport = createScriptedChatTransport((messages) => {
   switch (lastUserText(messages)) {
@@ -78,6 +85,12 @@ const transport = createScriptedChatTransport((messages) => {
         chunks: textTurn('one ', 'two ', 'three ', 'four ', 'the end'),
         delayMs: 300,
       };
+    case 'markdown':
+      return {
+        chunks: textTurn('Some **bold** text.\n\n', '```ts\nconst answer = 42;\n```\n'),
+      };
+    case 'book':
+      return { chunks: approvalTurn() };
     default:
       return { chunks: textTurn('Hi ', 'there!') };
   }
@@ -118,57 +131,40 @@ export class ToolsDirective {
 }
 
 /**
- * Compat smoke app: a chat over a scripted (offline) transport that covers
- * text streaming, a registered tool UI, `*auiIf` (Send/Stop) and cancel.
+ * Compat smoke app: the styled kit (`aui-thread-list` beside `aui-thread`) over
+ * an in-memory thread list (`AISDKThreads`) and a scripted (offline) transport.
+ * It covers streaming, markdown, a registered tool UI, the tool fallback's
+ * approval, attachments, editing and branches, cancel and thread switching.
  */
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    AuiProviderDirective,
-    AuiThreadRootDirective,
-    AuiThreadViewportDirective,
-    AuiThreadMessagesComponent,
-    AuiMessageTemplateDirective,
-    AuiMessageRootDirective,
-    AuiMessagePartsComponent,
-    AuiPartTemplateDirective,
-    AuiIfDirective,
-    AuiComposerRootDirective,
-    AuiComposerInputDirective,
-    AuiComposerSendDirective,
-    AuiComposerCancelDirective,
-    ToolsDirective,
-  ],
+  imports: [AuiProviderDirective, AuiThreadComponent, AuiThreadListComponent, ToolsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ng-container [auiProvider]="config">
-      <div auiThreadRoot appTools>
-        <div auiThreadViewport style="height: 320px; overflow-y: auto">
-          <aui-thread-messages>
-            <ng-template auiMessage>
-              <div auiMessageRoot>
-                <aui-message-parts>
-                  <ng-template auiPart="text" let-part>
-                    <p>{{ part.type === 'text' ? part.text : '' }}</p>
-                  </ng-template>
-                </aui-message-parts>
-              </div>
-            </ng-template>
-          </aui-thread-messages>
-        </div>
-        <form auiComposerRoot>
-          <textarea auiComposerInput aria-label="Message"></textarea>
-          <button *auiIf="isIdle" auiComposerSend aria-label="Send">Send</button>
-          <button *auiIf="isRunning" auiComposerCancel type="button" aria-label="Stop">Stop</button>
-        </form>
-      </div>
-    </ng-container>
+    <div class="app-shell" [auiProvider]="config">
+      <aside class="app-sidebar"><aui-thread-list /></aside>
+      <main class="app-main" appTools>
+        <aui-thread [welcome]="{ message: 'Compat smoke' }" />
+      </main>
+    </div>
+  `,
+  styles: `
+    .app-shell {
+      display: flex;
+      height: 100dvh;
+    }
+    .app-sidebar {
+      width: 260px;
+      flex: none;
+      overflow-y: auto;
+    }
+    .app-main {
+      flex: 1;
+      min-width: 0;
+    }
   `,
 })
-export class AppComponent {
-  protected readonly config = AuiConfig({ threads: AISDKChat({ transport }) });
-
-  protected readonly isRunning = (s: AssistantState) => s.thread.isRunning;
-  protected readonly isIdle = (s: AssistantState) => !s.thread.isRunning;
+export class App {
+  protected readonly config = AuiConfig({ threads: AISDKThreads({ transport }) });
 }

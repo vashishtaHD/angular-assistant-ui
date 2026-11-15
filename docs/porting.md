@@ -26,7 +26,8 @@ name exported from `packages/react/src/index.ts` (including `export * from "./co
 listed individually; several names share a row only where they share a status and an owner. Columns:
 the export, whether the upstream Vue binding has it, the Angular status, and the phase 2 task that owns it.
 
-Status is `ported`, `planned (Task N)` or `n/a (<reason>)`. Each task flips only its own rows.
+Status is `ported` or `n/a (<reason>)`. `node scripts/check-parity.mjs` (run in CI) fails on any
+other status, including any row that mentions `planned`.
 Only the agreed out-of-scope list (voice, speech, dictation, generative UI, MCP apps, devtools, Assistant
 Cloud, cloud run state, LangGraph/A2A, props-only generative/agent elements) and names that an existing
 Angular scope or directive replaces exactly are `n/a`.
@@ -285,10 +286,10 @@ consecutive `reasoning` and `tool-call` parts renders as one chain of thought.
 
 ### Entry points added in phase 2
 
-The secondary entries have no upstream package at the same granularity; their planned exports are listed
-here so the table covers them.
+The secondary entries have no upstream package at the same granularity; their exports are listed here so
+the table covers them.
 
-| Entry | Planned exports | Status |
+| Entry | Exports | Status |
 | --- | --- | --- |
 | `angular-assistant-ui/markdown` | `aui-markdown-text` (inputs `smooth`, `preprocess`, `components`, `componentsByLanguage`), `AuiCodeHeader`, `AUI_SYNTAX_HIGHLIGHTER`, `AuiSyntaxHighlighter`, `AuiMarkdownComponents`, vendored `createMarkdownSession`, `normalizeMathDelimiters`, `escapeCurrencyDollars` | ported |
 | `angular-assistant-ui/shiki` | `provideShikiHighlighter` | ported (Angular-native DI redesign of upstream shiki-highlighter; limits: bundled grammars/themes only, no embedded-language guessing, code is not trimmed, github-light/dark themes; the kit needs `color-scheme: light dark` for dark mode, Task 16) |
@@ -297,7 +298,7 @@ here so the table covers them.
 | `angular-assistant-ui/ui` (tools and media) | `aui-tool-fallback` (approval card, ask-user form), `aui-tool-group`, `aui-reasoning`, `aui-composer-attachments-styled`, `aui-composer-add-attachment-styled`, `aui-message-attachments-styled` | ported (also `aui-tool-fallback-approval`, `aui-tool-fallback-ask-user`, `aui-attachment-tile`, `AuiToolFallbackToolUIComponent`, the `registerToolUI` adapter, and `aui-reasoning-group` (`AuiReasoningGroupComponent`), the collapsible frame `aui-reasoning` renders its run in; closed disclosures are `hidden` with an inline `display: none` once their closing animation ends; reasoning renders each part through `aui-markdown-text` in its own part scope, as upstream Vue does; attachment tiles, their remove buttons and the add-attachment button use the styled `[auiTooltip]`; `aui-thread` renders all of these by default) |
 | `angular-assistant-ui/ui` (thread) | `aui-thread`, `AUI_THREAD_COMPONENTS`, `AuiThreadComponents`, `aui-markdown-text-styled` (`AuiStyledMarkdownText`), `AuiStyledCodeHeader`, `[auiTooltip]` (`AuiTooltipDirective`); in the main entry `[auiComponentOutlet]` (`AuiComponentOutletDirective`, scope-safe dynamic rendering, no upstream counterpart) and `aui-tool-ui-outlet` (`AuiToolUIOutletComponent`, upstream's `part.toolUI ?? <ToolFallback />`) | ported (assistant parts group as upstream: a chain of thought holding the `ReasoningGroup` slot (`aui-reasoning-group` around each `Reasoning` part) and the `ToolGroup` slot (a ghost `aui-tool-group` of `aui-tool-fallback`s, kept open while a call requires action), with registered tool UIs first; user messages show `aui-message-attachments-styled`, and the composer is a file drop zone with `aui-composer-attachments-styled` and `aui-composer-add-attachment-styled`; `AuiThreadComponents` adds `ToolGroup` and `ReasoningGroup` (the slots with an input, `group`) and `UserMessageAttachments`, `ComposerAttachments` and `ComposerAddAttachment`; limits: voice/spoken messages, dictation and `Resume`/`RefreshRun` are not rendered; Tailwind classes become `aui-*` CSS in `ui/styles.css`) |
 | `angular-assistant-ui/ui` (thread list and extras) | `aui-thread-list`, `aui-thread-list-sidebar`, `aui-assistant-modal`, `aui-quote-composer`, `aui-selection-toolbar-styled`, `aui-follow-up-suggestions`, `aui-message-timing`, `aui-composer-trigger-popover-styled`; also `aui-quote-block`, `groupThreadList` / `injectThreadListGroups` (upstream `useThreadListGroups`), `formatTimingMs`, and in the main entry `aui-thread-list-item-by-index` (`ThreadListPrimitive.ItemByIndex` as a component, for filtered and grouped lists) | ported (`aui-thread` renders `aui-follow-up-suggestions` above its composer; differences: the thread list groups into Today, Yesterday, Previous 7 days, Previous 30 days and Older, where upstream has Today, Yesterday and Earlier, and adds an archived section with Unarchive, Load more and a `threadSelect` output; the item menu opens below its button rather than to its side; the sidebar is shadcn's Sidebar rebuilt in the component: a column that collapses from the main area's header toggle, the rail or Ctrl/Cmd+B (`[(collapsed)]`, `collapsible="none"`) and becomes a modal drawer below `breakpoint` (768px) that traps focus and makes the main area `inert`, and it projects `[auiSidebarHeader]` / `[auiSidebarFooter]` instead of upstream's branding links; `collapsible="none"` is a static column at every width, as upstream; the modal panel is a CDK overlay with a focus trap, where upstream's popover does not trap Tab; `aui-message-timing` renders its stats in its own CDK overlay (flipping like the tooltip) instead of the tooltip kit, which takes text only; trigger popover icons are `AuiIconName`s in `iconMap` / `fallbackIcon` instead of components; the ui collapsible is not used; Tailwind classes become `aui-*` CSS in `ui/styles.css`) |
-| `angular-assistant-ui/testing` | `createScriptedChatTransport` (no upstream counterpart); approval, ask-user, attachment and thread-list helpers | ported; extensions planned (Tasks 4-9, 14) |
+| `angular-assistant-ui/testing` | `createScriptedChatTransport`, `ScriptedTurn`, `createMockMastraServer` and its `MockMastra*` types (no upstream counterpart) | ported (approval, ask-user, attachment and thread-list scenarios are scripted as plain AI SDK `UIMessageChunk` arrays, for example `tool-approval-request`, over `createScriptedChatTransport` with `AISDKThreads` for an in-memory thread list; `compat/ng*/src/app/app.ts` shows each) |
 
 ## Porting the next primitive
 
@@ -338,8 +339,7 @@ Found in the phase 1 final review and deliberately not done in phase 1.
   No current listener throws; wrapping each in `try/catch` would harden it.
 - CI (`.github/workflows/ci.yml`) has never run: no remote exists yet. Push, get a green `verify` and
   three `compat` jobs, and record the run before relying on the compat table.
-- The compat smoke covers tool UI, `*auiIf` and cancel, but the Angular 22 (zoneless) app has so far
-  only been type-checked with its own `ngc` locally, because the Angular 22 CLI needs Node
-  `^22.22.3` or `^24.15.0`. Run `npm run compat -- ng22` on such a Node.
+- The compat smoke (Task 20) passes locally for Angular 18.2, 20 and 22, the last on Node 24.15.0
+  (`npx -y -p node@24.15.0 -- node scripts/compat.mjs ng22`); it still needs its first CI run.
 - Before any npm publish, add `description`, `repository`, `author` and `keywords` to the library
   `package.json` and pick the final package name.

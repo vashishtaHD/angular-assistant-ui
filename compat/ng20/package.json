@@ -7,6 +7,7 @@
   },
   "private": true,
   "dependencies": {
+    "@angular/cdk": "~20.2.14",
     "@angular/common": "^20.3.0",
     "@angular/compiler": "^20.3.0",
     "@angular/core": "^20.3.0",
@@ -16,6 +17,7 @@
     "@assistant-ui/store": "~0.3.23",
     "@assistant-ui/tap": "~0.9.26",
     "ai": "^7.0.173",
+    "markdown-it": "^15.0.3",
     "react": "^19.3.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
