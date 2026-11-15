@@ -8,18 +8,23 @@ import {
   inject,
   input,
   isDevMode,
+  reflectComponentType,
   signal,
   untracked,
+  type Type,
 } from '@angular/core';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { AUI_SYNTAX_HIGHLIGHTER } from './highlighter.token';
+import type { CodeBlockNode } from './markdown-api';
 import { AuiMarkdownRenderContext } from './markdown-context';
 
 /**
  * The default code block header of `aui-markdown-text`, which renders
  * nothing. Write your own with the same `language` and `code` inputs (a
  * language label and a copy button, say) and pass it as
- * `components.codeHeader` or per language in `componentsByLanguage`.
+ * `components.codeHeader` or per language in `componentsByLanguage`. A header
+ * (or `highlighter` component) that also declares a `node` input receives the
+ * block's `CodeBlockNode` (upstream's `node` prop); one without it never gets it.
  *
  * @example
  * ```ts
@@ -48,6 +53,24 @@ export class AuiCodeHeader {
   readonly code = input<string>('');
 }
 
+const nodeInputs = new WeakMap<Type<unknown>, boolean>();
+
+/**
+ * Whether `component` declares a `node` input. Only those get one: binding an input a component
+ * does not declare is an error in Angular, so the `node` of upstream's `CodeHeaderProps` and
+ * `SyntaxHighlighterProps` is opt-in.
+ */
+const declaresNodeInput = (component: Type<unknown>): boolean => {
+  let declared = nodeInputs.get(component);
+  if (declared === undefined) {
+    declared =
+      reflectComponentType(component)?.inputs.some((entry) => entry.templateName === 'node') ??
+      false;
+    nodeInputs.set(component, declared);
+  }
+  return declared;
+};
+
 interface Highlighted {
   readonly code: string;
   readonly language: string;
@@ -70,10 +93,10 @@ interface Highlighted {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: block' },
   template: `@if (header(); as header) {
-      <ng-container *ngComponentOutlet="header; inputs: { language: language(), code: code() }" />
+      <ng-container *ngComponentOutlet="header; inputs: headerInputs()" />
     }
     @if (highlighterComponent(); as body) {
-      <ng-container *ngComponentOutlet="body; inputs: { language: language(), code: code() }" />
+      <ng-container *ngComponentOutlet="body; inputs: bodyInputs()" />
     } @else {
       @if (highlighted(); as html) {
         <div class="aui-md-code-highlighted" [innerHTML]="html"></div>
@@ -89,6 +112,8 @@ export class AuiMarkdownCodeBlockComponent {
   readonly code = input.required<string>();
   /** A `$$` math block, which renders with the `math-display` class. */
   readonly math = input<boolean>(false);
+  /** The block's AST node (upstream's `node` prop), for components that declare a `node` input. */
+  readonly node = input<CodeBlockNode | undefined>(undefined);
 
   private readonly context = inject(AuiMarkdownRenderContext);
   private readonly highlighter = inject(AUI_SYNTAX_HIGHLIGHTER, { optional: true });
@@ -115,6 +140,17 @@ export class AuiMarkdownCodeBlockComponent {
   protected readonly highlighterComponent = computed(
     () => this.byLanguage()?.highlighter ?? this.context.components().highlighter ?? null,
   );
+
+  /** The header's inputs: `language` and `code`, plus `node` when the component declares it. */
+  protected readonly headerInputs = computed(() => this.inputsFor(this.header()));
+  /** The highlighter component's inputs, as for the header. */
+  protected readonly bodyInputs = computed(() => this.inputsFor(this.highlighterComponent()));
+
+  private inputsFor(component: Type<unknown> | null): Record<string, unknown> {
+    const inputs: Record<string, unknown> = { language: this.language(), code: this.code() };
+    if (component && declaresNodeInput(component)) inputs['node'] = this.node();
+    return inputs;
+  }
 
   protected readonly codeClass = computed(() => {
     const language = this.language();

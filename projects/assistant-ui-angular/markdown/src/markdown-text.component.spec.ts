@@ -25,6 +25,7 @@ import {
   type AuiMarkdownComponents,
   type AuiMarkdownComponentsByLanguage,
   type AuiSyntaxHighlighter,
+  type CodeBlockNode,
   type HeadingNode,
   type InlineNode,
   type LinkNode,
@@ -715,6 +716,42 @@ describe('aui-markdown-text', () => {
       );
       expect(highlight).toHaveBeenCalledTimes(1);
       expect(highlight).toHaveBeenCalledWith('x\n', 'ts');
+    });
+
+    it('passes the block node to code header and highlighter components that declare a node input', async () => {
+      @Component({
+        selector: 'aui-test-node-header',
+        standalone: true,
+        changeDetection: ChangeDetectionStrategy.OnPush,
+        template: `<span class="node-header">{{ node()?.type }}:{{ node()?.lang }}</span>`,
+      })
+      class NodeHeaderComponent {
+        readonly language = input.required<string>();
+        readonly code = input.required<string>();
+        readonly node = input<CodeBlockNode | undefined>();
+      }
+      @Component({
+        selector: 'aui-test-node-body',
+        standalone: true,
+        changeDetection: ChangeDetectionStrategy.OnPush,
+        template: `<pre class="node-body">{{ node()?.value }}</pre>`,
+      })
+      class NodeBodyComponent {
+        readonly language = input.required<string>();
+        readonly code = input.required<string>();
+        readonly node = input<CodeBlockNode | undefined>();
+      }
+      const { host } = await mount({
+        text: '```ts\nconst a = 1;\n```\n\n```py\nx\n```',
+        components: { codeHeader: NodeHeaderComponent },
+        componentsByLanguage: {
+          py: { highlighter: NodeBodyComponent, codeHeader: HeaderComponent },
+        },
+      });
+      expect(host().querySelector('.node-header')?.textContent).toBe('codeBlock:ts');
+      expect(host().querySelector('.node-body')?.textContent).toBe('x\n');
+      // A component without a node input still renders (it is never given one).
+      expect(host().textContent).toContain('py:2');
     });
 
     it('renders a code header from components or per language', async () => {

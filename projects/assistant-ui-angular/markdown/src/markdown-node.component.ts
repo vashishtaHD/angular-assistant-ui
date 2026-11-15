@@ -134,6 +134,7 @@ export const NODES_TEMPLATE = `@if (task(); as task) {<input
       @case ('codeBlock') {<aui-markdown-code-block
           [language]="codeBlock(node).lang ?? ''"
           [code]="codeBlock(node).value"
+          [node]="codeBlock(node)"
         />}
       @case ('mathBlock') {<aui-markdown-code-block
           [language]="'math'"
