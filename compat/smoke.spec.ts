@@ -194,6 +194,14 @@ test('approving a tool call renders the receipt', async ({ page }) => {
   await expect(assistantMessages(page).last()).toContainText('Booked.', { timeout: 5_000 });
   await expect(receipt).toHaveAttribute('data-outcome', 'allowed');
 
+  // A second request in a new turn asks again instead of reusing the first answer.
+  await send(page, 'book');
+  await expect(assistantMessages(page)).toHaveCount(2, { timeout: 10_000 });
+  await expect(assistantMessages(page).last().getByRole('button', { name: 'Approve' })).toBeVisible(
+    { timeout: 10_000 },
+  );
+  await expect(assistantMessages(page).last()).not.toContainText('Booked.');
+
   expect(errors).toEqual([]);
 });
 
@@ -211,6 +219,14 @@ test('answering an ask-user question resubmits the choice', async ({ page }) => 
     timeout: 5_000,
   });
   await expect(form).toHaveCount(0);
+
+  // A second request in a new turn asks the question again.
+  await send(page, 'ask');
+  await expect(assistantMessages(page)).toHaveCount(2, { timeout: 10_000 });
+  await expect(
+    assistantMessages(page).last().locator('[data-slot="aui_tool-fallback-ask-user"]'),
+  ).toContainText('Which city?', { timeout: 10_000 });
+  await expect(assistantMessages(page).last()).not.toContainText('You picked');
 
   expect(errors).toEqual([]);
 });

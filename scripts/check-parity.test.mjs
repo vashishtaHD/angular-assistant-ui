@@ -125,6 +125,15 @@ test('n/a needs a non-blank reason', () => {
   assert.match(result.errors[1], /"B"/);
 });
 
+test('n/a needs the closing paren of its reason', () => {
+  const result = checkParity(
+    doc(['| Foo | yes | n/a (voice |  |', '| Bar | no | n/a (voice) later |  |']),
+  );
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /"Foo"/);
+  assert.match(result.errors[0], /without a reason/);
+});
+
 test('a row with a missing status cell fails', () => {
   const result = checkParity(doc(['| A | yes |']));
   assert.equal(result.errors.length, 1);

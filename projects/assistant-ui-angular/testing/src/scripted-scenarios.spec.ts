@@ -1,3 +1,5 @@
+// Angular addition (no upstream counterpart): specs for the scripted turn builders and
+// the current-turn approval and ask-user readers.
 import { AISDKChat } from '@assistant-ui/ai-sdk';
 import { AuiConfig, type AssistantClient } from '@assistant-ui/store/client';
 import {
@@ -11,6 +13,7 @@ import { mountAui, type MountedAui } from '../../src/testing-internal/mastra-hos
 import { createScriptedChatTransport, type ScriptedTurn } from './scripted-chat-transport';
 import {
   askUserAnswerOf,
+  currentTurnMessages,
   findToolPart,
   scriptedApprovalTurn,
   scriptedAskUserTurn,
@@ -244,5 +247,120 @@ describe('findToolPart', () => {
     expect(findToolPart(messages, 'c1')).toMatchObject({ type: 'tool-x' });
     expect(findToolPart(messages, 'c2')).toMatchObject({ type: 'dynamic-tool', output: 1 });
     expect(findToolPart(messages, 'nope')).toBeUndefined();
+  });
+});
+
+describe('the readers look only at the current turn', () => {
+  const user = (id: string, text: string) => ({
+    id,
+    role: 'user',
+    parts: [{ type: 'text', text }],
+  });
+  const answered = [
+    user('u1', 'book'),
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-bookMeeting',
+          toolCallId: 'call-1',
+          state: 'approval-responded',
+          input: {},
+          approval: { id: 'approval-call-1', approved: true },
+        },
+        {
+          type: 'tool-askUser',
+          toolCallId: 'ask-1',
+          state: 'output-available',
+          input: { question: 'Colour?' },
+          output: 'Blue',
+        },
+      ],
+    },
+  ];
+
+  it('ignores an approval or answer given before the last user message', () => {
+    const messages = [...answered, user('u2', 'book')] as unknown as UIMessage[];
+    expect(currentTurnMessages(messages)).toEqual([]);
+    expect(toolApprovalOf(messages, 'call-1')).toBeUndefined();
+    expect(askUserAnswerOf(messages, 'ask-1')).toBeUndefined();
+    expect(findToolPart(messages, 'call-1')).toBeUndefined();
+  });
+
+  it('reads them while the answered call is still in the current turn', () => {
+    const messages = answered as unknown as UIMessage[];
+    expect(currentTurnMessages(messages).map((message) => message.id)).toEqual(['a1']);
+    expect(toolApprovalOf(messages, 'call-1')).toEqual({ approved: true });
+    expect(askUserAnswerOf(messages, 'ask-1')).toBe('Blue');
+  });
+
+  it('asks for approval again when the same request is sent a second time', async () => {
+    const { aui, mounted, sends } = await mountChat((messages) => {
+      const approval = toolApprovalOf(messages, 'call-1');
+      if (!approval) {
+        return scriptedApprovalTurn({ toolCallId: 'call-1', toolName: 'bookMeeting', input: {} });
+      }
+      return scriptedToolOutputTurn({ toolCallId: 'call-1', output: 'ok', text: 'Booked.' });
+    }, lastAssistantMessageIsCompleteWithApprovalResponses);
+    const sendText = (text: string) => {
+      aui.thread().composer().setText(text);
+      aui.thread().composer().send();
+    };
+
+    sendText('Book');
+    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(2));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    await aui.thread().message({ index: 1 }).part({ toolCallId: 'call-1' }).respondToToolApproval({
+      approved: true,
+    });
+    await mounted.waitFor(() => expect(lastText(aui)).toContain('Booked.'));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+
+    sendText('Book again');
+    await mounted.waitFor(() => expect(sends).toHaveLength(3));
+    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(4));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    // The third send played a new approval request instead of reusing the first answer.
+    expect(toolApprovalOf(sends[2]!, 'call-1')).toBeUndefined();
+    const messages = aui.thread().getState().messages;
+    expect(messages).toHaveLength(4);
+    const last = messages[3]!.content.find((part) => part.type === 'tool-call');
+    expect(last).toMatchObject({ toolName: 'bookMeeting', approval: { id: 'approval-call-1' } });
+    expect(last).toMatchObject({ result: undefined });
+    expect(last).not.toHaveProperty('approval.approved');
+    expect(lastText(aui)).not.toContain('Booked.');
+  });
+
+  it('asks the question again when the same request is sent a second time', async () => {
+    const { aui, mounted, sends } = await mountChat((messages) => {
+      const answer = askUserAnswerOf(messages, 'ask-1');
+      return answer === undefined
+        ? scriptedAskUserTurn({ question: 'Colour?', options: ['Blue', 'Red'] })
+        : scriptedTextTurn(`You chose ${String(answer)}.`);
+    }, lastAssistantMessageIsCompleteWithToolCalls);
+    const sendText = (text: string) => {
+      aui.thread().composer().setText(text);
+      aui.thread().composer().send();
+    };
+
+    sendText('Ask me');
+    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(2));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    aui.thread().message({ index: 1 }).part({ toolCallId: 'ask-1' }).addToolResult('Blue');
+    await mounted.waitFor(() => expect(lastText(aui)).toContain('You chose Blue.'));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+
+    sendText('Ask me again');
+    await mounted.waitFor(() => expect(sends).toHaveLength(3));
+    await mounted.waitFor(() => expect(aui.thread().getState().messages).toHaveLength(4));
+    await mounted.waitFor(() => expect(aui.thread().getState().isRunning).toBe(false));
+    expect(askUserAnswerOf(sends[2]!, 'ask-1')).toBeUndefined();
+    const messages = aui.thread().getState().messages;
+    expect(messages).toHaveLength(4);
+    expect(messages[3]!.content.find((part) => part.type === 'tool-call')).toMatchObject({
+      toolName: 'askUser',
+      args: { question: 'Colour?' },
+    });
   });
 });

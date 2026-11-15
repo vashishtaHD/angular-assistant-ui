@@ -268,7 +268,9 @@ From `angular-assistant-ui/testing` (needs the `ai` package):
 - Turn builders for the script: `scriptedTextTurn`, `scriptedApprovalTurn` (a tool call waiting
   for approval), `scriptedToolOutputTurn` (the continuation after an answer) and
   `scriptedAskUserTurn` (an `askUser` client tool call). `toolApprovalOf`, `askUserAnswerOf` and
-  `findToolPart` read the user's answer from the messages a resubmit sends.
+  `findToolPart` read the user's answer from the messages a resubmit sends. They look only at the
+  current turn (`currentTurnMessages`: the messages after the last user message), so a repeated
+  request with the same fixed tool-call id asks again instead of reusing an earlier answer.
 - `createScriptedAttachmentAdapter(options)` and `scriptedFile(name, content)`: an offline
   attachment adapter (deterministic ids, scripted rejections, upload progress and failed sends) and
   test files.

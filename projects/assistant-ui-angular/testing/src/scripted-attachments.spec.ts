@@ -1,3 +1,4 @@
+// Angular addition (no upstream counterpart): specs for the scripted attachment adapter.
 import { describe, expect, it } from 'vitest';
 import { createScriptedAttachmentAdapter, scriptedFile } from './scripted-attachments';
 

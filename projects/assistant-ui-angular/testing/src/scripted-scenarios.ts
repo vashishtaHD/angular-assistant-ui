@@ -1,3 +1,5 @@
+// Angular addition (no upstream counterpart): scripted turn builders and
+// current-turn readers for approval and ask-user flows over the scripted transport.
 import type { UIMessage, UIMessageChunk } from 'ai';
 import type { ScriptedTurn } from './scripted-chat-transport';
 
@@ -214,15 +216,31 @@ const isToolPart = (part: { type: string }): part is ScriptedToolPart =>
   (part.type.startsWith('tool-') || part.type === 'dynamic-tool') && 'toolCallId' in part;
 
 /**
- * The tool part with `toolCallId` in the messages a script receives, searching
- * from the latest message, or `undefined`.
+ * The messages of the current turn: those after the last user message (all
+ * of them when there is no user message). A resubmit after an approval or a
+ * tool result keeps the same turn; a new user message starts a new one, so a
+ * script that reuses fixed tool-call ids does not read an earlier turn's
+ * answer as the answer to the new request.
+ */
+export function currentTurnMessages(messages: readonly UIMessage[]): readonly UIMessage[] {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]!.role === 'user') return messages.slice(index + 1);
+  }
+  return messages;
+}
+
+/**
+ * The tool part with `toolCallId` in the current turn of the messages a
+ * script receives (see {@link currentTurnMessages}), searching from the
+ * latest message, or `undefined`.
  */
 export function findToolPart(
   messages: readonly UIMessage[],
   toolCallId: string,
 ): ScriptedToolPart | undefined {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const part = messages[index]!.parts.find(
+  const turn = currentTurnMessages(messages);
+  for (let index = turn.length - 1; index >= 0; index--) {
+    const part = turn[index]!.parts.find(
       (candidate) => isToolPart(candidate) && candidate.toolCallId === toolCallId,
     );
     if (part) return part as unknown as ScriptedToolPart;
@@ -233,7 +251,7 @@ export function findToolPart(
 /**
  * The user's answer to the approval request of `toolCallId`, once given
  * (`{ approved, reason? }`), or `undefined` while it is still pending or the
- * call does not exist.
+ * call is not in the current turn.
  */
 export function toolApprovalOf(
   messages: readonly UIMessage[],
@@ -249,7 +267,7 @@ export function toolApprovalOf(
 
 /**
  * The result the user gave the ask-user call `toolCallId` (its tool output),
- * or `undefined` while it is unanswered.
+ * or `undefined` while it is unanswered or not in the current turn.
  */
 export function askUserAnswerOf(messages: readonly UIMessage[], toolCallId: string): unknown {
   const part = findToolPart(messages, toolCallId);

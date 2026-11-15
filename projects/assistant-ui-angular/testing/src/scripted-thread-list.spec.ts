@@ -1,3 +1,4 @@
+// Angular addition (no upstream counterpart): specs for the scripted thread list adapter.
 import { describe, expect, it } from 'vitest';
 import { createScriptedThreadListAdapter } from './scripted-thread-list';
 

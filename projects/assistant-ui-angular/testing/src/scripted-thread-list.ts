@@ -1,3 +1,6 @@
+// Derived from packages/core/src/runtimes/remote-thread-list/adapter/in-memory.ts @ 7d74276
+// (InMemoryThreadListAdapter semantics). Angular addition: seeded threads, a scripted
+// title stream, a call log and one-shot failures for tests and demos.
 import type {
   RemoteThreadInitializeResponse,
   RemoteThreadListAdapter,

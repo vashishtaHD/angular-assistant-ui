@@ -21,6 +21,7 @@ export {
 // Task 20: scripted scenario helpers (approval, ask-user, attachments, thread list).
 export {
   askUserAnswerOf,
+  currentTurnMessages,
   findToolPart,
   scriptedApprovalTurn,
   scriptedAskUserTurn,

@@ -1,3 +1,7 @@
+// Derived from packages/core/src/adapters/attachment.ts and
+// packages/ai-sdk/src/adapters/vercelAttachmentAdapter.ts @ 7d74276 (the add, send
+// and remove contract and the image or file part shapes). Angular addition: a
+// deterministic scripted adapter with rejection, failure and upload-progress options.
 import type {
   Attachment,
   AttachmentAdapter,

@@ -22,7 +22,8 @@ const md = new MarkdownIt({ html: true });
 function statusProblem(status) {
   if (/\bplanned\b/i.test(status)) return 'is planned';
   if (/^ported\b/.test(status)) return null;
-  if (/^n\/a \(\s*[^\s)]/.test(status)) return null;
+  // A non-blank reason inside a closed paren: `n/a (voice` without `)` fails.
+  if (/^n\/a \(\s*[^\s)][^)]*\)/.test(status)) return null;
   if (status === '') return 'has no status';
   if (/^n\/a\b/.test(status)) return 'is n/a without a reason';
   return 'is neither `ported` nor `n/a (<reason>)`';
