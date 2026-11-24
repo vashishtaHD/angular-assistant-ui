@@ -27,6 +27,10 @@ updates:
       # Angular 18 requires zone.js ~0.14; a 0.x minor is a breaking release.
       - dependency-name: 'zone.js'
         update-types: ['version-update:semver-minor']
+      # Angular 18.2's compiler and build-angular require TypeScript >=5.4 <5.6, so TypeScript is
+      # held to 5.5.x patches; raise it by hand together with the Angular floor.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-minor']
       # Pinned exactly: angular-assistant-ui/mastra vendors code from this version, so raising it
       # means re-vendoring (see docs/porting.md).
       - dependency-name: '@assistant-ui/ai-sdk'
